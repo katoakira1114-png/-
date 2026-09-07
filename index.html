@@ -78,7 +78,7 @@
     </div>
     <div class="calc-row-sub">
       <span>合計容積: <span id="total-vol">0</span> vol</span>
-      <span id="box-count-status" style="color:#2b6cb0; font-weight:bold;">必要箱数: 0箱 (0%)</span>
+      <span id="box-count-status" style="color:#2b6cb0; font-weight:bold;">箱数: 0箱目 (0%)</span>
     </div>
     <div class="progress-bar-bg">
       <div id="progress-fill" class="progress-bar-fill"></div>
@@ -209,7 +209,7 @@
       }
     });
 
-    // 箱数と残容量パーセントの計算
+    // 箱数と残容量パーセントの計算（1000volごとにバーリセット）
     let currentBoxNum = 0;
     let currentBoxPercent = 0;
 
@@ -232,7 +232,7 @@
     submitBtn.disabled = totalItems === 0;
   }
 
-  // モーダル処理
+  // モーダル処理（画像拡大）
   function openModal(imgSrc) {
     document.getElementById('modal-img').src = imgSrc;
     document.getElementById('image-modal').style.display = 'flex';
