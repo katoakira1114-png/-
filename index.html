@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>航空便コンテナ注文シミュレーター</title>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { margin: 0; padding: 16px; background-color: #f4f6f8; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; }
+    h1 { font-size: 20px; text-align: center; color: #1a365d; margin-bottom: 20px; }
+    
+    /* 上部固定ヘッダー */
+    .sticky-calculator {
+      position: sticky; top: 12px; z-index: 100;
+      background: #ffffff; border: 2px solid #3182ce; border-radius: 12px;
+      padding: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 24px;
+    }
+    .calc-row-top { display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; margin-bottom: 6px; }
+    .calc-row-sub { display: flex; justify-content: space-between; font-size: 13px; color: #4a5568; margin-bottom: 8px; }
+    
+    .progress-bar-bg { background-color: #e2e8f0; height: 16px; border-radius: 8px; overflow: hidden; margin-bottom: 6px; }
+    .progress-bar-fill { background-color: #3182ce; height: 100%; width: 0%; transition: width 0.3s; }
+    .calc-status { font-size: 13px; text-align: right; color: #2b6cb0; font-weight: bold; }
+
+    /* 商品カード */
+    .item-card {
+      background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 12px;
+      display: flex; justify-content: space-between; align-items: center;
+      border: 1px solid #e2e8f0;
+    }
+    .item-info { flex: 1; }
+    .item-name { font-weight: bold; font-size: 16px; margin-bottom: 4px; }
+    .item-meta { font-size: 14px; color: #718096; }
+    .item-vol { color: #d69e2e; font-weight: bold; }
+    .qty-control { display: flex; align-items: center; gap: 8px; }
+    .btn-qty { width: 32px; height: 32px; border: 1px solid #cbd5e0; background: #edf2f7; border-radius: 6px; font-size: 18px; cursor: pointer; }
+    .qty-num { font-weight: bold; font-size: 16px; min-width: 20px; text-align: center; }
+
+    /* 注文入力フォーム */
+    .order-form { background: #fff; border-radius: 8px; padding: 16px; margin-top: 24px; border: 1px solid #e2e8f0; }
+    .form-group { margin-bottom: 12px; }
+    .form-group label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 4px; }
+    .form-group input, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 14px; }
+    
+    .btn-submit {
+      width: 100%; background: #06C755; color: white; border: none; padding: 14px;
+      font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 12px;
+      display: flex; justify-content: center; align-items: center; gap: 8px;
+    }
+    .btn-submit:disabled { background: #a0aec0; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>✈️ 航空便コンテナ直行便 注文フォーム</h1>
+
+  <!-- 上部固定表示エリア -->
+  <div class="sticky-calculator">
+    <div class="calc-row-top">
+      <span>合計金額: <span id="total-price" style="color:#e53e3e;">¥0</span></span>
+      <span>購入点数: <span id="total-items">0</span> 点</span>
+    </div>
+    <div class="calc-row-sub">
+      <span>合計容積: <span id="total-vol">0</span> vol</span>
+      <span id="calc-status">コンテナ充足率: 0%</span>
+    </div>
+    <div class="progress-bar-bg">
+      <div id="progress-fill" class="progress-bar-fill"></div>
+    </div>
+  </div>
+
+  <!-- 商品リスト -->
+  <div id="product-list"></div>
+
+  <!-- 注文フォーム -->
+  <div class="order-form">
+    <div style="font-weight:bold; font-size:15px; margin-bottom:12px; color:#2d3748;">📝 注文送信設定</div>
+    <div class="form-group">
+      <label>お名前・屋号</label>
+      <input type="text" id="customer-name" placeholder="例：加藤">
+    </div>
+    <div class="form-group">
+      <label>備考・ご要望（任意）</label>
+      <textarea id="customer-note" rows="3" placeholder="受け取り希望日など"></textarea>
+    </div>
+    <button id="submit-btn" class="btn-submit" onclick="sendToLine()" disabled>
+      LINEで注文内容を送信する
+    </button>
+  </div>
+</div>
+
+<script>
+  // ★ここに自分のLINE公式アカウントのIDを入力（例: @123abcd）
+  const LINE_ACCOUNT_ID = "@YOUR_LINE_ID";
+
+  // 商品データ定義
+  const products = [
+    { id: 1, name: "ミナミハタタテダイ", price: 800, vol: 30 },
+    { id: 2, name: "ミナミゴンズイ", price: 1200, vol: 50 },
+    { id: 3, name: "ウスジマイシモチ", price: 1500, vol: 40 },
+    { id: 4, name: "アゴアマダイ", price: 3500, vol: 100 }
+  ];
+
+  const MAX_VOL = 1000;
+  const quantities = {};
+
+  // 初期化
+  function init() {
+    const listEl = document.getElementById('product-list');
+    listEl.innerHTML = '';
+
+    products.forEach(p => {
+      quantities[p.id] = 0;
+      const card = document.createElement('div');
+      card.className = 'item-card';
+      card.innerHTML = `
+        <div class="item-info">
+          <div class="item-name">${p.name}</div>
+          <div class="item-meta">¥${p.price.toLocaleString()} / <span class="item-vol">${p.vol} vol</span></div>
+        </div>
+        <div class="qty-control">
+          <button class="btn-qty" onclick="changeQty(${p.id}, -1)">-</button>
+          <span class="qty-num" id="qty-${p.id}">0</span>
+          <button class="btn-qty" onclick="changeQty(${p.id}, 1)">+</button>
+        </div>
+      `;
+      listEl.appendChild(card);
+    });
+    updateCalculator();
+  }
+
+  // 数量変更
+  function changeQty(id, delta) {
+    quantities[id] = Math.max(0, (quantities[id] || 0) + delta);
+    document.getElementById(`qty-${id}`).innerText = quantities[id];
+    updateCalculator();
+  }
+
+  // 計算＆表示更新
+  function updateCalculator() {
+    let totalVol = 0;
+    let totalPrice = 0;
+    let totalItems = 0;
+
+    products.forEach(p => {
+      const qty = quantities[p.id] || 0;
+      totalVol += p.vol * qty;
+      totalPrice += p.price * qty;
+      totalItems += qty;
+    });
+
+    const percent = Math.round((totalVol / MAX_VOL) * 100);
+    const fillWidth = Math.min(percent, 100); // ゲージ表示上限は100%まで伸ばす
+
+    // 上部固定エリアの更新
+    document.getElementById('total-price').innerText = `¥${totalPrice.toLocaleString()}`;
+    document.getElementById('total-items').innerText = totalItems;
+    document.getElementById('total-vol').innerText = totalVol;
+    document.getElementById('calc-status').innerText = `コンテナ充足率: ${percent}%`;
+
+    const fillEl = document.getElementById('progress-fill');
+    fillEl.style.width = `${fillWidth}%`;
+
+    // 1点以上選んでいれば送信ボタン有効化（警告制限なし）
+    const submitBtn = document.getElementById('submit-btn');
+    submitBtn.disabled = totalItems === 0;
+  }
+
+  // LINE送信処理
+  function sendToLine() {
+    const name = document.getElementById('customer-name').value || "未入力";
+    const note = document.getElementById('customer-note').value || "なし";
+    
+    let text = `【注文依頼】\n`;
+    text += `お名前: ${name}\n`;
+    text += `---------------\n`;
+
+    let totalVol = 0;
+    let totalPrice = 0;
+    let totalItems = 0;
+
+    products.forEach(p => {
+      const qty = quantities[p.id];
+      if (qty > 0) {
+        text += `・${p.name} × ${qty} (${p.vol * qty}vol / ¥${(p.price * qty).toLocaleString()})\n`;
+        totalVol += p.vol * qty;
+        totalPrice += p.price * qty;
+        totalItems += qty;
+      }
+    });
+
+    const percent = Math.round((totalVol / MAX_VOL) * 100);
+
+    text += `---------------\n`;
+    text += `購入点数: ${totalItems}点\n`;
+    text += `合計容積: ${totalVol} vol (充足率: ${percent}%)\n`;
+    text += `合計金額: ¥${totalPrice.toLocaleString()}\n`;
+    text += `備考: ${note}`;
+
+    // LINEアプリを起動してメッセージを自動挿入
+    const lineUrl = `https://line.me/R/oaMessage/${LINE_ACCOUNT_ID}/?${encodeURIComponent(text)}`;
+    window.location.href = lineUrl;
+  }
+
+  init();
+</script>
+
+</body>
+</html>
