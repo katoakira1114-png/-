@@ -3,171 +3,256 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>商品一覧・在庫管理</title>
+  <title>石垣島観賞魚便商品一覧</title>
   <style>
-    :root {
-      --bg-color: #f8f9fa;
-      --card-bg: #ffffff;
-      --text-color: #333333;
-      --primary-color: #007bff;
-      --soldout-color: #dc3545;
-      --border-color: #e0e0e0;
-    }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { margin: 0; padding: 16px; background-color: #f5f7fa; color: #333; padding-bottom: 120px; }
+    .container { max-width: 600px; margin: 0 auto; }
+    h1 { font-size: 22px; text-align: center; margin-bottom: 16px; color: #1a202c; }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background-color: var(--bg-color);
-      color: var(--text-color);
-      margin: 0;
-      padding: 16px;
+    /* 上部固定計算・進捗ヘッダー */
+    .sticky-calculator {
+      position: sticky; top: 12px; z-index: 100;
+      background: #ffffff; border: 2px solid #3182ce; border-radius: 12px;
+      padding: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 20px;
     }
+    .calc-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 15px; margin-bottom: 6px; }
+    .progress-bg { background-color: #e2e8f0; border-radius: 6px; height: 10px; overflow: hidden; margin-top: 4px; }
+    .progress-bar { background-color: #3182ce; height: 100%; width: 0%; transition: width 0.3s ease; }
 
-    h1 {
-      text-align: center;
-      font-size: 1.5rem;
-      margin-bottom: 20px;
+    /* 商品カードグリッド */
+    .product-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .item-card {
+      background: #fff; border-radius: 10px; overflow: hidden;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; flex-direction: column; justify-content: space-between;
+      border: 1px solid #e2e8f0; position: relative;
     }
-
-    #loading {
-      text-align: center;
-      padding: 40px;
-      font-size: 1.1rem;
-      color: #666;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-      gap: 16px;
-      max-width: 1000px;
-      margin: 0 auto;
-    }
-
-    .card {
-      background: var(--card-bg);
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      position: relative;
-    }
-
-    .card-img-container {
-      width: 100%;
-      padding-top: 75%; /* 4:3 Aspect Ratio */
-      position: relative;
-      background-color: #eee;
-    }
-
-    .card-img-container img {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .card-body {
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
-      flex-grow: 1;
-    }
-
-    .card-title {
-      font-weight: bold;
-      font-size: 1rem;
-      margin: 0 0 8px 0;
-    }
-
-    .card-details {
-      font-size: 0.85rem;
-      color: #555;
-      margin-bottom: 8px;
-    }
-
-    .card-price {
-      font-size: 1.1rem;
-      font-weight: bold;
-      color: #000;
-      margin-top: auto;
-    }
-
+    .img-wrapper { width: 100%; aspect-ratio: 1; background: #edf2f7; position: relative; cursor: pointer; }
+    .img-wrapper img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .img-placeholder { display: flex; align-items: center; justify-content: center; height: 100%; color: #a0aec0; font-size: 12px; }
+    
     .sold-out-badge {
-      position: absolute;
-      top: 8px;
-      left: 8px;
-      background-color: var(--soldout-color);
-      color: #fff;
-      padding: 4px 8px;
-      font-size: 0.75rem;
-      font-weight: bold;
-      border-radius: 4px;
-      z-index: 10;
+      position: absolute; top: 8px; left: 8px; background: rgba(229, 62, 62, 0.9);
+      color: white; padding: 4px 8px; font-size: 11px; font-weight: bold; border-radius: 4px;
     }
 
-    .is-soldout {
-      opacity: 0.6;
+    .card-content { padding: 10px; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; }
+    .item-title { font-size: 14px; font-weight: bold; margin-bottom: 4px; line-height: 1.3; }
+    .item-meta { font-size: 12px; color: #718096; margin-bottom: 6px; }
+    .item-price { font-size: 15px; font-weight: bold; color: #2b6cb0; margin-bottom: 8px; }
+
+    /* 数量カウンター */
+    .quantity-control { display: flex; align-items: center; justify-content: space-between; background: #f7fafc; border-radius: 6px; border: 1px solid #cbd5e0; }
+    .btn-qty { width: 32px; height: 32px; background: #edf2f7; border: none; font-size: 16px; font-weight: bold; cursor: pointer; color: #4a5568; }
+    .btn-qty:disabled { opacity: 0.4; cursor: not-allowed; }
+    .qty-num { font-weight: bold; font-size: 14px; }
+
+    /* 下部固定注文確認バー */
+    .bottom-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #ffffff; border-top: 1px solid #e2e8f0; padding: 12px 16px;
+      box-shadow: 0 -4px 12px rgba(0,0,0,0.08); display: flex; justify-content: center; z-index: 99;
     }
+    .btn-order {
+      width: 100%; max-width: 600px; background: #06c755; color: white; border: none;
+      padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; text-align: center;
+    }
+    .btn-order:disabled { background: #cbd5e0; cursor: not-allowed; }
+
+    /* 画像拡大モーダル */
+    .modal {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; padding: 16px;
+    }
+    .modal img { max-width: 100%; max-height: 80vh; border-radius: 8px; object-fit: contain; }
+    .modal-close { position: absolute; top: 20px; right: 20px; color: white; font-size: 28px; font-weight: bold; cursor: pointer; }
   </style>
 </head>
 <body>
 
-  <h1>商品一覧</h1>
-  <div id="loading">データを読み込み中...</div>
-  <div class="grid" id="product-grid"></div>
+  <div class="container">
+    <h1>商品一覧</h1>
+
+    <!-- 容積・合計額リアルタイム計算バー -->
+    <div class="sticky-calculator">
+      <div class="calc-row">
+        <span>合計金額: <span id="total-price">0</span> 円</span>
+        <span>合計容積: <span id="total-vol">0</span> vol</span>
+      </div>
+      <div class="calc-row" style="font-size: 12px; color: #4a5568; margin-top: 4px;">
+        <span>箱の占有目安 (1000vol/箱)</span>
+        <span><span id="box-count">0</span> 箱分</span>
+      </div>
+      <div class="progress-bg">
+        <div class="progress-bar" id="vol-progress"></div>
+      </div>
+    </div>
+
+    <!-- 商品一覧グリッド -->
+    <div class="product-grid" id="product-list">
+      <div style="grid-column: span 2; text-align: center; padding: 40px; color: #a0aec0;">読み込み中...</div>
+    </div>
+  </div>
+
+  <!-- 下部固定注文ボタン -->
+  <div class="bottom-bar">
+    <button class="btn-order" id="order-btn" disabled onclick="sendOrder()">注文を確定する (0点)</button>
+  </div>
+
+  <!-- 画像拡大用モーダル -->
+  <div class="modal" id="image-modal" onclick="closeModal()">
+    <span class="modal-close">&times;</span>
+    <img id="modal-img" src="" alt="拡大画像">
+  </div>
 
   <script>
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbwkRNNrDet_jvnHvhmDJhh2A4Zy0C0lYbWFOJ1duNFpf-LnufBVB03ojjAKXUIYqI3I/exec";
+    // GASのAPIエンドポイントURL
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyHtHcSYNxXCP8EdqUYDVMkBNFzSCoDQC7mC4xk1odIXu9vwD4l_TWxztNiRK6yTrdv/exec";
 
+    let productsData = [];
+    let cart = {};
+
+    // 商品データ取得
     async function fetchProducts() {
-      const loadingEl = document.getElementById("loading");
-      const gridEl = document.getElementById("product-grid");
-
       try {
-        const response = await fetch(GAS_URL);
-        const products = await response.json();
-
-        loadingEl.style.display = "none";
-        gridEl.innerHTML = "";
-
-        if (products.length === 0) {
-          gridEl.innerHTML = "<p style='grid-column: 1/-1; text-align: center;'>表示できる商品がありません。</p>";
-          return;
-        }
-
-        products.forEach(item => {
-          const isSoldOut = Number(item.stock) === 0;
-          const card = document.createElement("div");
-          card.className = `card ${isSoldOut ? 'is-soldout' : ''}`;
-
-          const imgSrc = item.img ? item.img : 'https://via.placeholder.com/300x225?text=No+Image';
-
-          card.innerHTML = `
-            ${isSoldOut ? '<div class="sold-out-badge">売り切れ</div>' : ''}
-            <div class="card-img-container">
-              <img src="${imgSrc}" alt="${item.name}" loading="lazy">
-            </div>
-            <div class="card-body">
-              <div class="card-title">${item.name}</div>
-              <div class="card-details">
-                ${item.vol ? `内容量: ${item.vol}g<br>` : ''}
-                在庫: ${item.stock}
-              </div>
-              <div class="card-price">¥${Number(item.price).toLocaleString()}</div>
-            </div>
-          `;
-          gridEl.appendChild(card);
-        });
-
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        loadingEl.textContent = "データの取得に失敗しました。";
+        const res = await fetch(GAS_API_URL);
+        productsData = await res.json();
+        renderProducts();
+      } catch (e) {
+        document.getElementById('product-list').innerHTML = 
+          '<div style="grid-column: span 2; text-align: center; color: #e53e3e; padding: 20px;">データの読み込みに失敗しました。</div>';
       }
     }
 
+    // 商品描画
+    function renderProducts() {
+      const container = document.getElementById('product-list');
+      if (!productsData || productsData.length === 0) {
+        container.innerHTML = '<div style="grid-column: span 2; text-align: center; padding: 40px; color: #718096;">表示できる商品がありません。</div>';
+        return;
+      }
+
+      container.innerHTML = productsData.map(item => {
+        const isSoldOut = item.stock <= 0;
+        const currentQty = cart[item.id] || 0;
+        
+        // 画像URLのフォールバック処理
+        let imgHtml = `<div class="img-placeholder">画像なし</div>`;
+        if (item.img) {
+          imgHtml = `<img src="${item.img}" alt="${item.name}" onclick="openModal('${item.img}')" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'img-placeholder\\'>画像読み込みエラー</div>';">`;
+        }
+
+        return `
+          <div class="item-card">
+            <div class="img-wrapper">
+              ${imgHtml}
+              ${isSoldOut ? '<div class="sold-out-badge">売り切れ</div>' : ''}
+            </div>
+            <div class="card-content">
+              <div>
+                <div class="item-title">${item.name}</div>
+                <div class="item-meta">容積: ${item.vol}vol / 在庫: ${item.stock}</div>
+                <div class="item-price">¥${item.price.toLocaleString()}</div>
+              </div>
+              <div class="quantity-control">
+                <button class="btn-qty" onclick="updateQty(${item.id}, -1)" ${currentQty === 0 ? 'disabled' : ''}>-</button>
+                <span class="qty-num">${currentQty}</span>
+                <button class="btn-qty" onclick="updateQty(${item.id}, 1)" ${isSoldOut || currentQty >= item.stock ? 'disabled' : ''}>+</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      calculateTotal();
+    }
+
+    // 数量変更処理
+    function updateQty(id, change) {
+      const item = productsData.find(p => p.id === id);
+      if (!item) return;
+
+      const currentQty = cart[id] || 0;
+      const newQty = currentQty + change;
+
+      if (newQty <= 0) {
+        delete cart[id];
+      } else if (newQty <= item.stock) {
+        cart[id] = newQty;
+      }
+
+      renderProducts();
+    }
+
+    // カート・合計計算
+    function calculateTotal() {
+      let totalPrice = 0;
+      let totalVol = 0;
+      let totalItems = 0;
+
+      Object.keys(cart).forEach(id => {
+        const item = productsData.find(p => p.id == id);
+        if (item) {
+          const qty = cart[id];
+          totalPrice += item.price * qty;
+          totalVol += item.vol * qty;
+          totalItems += qty;
+        }
+      });
+
+      document.getElementById('total-price').innerText = totalPrice.toLocaleString();
+      document.getElementById('total-vol').innerText = totalVol.toLocaleString();
+      
+      // 1000vol = 1箱の計算ゲージ
+      const boxCount = (totalVol / 1000).toFixed(1);
+      document.getElementById('box-count').innerText = boxCount;
+
+      const progressPercent = Math.min((totalVol % 1000) / 10, 100);
+      document.getElementById('vol-progress').style.width = (totalVol > 0 && progressPercent === 0 ? 100 : progressPercent) + '%';
+
+      // 注文ボタン更新
+      const btn = document.getElementById('order-btn');
+      btn.disabled = totalItems === 0;
+      btn.innerText = `注文を確定する (${totalItems}点)`;
+    }
+
+    // 画像モーダル表示
+    function openModal(src) {
+      document.getElementById('modal-img').src = src;
+      document.getElementById('image-modal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('image-modal').style.display = 'none';
+    }
+
+    // LINE注文テキスト生成・送信
+    function sendOrder() {
+      let message = "【ご注文内容】\n";
+      let totalPrice = 0;
+      let totalVol = 0;
+
+      Object.keys(cart).forEach(id => {
+        const item = productsData.find(p => p.id == id);
+        if (item) {
+          const qty = cart[id];
+          const subtotal = item.price * qty;
+          message += `・${item.name} × ${qty} (${subtotal.toLocaleString()}円)\n`;
+          totalPrice += subtotal;
+          totalVol += item.vol * qty;
+        }
+      });
+
+      message += `\n合計金額: ${totalPrice.toLocaleString()}円\n`;
+      message += `合計容積: ${totalVol.toLocaleString()}vol\n`;
+      message += `発送箱数目安: ${(totalVol / 1000).toFixed(1)}箱`;
+
+      // LINE共有リンクを開く
+      const lineUrl = `https://line.me/R/msg/text/?${encodeURIComponent(message)}`;
+      window.location.href = lineUrl;
+    }
+
+    // 初期化
     fetchProducts();
   </script>
 </body>
