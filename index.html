@@ -3,283 +3,172 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>石垣島観賞魚便注文フォーム</title>
+  <title>商品一覧・在庫管理</title>
   <style>
-    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { margin: 0; padding: 16px; background-color: #f4f6f8; color: #333; }
-    .container { max-width: 600px; margin: 0 auto; }
-    h1 { font-size: 20px; text-align: center; color: #1a365d; margin-bottom: 20px; }
-    
-    /* 上部固定ヘッダー */
-    .sticky-calculator {
-      position: sticky; top: 12px; z-index: 100;
-      background: #ffffff; border: 2px solid #3182ce; border-radius: 12px;
-      padding: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 24px;
+    :root {
+      --bg-color: #f8f9fa;
+      --card-bg: #ffffff;
+      --text-color: #333333;
+      --primary-color: #007bff;
+      --soldout-color: #dc3545;
+      --border-color: #e0e0e0;
     }
-    .calc-row-top { display: flex; justify-content: space-between; font-size: 15px; font-weight: bold; margin-bottom: 6px; }
-    .calc-row-sub { display: flex; justify-content: space-between; font-size: 13px; color: #4a5568; margin-bottom: 8px; }
-    
-    .progress-bar-bg { background-color: #e2e8f0; height: 16px; border-radius: 8px; overflow: hidden; margin-bottom: 6px; }
-    .progress-bar-fill { background-color: #3182ce; height: 100%; width: 0%; transition: width 0.3s; }
-    
-    /* 商品カード */
-    .item-card {
-      background: #fff; border-radius: 10px; padding: 12px; margin-bottom: 12px;
-      display: flex; align-items: center; gap: 12px;
-      border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-    }
-    .item-img {
-      width: 70px; height: 70px; border-radius: 8px; object-fit: cover;
-      background-color: #edf2f7; flex-shrink: 0; cursor: pointer;
-    }
-    .item-info { flex: 1; min-width: 0; }
-    .item-name { font-weight: bold; font-size: 15px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .item-meta { font-size: 13px; color: #4a5568; }
-    .item-vol { color: #d69e2e; font-weight: bold; }
-    .item-stock { font-size: 11px; color: #718096; margin-top: 2px; }
 
-    .qty-control { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-    .btn-qty { width: 32px; height: 32px; border: 1px solid #cbd5e0; background: #edf2f7; border-radius: 6px; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-    .btn-qty:disabled { opacity: 0.3; cursor: not-allowed; }
-    .qty-num { font-weight: bold; font-size: 15px; min-width: 20px; text-align: center; }
-
-    /* 注文入力フォーム */
-    .order-form { background: #fff; border-radius: 10px; padding: 16px; margin-top: 24px; border: 1px solid #e2e8f0; }
-    .form-group { margin-bottom: 12px; }
-    .form-group label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 4px; }
-    .form-group input, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #cbd5e0; border-radius: 6px; font-size: 14px; }
-    
-    .btn-submit {
-      width: 100%; background: #06C755; color: white; border: none; padding: 14px;
-      font-size: 16px; font-weight: bold; border-radius: 8px; cursor: pointer; margin-top: 12px;
-      display: flex; justify-content: center; align-items: center; gap: 8px;
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 16px;
     }
-    .btn-submit:disabled { background: #a0aec0; cursor: not-allowed; }
 
-    /* 画像拡大用モーダル */
-    .modal {
-      display: none; position: fixed; z-index: 1000; left: 0; top: 0;
-      width: 100%; height: 100%; background-color: rgba(0,0,0,0.85);
-      justify-content: center; align-items: center;
+    h1 {
+      text-align: center;
+      font-size: 1.5rem;
+      margin-bottom: 20px;
     }
-    .modal-content { max-width: 90%; max-height: 80%; border-radius: 8px; }
+
+    #loading {
+      text-align: center;
+      padding: 40px;
+      font-size: 1.1rem;
+      color: #666;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 16px;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .card-img-container {
+      width: 100%;
+      padding-top: 75%; /* 4:3 Aspect Ratio */
+      position: relative;
+      background-color: #eee;
+    }
+
+    .card-img-container img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .card-body {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+    }
+
+    .card-title {
+      font-weight: bold;
+      font-size: 1rem;
+      margin: 0 0 8px 0;
+    }
+
+    .card-details {
+      font-size: 0.85rem;
+      color: #555;
+      margin-bottom: 8px;
+    }
+
+    .card-price {
+      font-size: 1.1rem;
+      font-weight: bold;
+      color: #000;
+      margin-top: auto;
+    }
+
+    .sold-out-badge {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      background-color: var(--soldout-color);
+      color: #fff;
+      padding: 4px 8px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      border-radius: 4px;
+      z-index: 10;
+    }
+
+    .is-soldout {
+      opacity: 0.6;
+    }
   </style>
 </head>
 <body>
 
-<div class="container">
-  <h1>🏝️ 石垣島観賞魚便注文フォーム</h1>
+  <h1>商品一覧</h1>
+  <div id="loading">データを読み込み中...</div>
+  <div class="grid" id="product-grid"></div>
 
-  <!-- 上部固定表示エリア -->
-  <div class="sticky-calculator">
-    <div class="calc-row-top">
-      <span>合計金額: <span id="total-price" style="color:#e53e3e;">¥0</span></span>
-      <span>購入点数: <span id="total-items">0</span> 点</span>
-    </div>
-    <div class="calc-row-sub">
-      <span>合計容積: <span id="total-vol">0</span> vol</span>
-      <span id="box-count-status" style="color:#2b6cb0; font-weight:bold;">箱数: 0箱目 (0%)</span>
-    </div>
-    <div class="progress-bar-bg">
-      <div id="progress-fill" class="progress-bar-fill"></div>
-    </div>
-  </div>
+  <script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbwkRNNrDet_jvnHvhmDJhh2A4Zy0C0lYbWFOJ1duNFpf-LnufBVB03ojjAKXUIYqI3I/exec";
 
-  <!-- 商品リスト -->
-  <div id="product-list"></div>
+    async function fetchProducts() {
+      const loadingEl = document.getElementById("loading");
+      const gridEl = document.getElementById("product-grid");
 
-  <!-- 注文フォーム -->
-  <div class="order-form">
-    <div style="font-weight:bold; font-size:15px; margin-bottom:12px; color:#2d3748;">📝 注文送信設定</div>
-    <div class="form-group">
-      <label>お名前・屋号</label>
-      <input type="text" id="customer-name" placeholder="例：加藤">
-    </div>
-    <div class="form-group">
-      <label>備考・ご要望（任意）</label>
-      <textarea id="customer-note" rows="3" placeholder="受け取り希望日など"></textarea>
-    </div>
-    <button id="submit-btn" class="btn-submit" onclick="sendToLine()" disabled>
-      LINEで注文内容を送信する
-    </button>
-  </div>
-</div>
+      try {
+        const response = await fetch(GAS_URL);
+        const products = await response.json();
 
-<!-- 画像拡大表示モーダル -->
-<div id="image-modal" class="modal" onclick="closeModal()">
-  <img id="modal-img" class="modal-content" src="">
-</div>
+        loadingEl.style.display = "none";
+        gridEl.innerHTML = "";
 
-<script>
-  // ★ここに自分のLINE公式アカウントのIDを入力（例: @123abcd）
-  const LINE_ACCOUNT_ID = "@YOUR_LINE_ID";
+        if (products.length === 0) {
+          gridEl.innerHTML = "<p style='grid-column: 1/-1; text-align: center;'>表示できる商品がありません。</p>";
+          return;
+        }
 
-  // 商品データ
-  const products = [
-    { 
-      id: 1, 
-      name: "ミナミハタタテダイ", 
-      price: 1800, 
-      vol: 400, 
-      stock: 3, 
-      img: "https://images.unsplash.com/photo-1524704654690-b56c05c78a00?w=600&auto=format&fit=crop" 
-    },
-    { 
-      id: 2, 
-      name: "ツノダシ 大", 
-      price: 2980, 
-      vol: 700, 
-      stock: 5, 
-      img: "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=600&auto=format&fit=crop" 
-    },
-    { 
-      id: 3, 
-      name: "ミナミゴンズイ", 
-      price: 80, 
-      vol: 10, 
-      stock: 100, 
-      img: "https://images.unsplash.com/photo-1520301255226-bf5f144451c1?w=600&auto=format&fit=crop" 
-    }
-  ];
+        products.forEach(item => {
+          const isSoldOut = Number(item.stock) === 0;
+          const card = document.createElement("div");
+          card.className = `card ${isSoldOut ? 'is-soldout' : ''}`;
 
-  const VOL_PER_BOX = 1000;
-  const quantities = {};
+          const imgSrc = item.img ? item.img : 'https://via.placeholder.com/300x225?text=No+Image';
 
-  // 初期化
-  function init() {
-    const listEl = document.getElementById('product-list');
-    listEl.innerHTML = '';
+          card.innerHTML = `
+            ${isSoldOut ? '<div class="sold-out-badge">売り切れ</div>' : ''}
+            <div class="card-img-container">
+              <img src="${imgSrc}" alt="${item.name}" loading="lazy">
+            </div>
+            <div class="card-body">
+              <div class="card-title">${item.name}</div>
+              <div class="card-details">
+                ${item.vol ? `内容量: ${item.vol}g<br>` : ''}
+                在庫: ${item.stock}
+              </div>
+              <div class="card-price">¥${Number(item.price).toLocaleString()}</div>
+            </div>
+          `;
+          gridEl.appendChild(card);
+        });
 
-    products.forEach(p => {
-      quantities[p.id] = 0;
-      const card = document.createElement('div');
-      card.className = 'item-card';
-      card.innerHTML = `
-        <img src="${p.img}" alt="${p.name}" class="item-img" onclick="openModal('${p.img}')" onerror="this.src='https://via.placeholder.com/70?text=No+Image'">
-        <div class="item-info">
-          <div class="item-name">${p.name}</div>
-          <div class="item-meta">¥${p.price.toLocaleString()} / <span class="item-vol">${p.vol} vol</span></div>
-          <div class="item-stock" id="stock-label-${p.id}">在庫: 残り${p.stock}匹</div>
-        </div>
-        <div class="qty-control">
-          <button class="btn-qty" id="btn-minus-${p.id}" onclick="changeQty(${p.id}, -1)" disabled>-</button>
-          <span class="qty-num" id="qty-${p.id}">0</span>
-          <button class="btn-qty" id="btn-plus-${p.id}" onclick="changeQty(${p.id}, 1)">+</button>
-        </div>
-      `;
-      listEl.appendChild(card);
-    });
-    updateCalculator();
-  }
-
-  // 数量変更
-  function changeQty(id, delta) {
-    const product = products.find(p => p.id === id);
-    if (!product) return;
-
-    const currentQty = quantities[id] || 0;
-    const newQty = currentQty + delta;
-
-    if (newQty >= 0 && newQty <= product.stock) {
-      quantities[id] = newQty;
-      document.getElementById(`qty-${id}`).innerText = newQty;
-    }
-
-    updateCalculator();
-  }
-
-  // 計算＆表示更新
-  function updateCalculator() {
-    let totalVol = 0;
-    let totalPrice = 0;
-    let totalItems = 0;
-
-    products.forEach(p => {
-      const qty = quantities[p.id] || 0;
-      totalVol += p.vol * qty;
-      totalPrice += p.price * qty;
-      totalItems += qty;
-
-      const btnMinus = document.getElementById(`btn-minus-${p.id}`);
-      const btnPlus = document.getElementById(`btn-plus-${p.id}`);
-      
-      if (btnMinus && btnPlus) {
-        btnMinus.disabled = qty <= 0;
-        btnPlus.disabled = qty >= p.stock;
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        loadingEl.textContent = "データの取得に失敗しました。";
       }
-    });
-
-    // 箱数と残容量パーセントの計算（1000volごとにバーリセット）
-    let currentBoxNum = 0;
-    let currentBoxPercent = 0;
-
-    if (totalVol > 0) {
-      currentBoxNum = Math.ceil(totalVol / VOL_PER_BOX);
-      const remainder = totalVol % VOL_PER_BOX;
-      currentBoxPercent = (remainder === 0) ? 100 : Math.round((remainder / VOL_PER_BOX) * 100);
     }
 
-    // 表示更新
-    document.getElementById('total-price').innerText = `¥${totalPrice.toLocaleString()}`;
-    document.getElementById('total-items').innerText = totalItems;
-    document.getElementById('total-vol').innerText = totalVol;
-    document.getElementById('box-count-status').innerText = `箱数: ${currentBoxNum}箱目 (${currentBoxPercent}%)`;
-
-    const fillEl = document.getElementById('progress-fill');
-    fillEl.style.width = `${currentBoxPercent}%`;
-
-    const submitBtn = document.getElementById('submit-btn');
-    submitBtn.disabled = totalItems === 0;
-  }
-
-  // モーダル処理（画像拡大）
-  function openModal(imgSrc) {
-    document.getElementById('modal-img').src = imgSrc;
-    document.getElementById('image-modal').style.display = 'flex';
-  }
-
-  function closeModal() {
-    document.getElementById('image-modal').style.display = 'none';
-  }
-
-  // LINE送信
-  function sendToLine() {
-    const name = document.getElementById('customer-name').value || "未入力";
-    const note = document.getElementById('customer-note').value || "なし";
-    
-    let totalVol = 0;
-    let totalPrice = 0;
-    let totalItems = 0;
-
-    let text = `【石垣島観賞魚便 注文依頼】\n`;
-    text += `お名前: ${name}\n`;
-    text += `---------------\n`;
-
-    products.forEach(p => {
-      const qty = quantities[p.id];
-      if (qty > 0) {
-        text += `・${p.name} × ${qty} (${p.vol * qty}vol / ¥${(p.price * qty).toLocaleString()})\n`;
-        totalVol += p.vol * qty;
-        totalPrice += p.price * qty;
-        totalItems += qty;
-      }
-    });
-
-    const boxCount = Math.ceil(totalVol / VOL_PER_BOX) || 0;
-
-    text += `---------------\n`;
-    text += `購入点数: ${totalItems}点\n`;
-    text += `合計容積: ${totalVol} vol\n`;
-    text += `必要箱数: ${boxCount}箱\n`;
-    text += `合計金額: ¥${totalPrice.toLocaleString()}\n`;
-    text += `備考: ${note}`;
-
-    const lineUrl = `https://line.me/R/oaMessage/${LINE_ACCOUNT_ID}/?${encodeURIComponent(text)}`;
-    window.location.href = lineUrl;
-  }
-
-  init();
-</script>
-
+    fetchProducts();
+  </script>
 </body>
 </html>
