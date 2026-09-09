@@ -165,6 +165,7 @@
         id: p.id,
         name: p.name,
         price: p.price,
+        vol: p.vol,
         qty: cart[p.id],
         subtotal: p.price * cart[p.id]
       }));
@@ -182,14 +183,21 @@
           body: JSON.stringify({ items: orderItems })
         });
 
-        // LINE送信文章の作成
+        // 合計容積と箱数の計算
+        let totalVol = 0;
+        let totalAmount = 0;
         let msg = "【ご注文内容】\n";
-        let total = 0;
+        
         orderItems.forEach(item => {
           msg += `・${item.name} × ${item.qty}（¥${item.subtotal.toLocaleString()}）\n`;
-          total += item.subtotal;
+          totalAmount += item.subtotal;
+          totalVol += item.vol * item.qty;
         });
-        msg += `\n合計金額: ¥${total.toLocaleString()}`;
+
+        const boxCount = (totalVol / 1000).toFixed(1);
+
+        msg += `\n合計金額: ¥${totalAmount.toLocaleString()}`;
+        msg += `\n合計容積: ${totalVol.toLocaleString()} vol（約 ${boxCount} 箱分）`;
 
         // LINEアプリ内で送信先を選択して共有
         const lineUrl = `https://line.me/R/share?text=${encodeURIComponent(msg)}`;
