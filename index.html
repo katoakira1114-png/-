@@ -5,290 +5,214 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>石垣島観賞魚便商品一覧</title>
   <style>
-    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { margin: 0; padding: 16px; background-color: #f5f7fa; color: #333; padding-bottom: 120px; }
-    .container { max-width: 600px; margin: 0 auto; }
-    h1 { font-size: 22px; text-align: center; margin-bottom: 16px; color: #1a202c; }
-
-    /* 計算・進捗ヘッダー */
-    .sticky-calculator {
-      position: sticky; top: 12px; z-index: 100;
-      background: #ffffff; border: 2px solid #3182ce; border-radius: 12px;
-      padding: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 20px;
-    }
-    .calc-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 15px; margin-bottom: 6px; }
-    .progress-bg { background-color: #e2e8f0; border-radius: 6px; height: 10px; overflow: hidden; margin-top: 4px; }
-    .progress-bar { background-color: #3182ce; height: 100%; width: 0%; transition: width 0.3s ease; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f6f9; color: #333; padding-bottom: 90px; }
+    
+    /* 上部固定バー */
+    .header-bar { position: sticky; top: 0; z-index: 100; background: #fff; padding: 12px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-bottom: 1px solid #e0e0e0; }
+    .header-title { font-size: 18px; font-weight: bold; text-align: center; margin-bottom: 8px; color: #1a252c; }
+    .calc-box { border: 2px solid #0056b3; border-radius: 10px; padding: 10px 14px; background: #f8fbff; }
+    .calc-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; margin-bottom: 6px; }
+    .progress-container { background: #e9ecef; height: 10px; border-radius: 5px; overflow: hidden; margin-top: 4px; }
+    .progress-bar { background: #0056b3; height: 100%; width: 0%; transition: width 0.3s; }
+    .progress-text { display: flex; justify-content: space-between; font-size: 11px; color: #666; margin-top: 4px; }
 
     /* 商品グリッド */
-    .product-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .item-card {
-      background: #fff; border-radius: 10px; overflow: hidden;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; flex-direction: column; justify-content: space-between;
-      border: 1px solid #e2e8f0; position: relative;
-    }
-    .img-wrapper { width: 100%; aspect-ratio: 1; background: #edf2f7; position: relative; cursor: pointer; }
-    .img-wrapper img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .img-placeholder { display: flex; align-items: center; justify-content: center; height: 100%; color: #a0aec0; font-size: 12px; }
+    .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 12px; max-width: 800px; margin: 0 auto; }
+    .card { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between; border: 1px solid #eee; }
     
-    .sold-out-badge {
-      position: absolute; top: 8px; left: 8px; background: rgba(229, 62, 62, 0.9);
-      color: white; padding: 4px 8px; font-size: 11px; font-weight: bold; border-radius: 4px;
-    }
+    .img-box { width: 100%; height: 140px; background: #eef2f5; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 12px; cursor: pointer; overflow: hidden; position: relative; }
+    .img-box img { width: 100%; height: 100%; object-fit: cover; }
+    
+    .card-info { padding: 10px; }
+    .item-name { font-weight: bold; font-size: 14px; margin-bottom: 4px; color: #111; line-height: 1.3; }
+    .item-sub { font-size: 11px; color: #666; margin-bottom: 6px; }
+    .item-price { color: #0056b3; font-weight: bold; font-size: 15px; margin-bottom: 8px; }
 
-    .card-content { padding: 10px; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; }
-    .item-title { font-size: 14px; font-weight: bold; margin-bottom: 4px; line-height: 1.3; }
-    .item-meta { font-size: 11px; color: #4a5568; margin-bottom: 6px; line-height: 1.4; }
-    .item-price { font-size: 15px; font-weight: bold; color: #2b6cb0; margin-bottom: 8px; }
+    .counter { display: flex; align-items: center; border: 1px solid #ccc; border-radius: 6px; overflow: hidden; background: #f9f9f9; }
+    .counter button { border: none; background: #e9ecef; width: 32px; height: 32px; font-size: 16px; font-weight: bold; cursor: pointer; color: #333; }
+    .counter button:disabled { opacity: 0.3; cursor: not-allowed; }
+    .counter span { flex: 1; text-align: center; font-size: 14px; font-weight: bold; }
 
-    /* 数量ボタン */
-    .quantity-control { display: flex; align-items: center; justify-content: space-between; background: #f7fafc; border-radius: 6px; border: 1px solid #cbd5e0; }
-    .btn-qty { width: 32px; height: 32px; background: #edf2f7; border: none; font-size: 16px; font-weight: bold; cursor: pointer; color: #4a5568; }
-    .btn-qty:disabled { opacity: 0.4; cursor: not-allowed; }
-    .qty-num { font-weight: bold; font-size: 14px; }
+    /* 下部確定ボタン */
+    .footer-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; padding: 12px 16px; box-shadow: 0 -2px 8px rgba(0,0,0,0.1); display: flex; justify-content: center; z-index: 100; }
+    .submit-btn { width: 100%; max-width: 600px; padding: 14px; background: #0056b3; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; text-align: center; }
+    .submit-btn:disabled { background: #ccc; cursor: not-allowed; }
 
-    /* 下部注文バー */
-    .bottom-bar {
-      position: fixed; bottom: 0; left: 0; right: 0;
-      background: #ffffff; border-top: 1px solid #e2e8f0; padding: 12px 16px;
-      box-shadow: 0 -4px 12px rgba(0,0,0,0.08); display: flex; justify-content: center; z-index: 99;
-    }
-    .btn-order {
-      width: 100%; max-width: 600px; background: #06c755; color: white; border: none;
-      padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; text-align: center;
-    }
-    .btn-order:disabled { background: #cbd5e0; cursor: not-allowed; }
-
-    /* 画像モーダル */
-    .modal {
-      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; padding: 16px;
-    }
-    .modal img { max-width: 100%; max-height: 80vh; border-radius: 8px; object-fit: contain; }
-    .modal-close { position: absolute; top: 20px; right: 20px; color: white; font-size: 28px; font-weight: bold; cursor: pointer; }
+    /* 画像拡大モーダル */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center; }
+    .modal img { max-width: 90%; max-height: 80%; border-radius: 8px; }
   </style>
 </head>
 <body>
 
-  <div class="container">
-    <h1>商品一覧</h1>
-
-    <!-- リアルタイム計算バー -->
-    <div class="sticky-calculator">
+  <div class="header-bar">
+    <div class="header-title">商品一覧</div>
+    <div class="calc-box">
       <div class="calc-row">
         <span>合計金額: <span id="total-price">0</span> 円</span>
         <span>合計容積: <span id="total-vol">0</span> vol</span>
       </div>
-      <div class="calc-row" style="font-size: 12px; color: #4a5568; margin-top: 4px;">
+      <div class="progress-container"><div class="progress-bar" id="p-bar"></div></div>
+      <div class="progress-text">
         <span>箱の占有目安 (1000vol/箱)</span>
-        <span><span id="box-count">0</span> 箱分</span>
+        <span><span id="box-ratio">0.0</span> 箱分 (<span id="box-pct">0</span>%)</span>
       </div>
-      <div class="progress-bg">
-        <div class="progress-bar" id="vol-progress"></div>
-      </div>
-    </div>
-
-    <!-- 商品一覧リスト -->
-    <div class="product-grid" id="product-list">
-      <div style="grid-column: span 2; text-align: center; padding: 40px; color: #a0aec0;">読み込み中...</div>
     </div>
   </div>
 
-  <!-- 固定注文ボタン -->
-  <div class="bottom-bar">
-    <button class="btn-order" id="order-btn" disabled onclick="sendOrder()">注文を確定する (0点)</button>
+  <div class="grid" id="product-grid">読み込み中...</div>
+
+  <div class="footer-bar">
+    <button class="submit-btn" id="submit-btn" disabled onclick="submitOrder()">注文を確定する (0点)</button>
   </div>
 
-  <!-- 画像拡大モーダル -->
-  <div class="modal" id="image-modal" onclick="closeModal()">
-    <span class="modal-close">&times;</span>
+  <div class="modal" id="img-modal" onclick="closeModal()">
     <img id="modal-img" src="" alt="拡大画像">
   </div>
 
   <script>
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyHtHcSYNxXCP8EdqUYDVMkBNFzSCoDQC7mC4xk1odIXu9vwD4l_TWxztNiRK6yTrdv/exec";
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxRpRJxSVIVEphn7kndPs8YkVbJ_IeDBTecH00TduQxZzmd9x2mehloUEqaMdh7VDipyQ/exec";
 
-    let productsData = [];
+    let products = [];
     let cart = {};
 
-    // 1. GASからデータ取得
-    async function fetchProducts() {
+    async function loadProducts() {
       try {
         const res = await fetch(GAS_API_URL);
-        const rawData = await res.json();
-        
-        // 配列で届いた場合もオブジェクト型に安全に整形
-        productsData = rawData.map((item, index) => {
-          if (Array.isArray(item)) {
-            return {
-              id: item[0] || (index + 1),
-              name: String(item[1] || ''),
-              price: Number(item[2]) || 0,
-              size: String(item[3] || ''),
-              vol: Number(item[4]) || 0,
-              stock: Number(item[5]) || 0,
-              img: item[6] || ''
-            };
-          }
-          return item;
-        });
-
-        renderProducts();
+        products = await res.json();
+        renderGrid();
       } catch (e) {
-        document.getElementById('product-list').innerHTML = 
-          '<div style="grid-column: span 2; text-align: center; color: #e53e3e; padding: 20px;">データの読み込みに失敗しました。</div>';
+        document.getElementById('product-grid').innerText = 'データ読み込みに失敗しました。';
       }
     }
 
-    // 2. 商品描画
-    function renderProducts() {
-      const container = document.getElementById('product-list');
-      if (!productsData || productsData.length === 0) {
-        container.innerHTML = '<div style="grid-column: span 2; text-align: center; padding: 40px; color: #718096;">表示できる商品がありません。</div>';
-        return;
-      }
+    function renderGrid() {
+      const grid = document.getElementById('product-grid');
+      grid.innerHTML = '';
 
-      container.innerHTML = productsData.map(item => {
-        const isSoldOut = item.stock <= 0;
-        const currentQty = cart[item.id] || 0;
+      products.forEach(p => {
+        cart[p.id] = 0;
+        const card = document.createElement('div');
+        card.className = 'card';
         
-        let imgHtml = `<div class="img-placeholder">画像なし</div>`;
-        if (item.img) {
-          imgHtml = `<img src="${item.img}" alt="${item.name}" onclick="openModal('${item.img}')" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'img-placeholder\\'>画像エラー</div>';">`;
-        }
+        const imgHtml = p.img ? `<img src="${p.img}" alt="${p.name}">` : '画像なし';
 
-        // サイズ/容積/在庫 レイアウト指定
-        const sizeText = item.size ? `${item.size} / ` : '';
-
-        return `
-          <div class="item-card">
-            <div class="img-wrapper">
-              ${imgHtml}
-              ${isSoldOut ? '<div class="sold-out-badge">売り切れ</div>' : ''}
-            </div>
-            <div class="card-content">
-              <div>
-                <div class="item-title">${item.name}</div>
-                <div class="item-meta">${sizeText}${item.vol}vol / 在庫: ${item.stock}</div>
-                <div class="item-price">¥${item.price.toLocaleString()}</div>
-              </div>
-              <div class="quantity-control">
-                <button class="btn-qty" onclick="updateQty(${item.id}, -1)" ${currentQty === 0 ? 'disabled' : ''}>-</button>
-                <span class="qty-num">${currentQty}</span>
-                <button class="btn-qty" onclick="updateQty(${item.id}, 1)" ${isSoldOut || currentQty >= item.stock ? 'disabled' : ''}>+</button>
-              </div>
+        card.innerHTML = `
+          <div class="img-box" onclick="openModal('${p.img}')">${imgHtml}</div>
+          <div class="card-info">
+            <div class="item-name">${p.name}</div>
+            <div class="item-sub">サイズ:${p.size} / ${p.vol}vol / 在庫:${p.stock}</div>
+            <div class="item-price">¥${p.price.toLocaleString()}</div>
+            <div class="counter">
+              <button onclick="updateQty(${p.id}, -1)">-</button>
+              <span id="qty-${p.id}">0</span>
+              <button onclick="updateQty(${p.id}, 1)">+</button>
             </div>
           </div>
         `;
-      }).join('');
+        grid.appendChild(card);
+      });
+    }
 
+    function updateQty(id, change) {
+      const item = products.find(p => p.id === id);
+      if (!item) return;
+
+      let current = cart[id] || 0;
+      let updated = current + change;
+
+      if (updated < 0) updated = 0;
+      if (updated > item.stock) {
+        alert(`在庫数（${item.stock}個）を超えて注文することはできません。`);
+        return;
+      }
+
+      cart[id] = updated;
+      document.getElementById(`qty-${id}`).innerText = updated;
       calculateTotal();
     }
 
-    // 3. 数量変更
-    function updateQty(id, change) {
-      const item = productsData.find(p => p.id === id);
-      if (!item) return;
-
-      const currentQty = cart[id] || 0;
-      const newQty = currentQty + change;
-
-      if (newQty <= 0) {
-        delete cart[id];
-      } else if (newQty <= item.stock) {
-        cart[id] = newQty;
-      }
-
-      renderProducts();
-    }
-
-    // 4. 合計計算
     function calculateTotal() {
       let totalPrice = 0;
       let totalVol = 0;
       let totalItems = 0;
 
-      Object.keys(cart).forEach(id => {
-        const item = productsData.find(p => p.id == id);
-        if (item) {
-          const qty = cart[id];
-          totalPrice += item.price * qty;
-          totalVol += item.vol * qty;
-          totalItems += qty;
-        }
+      products.forEach(p => {
+        const qty = cart[p.id] || 0;
+        totalPrice += p.price * qty;
+        totalVol += p.vol * qty;
+        totalItems += qty;
       });
 
       document.getElementById('total-price').innerText = totalPrice.toLocaleString();
       document.getElementById('total-vol').innerText = totalVol.toLocaleString();
-      
+
       const boxCount = (totalVol / 1000).toFixed(1);
-      document.getElementById('box-count').innerText = boxCount;
+      const boxPct = Math.round((totalVol % 1000) / 10);
+      
+      document.getElementById('box-ratio').innerText = boxCount;
+      document.getElementById('box-pct').innerText = boxPct > 100 ? 100 : boxPct;
+      document.getElementById('p-bar').style.width = `${boxPct > 100 ? 100 : boxPct}%`;
 
-      const progressPercent = Math.min((totalVol % 1000) / 10, 100);
-      document.getElementById('vol-progress').style.width = (totalVol > 0 && progressPercent === 0 ? 100 : progressPercent) + '%';
-
-      const btn = document.getElementById('order-btn');
-      btn.disabled = totalItems === 0;
+      const btn = document.getElementById('submit-btn');
       btn.innerText = `注文を確定する (${totalItems}点)`;
+      btn.disabled = totalItems === 0;
     }
 
-    // 5. 画像モーダル
+    async function submitOrder() {
+      const orderItems = products.filter(p => cart[p.id] > 0).map(p => ({
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        qty: cart[p.id],
+        subtotal: p.price * cart[p.id]
+      }));
+
+      if (orderItems.length === 0) return;
+
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+      btn.innerText = "送信中...";
+
+      try {
+        // GASへ注文データを送信（自動在庫減算＋売上記録）
+        await fetch(GAS_API_URL, {
+          method: 'POST',
+          body: JSON.stringify({ items: orderItems })
+        });
+
+        // LINE送信文章の作成
+        let msg = "【ご注文内容】\n";
+        let total = 0;
+        orderItems.forEach(item => {
+          msg += `・${item.name} × ${item.qty}（¥${item.subtotal.toLocaleString()}）\n`;
+          total += item.subtotal;
+        });
+        msg += `\n合計金額: ¥${total.toLocaleString()}`;
+
+        // LINEアプリ内で送信先を選択して共有
+        const lineUrl = `https://line.me/R/share?text=${encodeURIComponent(msg)}`;
+        window.location.href = lineUrl;
+
+      } catch (e) {
+        alert('注文処理中にエラーが発生しました。');
+        btn.disabled = false;
+        calculateTotal();
+      }
+    }
+
     function openModal(src) {
+      if (!src) return;
       document.getElementById('modal-img').src = src;
-      document.getElementById('image-modal').style.display = 'flex';
+      document.getElementById('img-modal').style.display = 'flex';
     }
 
     function closeModal() {
-      document.getElementById('image-modal').style.display = 'none';
+      document.getElementById('img-modal').style.display = 'none';
     }
 
-    // 6. 注文処理 & LINE送信
-    async function sendOrder() {
-      const btn = document.getElementById('order-btn');
-      btn.disabled = true;
-      btn.innerText = "注文処理中...";
-
-      let message = "【ご注文内容】\n";
-      let totalPrice = 0;
-      let totalVol = 0;
-      let orderPayload = [];
-
-      Object.keys(cart).forEach(id => {
-        const item = productsData.find(p => p.id == id);
-        if (item) {
-          const qty = cart[id];
-          const subtotal = item.price * qty;
-          const sizeInfo = item.size ? ` (${item.size})` : '';
-          message += `・${item.name}${sizeInfo} × ${qty} (${subtotal.toLocaleString()}円)\n`;
-          totalPrice += subtotal;
-          totalVol += item.vol * qty;
-          orderPayload.push({ id: item.id, qty: qty });
-        }
-      });
-
-      message += `\n合計金額: ${totalPrice.toLocaleString()}円\n`;
-      message += `合計容積: ${totalVol.toLocaleString()}vol\n`;
-      message += `発送箱数目安: ${(totalVol / 1000).toFixed(1)}箱`;
-
-      // 在庫減少リクエスト送信
-      try {
-        await fetch(GAS_API_URL, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(orderPayload)
-        });
-      } catch (e) {
-        console.error("在庫更新エラー:", e);
-      }
-
-      // LINEへ送信
-      const lineUrl = `https://line.me/R/msg/text/?${encodeURIComponent(message)}`;
-      window.location.href = lineUrl;
-    }
-
-    // 起動
-    fetchProducts();
+    loadProducts();
   </script>
 </body>
 </html>
