@@ -10,6 +10,7 @@
     .container { max-width: 600px; margin: 0 auto; }
     h1 { font-size: 22px; text-align: center; margin-bottom: 16px; color: #1a202c; }
 
+    /* 計算・進捗ヘッダー */
     .sticky-calculator {
       position: sticky; top: 12px; z-index: 100;
       background: #ffffff; border: 2px solid #3182ce; border-radius: 12px;
@@ -19,6 +20,7 @@
     .progress-bg { background-color: #e2e8f0; border-radius: 6px; height: 10px; overflow: hidden; margin-top: 4px; }
     .progress-bar { background-color: #3182ce; height: 100%; width: 0%; transition: width 0.3s ease; }
 
+    /* 商品グリッド */
     .product-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .item-card {
       background: #fff; border-radius: 10px; overflow: hidden;
@@ -39,11 +41,13 @@
     .item-meta { font-size: 11px; color: #4a5568; margin-bottom: 6px; line-height: 1.4; }
     .item-price { font-size: 15px; font-weight: bold; color: #2b6cb0; margin-bottom: 8px; }
 
+    /* 数量ボタン */
     .quantity-control { display: flex; align-items: center; justify-content: space-between; background: #f7fafc; border-radius: 6px; border: 1px solid #cbd5e0; }
     .btn-qty { width: 32px; height: 32px; background: #edf2f7; border: none; font-size: 16px; font-weight: bold; cursor: pointer; color: #4a5568; }
     .btn-qty:disabled { opacity: 0.4; cursor: not-allowed; }
     .qty-num { font-weight: bold; font-size: 14px; }
 
+    /* 下部注文バー */
     .bottom-bar {
       position: fixed; bottom: 0; left: 0; right: 0;
       background: #ffffff; border-top: 1px solid #e2e8f0; padding: 12px 16px;
@@ -55,6 +59,7 @@
     }
     .btn-order:disabled { background: #cbd5e0; cursor: not-allowed; }
 
+    /* 画像モーダル */
     .modal {
       display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; padding: 16px;
@@ -68,6 +73,7 @@
   <div class="container">
     <h1>商品一覧</h1>
 
+    <!-- リアルタイム計算バー -->
     <div class="sticky-calculator">
       <div class="calc-row">
         <span>合計金額: <span id="total-price">0</span> 円</span>
@@ -82,15 +88,18 @@
       </div>
     </div>
 
+    <!-- 商品一覧リスト -->
     <div class="product-grid" id="product-list">
       <div style="grid-column: span 2; text-align: center; padding: 40px; color: #a0aec0;">読み込み中...</div>
     </div>
   </div>
 
+  <!-- 固定注文ボタン -->
   <div class="bottom-bar">
     <button class="btn-order" id="order-btn" disabled onclick="sendOrder()">注文を確定する (0点)</button>
   </div>
 
+  <!-- 画像拡大モーダル -->
   <div class="modal" id="image-modal" onclick="closeModal()">
     <span class="modal-close">&times;</span>
     <img id="modal-img" src="" alt="拡大画像">
@@ -102,10 +111,28 @@
     let productsData = [];
     let cart = {};
 
+    // 1. GASからデータ取得
     async function fetchProducts() {
       try {
         const res = await fetch(GAS_API_URL);
-        productsData = await res.json();
+        const rawData = await res.json();
+        
+        // 配列で届いた場合もオブジェクト型に安全に整形
+        productsData = rawData.map((item, index) => {
+          if (Array.isArray(item)) {
+            return {
+              id: item[0] || (index + 1),
+              name: String(item[1] || ''),
+              price: Number(item[2]) || 0,
+              size: String(item[3] || ''),
+              vol: Number(item[4]) || 0,
+              stock: Number(item[5]) || 0,
+              img: item[6] || ''
+            };
+          }
+          return item;
+        });
+
         renderProducts();
       } catch (e) {
         document.getElementById('product-list').innerHTML = 
@@ -113,6 +140,7 @@
       }
     }
 
+    // 2. 商品描画
     function renderProducts() {
       const container = document.getElementById('product-list');
       if (!productsData || productsData.length === 0) {
@@ -129,7 +157,7 @@
           imgHtml = `<img src="${item.img}" alt="${item.name}" onclick="openModal('${item.img}')" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'img-placeholder\\'>画像エラー</div>';">`;
         }
 
-        // 「サイズ / 容積 / 在庫」の順で表示
+        // サイズ/容積/在庫 レイアウト指定
         const sizeText = item.size ? `${item.size} / ` : '';
 
         return `
@@ -157,6 +185,7 @@
       calculateTotal();
     }
 
+    // 3. 数量変更
     function updateQty(id, change) {
       const item = productsData.find(p => p.id === id);
       if (!item) return;
@@ -173,6 +202,7 @@
       renderProducts();
     }
 
+    // 4. 合計計算
     function calculateTotal() {
       let totalPrice = 0;
       let totalVol = 0;
@@ -202,6 +232,7 @@
       btn.innerText = `注文を確定する (${totalItems}点)`;
     }
 
+    // 5. 画像モーダル
     function openModal(src) {
       document.getElementById('modal-img').src = src;
       document.getElementById('image-modal').style.display = 'flex';
@@ -211,6 +242,7 @@
       document.getElementById('image-modal').style.display = 'none';
     }
 
+    // 6. 注文処理 & LINE送信
     async function sendOrder() {
       const btn = document.getElementById('order-btn');
       btn.disabled = true;
@@ -226,7 +258,8 @@
         if (item) {
           const qty = cart[id];
           const subtotal = item.price * qty;
-          message += `・${item.name} (${item.size}) × ${qty} (${subtotal.toLocaleString()}円)\n`;
+          const sizeInfo = item.size ? ` (${item.size})` : '';
+          message += `・${item.name}${sizeInfo} × ${qty} (${subtotal.toLocaleString()}円)\n`;
           totalPrice += subtotal;
           totalVol += item.vol * qty;
           orderPayload.push({ id: item.id, qty: qty });
@@ -237,6 +270,7 @@
       message += `合計容積: ${totalVol.toLocaleString()}vol\n`;
       message += `発送箱数目安: ${(totalVol / 1000).toFixed(1)}箱`;
 
+      // 在庫減少リクエスト送信
       try {
         await fetch(GAS_API_URL, {
           method: "POST",
@@ -248,10 +282,12 @@
         console.error("在庫更新エラー:", e);
       }
 
+      // LINEへ送信
       const lineUrl = `https://line.me/R/msg/text/?${encodeURIComponent(message)}`;
       window.location.href = lineUrl;
     }
 
+    // 起動
     fetchProducts();
   </script>
 </body>
