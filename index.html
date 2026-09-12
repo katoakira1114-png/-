@@ -101,7 +101,19 @@
     async function loadProducts() {
       try {
         const res = await fetch(GAS_API_URL);
-        allProducts = await res.json();
+        const data = await res.json();
+        
+        // データの整形と数値型の保証
+        allProducts = data.map(p => ({
+          ...p,
+          id: String(p.id),
+          category: p.category ? String(p.category).trim() : '',
+          price: Number(p.price) || 0,
+          vol: Number(p.vol) || 0,
+          stock: Number(p.stock) || 0
+        }));
+
+        console.log("読み込んだ商品データ:", allProducts);
         
         // カート初期化
         allProducts.forEach(p => {
@@ -110,6 +122,7 @@
 
         renderGrid();
       } catch (e) {
+        console.error("データ読み込みエラー:", e);
         document.getElementById('product-grid').innerText = 'データ読み込みに失敗しました。';
       }
     }
@@ -117,7 +130,7 @@
     function switchCategory(cat) {
       currentCategory = cat;
       document.querySelectorAll('.nav-tab').forEach(btn => {
-        btn.classList.toggle('active', btn.innerText === cat);
+        btn.classList.toggle('active', btn.innerText.trim() === cat);
       });
       renderGrid();
     }
@@ -159,10 +172,11 @@
     }
 
     function updateQty(id, change) {
-      const item = allProducts.find(p => p.id.toString() === id.toString());
+      const targetId = String(id);
+      const item = allProducts.find(p => p.id === targetId);
       if (!item) return;
 
-      let current = cart[id] || 0;
+      let current = cart[targetId] || 0;
       let updated = current + change;
 
       if (updated < 0) updated = 0;
@@ -171,8 +185,8 @@
         return;
       }
 
-      cart[id] = updated;
-      const el = document.getElementById(`qty-${id}`);
+      cart[targetId] = updated;
+      const el = document.getElementById(`qty-${targetId}`);
       if (el) el.innerText = updated;
 
       calculateTotal();
