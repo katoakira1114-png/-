@@ -6,7 +6,7 @@
   <title>石垣島観賞魚便商品一覧</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f6f9; color: #333; padding-bottom: 90px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f6f9; color: #333; padding-bottom: 100px; }
     
     /* 上部固定エリア */
     .header-bar { position: sticky; top: 0; z-index: 100; background: #fff; padding: 10px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-bottom: 1px solid #e0e0e0; }
@@ -17,17 +17,28 @@
     .nav-tab { flex: 1; min-width: 70px; padding: 8px 4px; text-align: center; background: #eef2f5; border: none; border-radius: 6px; font-size: 13px; font-weight: bold; color: #555; cursor: pointer; white-space: nowrap; }
     .nav-tab.active { background: #0056b3; color: #fff; }
 
-    .calc-box { border: 2px solid #0056b3; border-radius: 10px; padding: 8px 12px; background: #f8fbff; }
+    /* 容積・計算エリア */
+    .calc-box { border: 2px solid #0056b3; border-radius: 10px; padding: 10px 12px; background: #f8fbff; }
     .calc-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 13px; margin-bottom: 4px; }
-    .progress-container { background: #e9ecef; height: 8px; border-radius: 4px; overflow: hidden; margin-top: 4px; }
+    .progress-container { background: #e9ecef; height: 10px; border-radius: 5px; overflow: hidden; margin-top: 6px; }
     .progress-bar { background: #0056b3; height: 100%; width: 0%; transition: width 0.3s; }
-    .progress-text { display: flex; justify-content: space-between; font-size: 11px; color: #666; margin-top: 4px; }
+    .progress-text { display: flex; justify-content: space-between; font-size: 11px; color: #555; margin-top: 4px; font-weight: bold; }
+
+    /* 箱空きおすすめエリア */
+    .recommend-box { display: none; background: #fff3cd; border: 1px solid #ffeba8; border-radius: 8px; padding: 8px 12px; margin: 10px 12px 0; font-size: 12px; color: #856404; }
+    .recommend-title { font-weight: bold; margin-bottom: 4px; display: flex; justify-content: space-between; align-items: center; }
+    .recommend-items { display: flex; gap: 8px; overflow-x: auto; padding-top: 4px; }
+    .recommend-chip { background: #fff; border: 1px solid #ffd966; border-radius: 16px; padding: 4px 10px; font-size: 11px; white-space: nowrap; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+    .recommend-chip strong { color: #d9534f; }
 
     /* 商品グリッド */
     .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 12px; max-width: 800px; margin: 0 auto; }
-    .card { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between; border: 1px solid #eee; }
+    .card { background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between; border: 1px solid #eee; position: relative; }
     
-    .img-box { width: 100%; height: 130px; background: #eef2f5; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 12px; cursor: pointer; overflow: hidden; }
+    /* Newバッジ */
+    .badge-new { position: absolute; top: 6px; left: 6px; background: #ff3b30; color: #fff; font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 4px; z-index: 2; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+
+    .img-box { width: 100%; height: 130px; background: #eef2f5; display: flex; align-items: center; justify-content: center; color: #aaa; font-size: 12px; cursor: pointer; overflow: hidden; position: relative; }
     .img-box img { width: 100%; height: 100%; object-fit: cover; }
     
     .card-info { padding: 8px; }
@@ -44,9 +55,22 @@
     .submit-btn { width: 100%; max-width: 600px; padding: 12px; background: #0056b3; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; text-align: center; }
     .submit-btn:disabled { background: #ccc; cursor: not-allowed; }
 
-    /* 画像拡大モーダル */
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; align-items: center; justify-content: center; }
-    .modal img { max-width: 90%; max-height: 80%; border-radius: 8px; }
+    /* モーダル共通スタイル */
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center; padding: 16px; }
+    .modal-content { background: #fff; border-radius: 12px; max-width: 500px; width: 100%; max-height: 85vh; overflow-y: auto; padding: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+    .modal-title { font-size: 16px; font-weight: bold; margin-bottom: 12px; text-align: center; border-bottom: 2px solid #0056b3; padding-bottom: 6px; }
+    
+    /* 注文確認リスト */
+    .confirm-list { margin-bottom: 12px; font-size: 13px; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+    .confirm-item { display: flex; justify-content: space-between; margin-bottom: 6px; }
+    .confirm-total { font-size: 14px; font-weight: bold; text-align: right; margin-top: 8px; color: #0056b3; }
+    
+    .modal-btns { display: flex; gap: 8px; margin-top: 16px; }
+    .btn-cancel { flex: 1; padding: 10px; background: #6c757d; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+    .btn-send { flex: 2; padding: 10px; background: #28a745; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+    
+    .modal-img-container { text-align: center; }
+    .modal-img-container img { max-width: 100%; max-height: 75vh; border-radius: 8px; }
   </style>
 </head>
 <body>
@@ -62,6 +86,7 @@
       <button class="nav-tab" onclick="switchCategory('貝')">貝</button>
     </div>
 
+    <!-- 容積・箱占有計算表示 -->
     <div class="calc-box">
       <div class="calc-row">
         <span>合計金額: <span id="total-price">0</span> 円</span>
@@ -69,20 +94,46 @@
       </div>
       <div class="progress-container"><div class="progress-bar" id="p-bar"></div></div>
       <div class="progress-text">
-        <span>箱の占有目安 (1000vol/箱)</span>
-        <span><span id="box-ratio">0.0</span> 箱分 (<span id="box-pct">0</span>%)</span>
+        <span><span id="box-count">1</span>箱目の使用率: <span id="box-pct">0</span>%</span>
+        <span>箱の空き: 残り <span id="remaining-vol">1000</span> vol</span>
       </div>
     </div>
   </div>
 
-  <div class="grid" id="product-grid">読み込み中...</div>
-
-  <div class="footer-bar">
-    <button class="submit-btn" id="submit-btn" disabled onclick="submitOrder()">注文を確定する (0点)</button>
+  <!-- 箱空きおすすめ提案エリア -->
+  <div class="recommend-box" id="recommend-box">
+    <div class="recommend-title">
+      <span>💡 箱にあと <strong id="rec-vol">0</strong> vol 入ります！一緒にいかがですか？</span>
+    </div>
+    <div class="recommend-items" id="recommend-items"></div>
   </div>
 
+  <!-- 商品グリッド -->
+  <div class="grid" id="product-grid">読み込み中...</div>
+
+  <!-- 下部固定注文ボタン -->
+  <div class="footer-bar">
+    <button class="submit-btn" id="submit-btn" disabled onclick="openConfirmModal()">注文内容を確認する (0点)</button>
+  </div>
+
+  <!-- 最終確認モーダル -->
+  <div class="modal" id="confirm-modal">
+    <div class="modal-content">
+      <div class="modal-title">ご注文内容の確認</div>
+      <div class="confirm-list" id="confirm-list"></div>
+      <div class="confirm-total" id="confirm-summary"></div>
+      <div class="modal-btns">
+        <button class="btn-cancel" onclick="closeConfirmModal()">戻る</button>
+        <button class="btn-send" id="final-send-btn" onclick="submitOrder()">送信してLINE共有</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 画像拡大モーダル -->
   <div class="modal" id="img-modal" onclick="closeModal()">
-    <img id="modal-img" src="" alt="拡大画像">
+    <div class="modal-img-container">
+      <img id="modal-img" src="" alt="拡大画像">
+    </div>
   </div>
 
   <script>
@@ -103,19 +154,16 @@
         const res = await fetch(GAS_API_URL);
         const data = await res.json();
         
-        // データの整形と数値型の保証
         allProducts = data.map(p => ({
           ...p,
           id: String(p.id),
           category: p.category ? String(p.category).trim() : '',
           price: Number(p.price) || 0,
           vol: Number(p.vol) || 0,
-          stock: Number(p.stock) || 0
+          stock: Number(p.stock) || 0,
+          isNew: Boolean(p.isNew)
         }));
 
-        console.log("読み込んだ商品データ:", allProducts);
-        
-        // カート初期化
         allProducts.forEach(p => {
           if (cart[p.id] === undefined) cart[p.id] = 0;
         });
@@ -153,8 +201,10 @@
         
         const imgSrc = formatImgUrl(p.img);
         const imgHtml = imgSrc ? `<img src="${imgSrc}" alt="${p.name}">` : '画像なし';
+        const newBadge = p.isNew ? `<div class="badge-new">NEW</div>` : '';
 
         card.innerHTML = `
+          ${newBadge}
           <div class="img-box" onclick="openModal('${imgSrc}')">${imgHtml}</div>
           <div class="card-info">
             <div class="item-name">${p.name}</div>
@@ -207,16 +257,109 @@
       document.getElementById('total-price').innerText = totalPrice.toLocaleString();
       document.getElementById('total-vol').innerText = totalVol.toLocaleString();
 
-      const boxCount = (totalVol / 1000).toFixed(1);
-      const boxPct = Math.round((totalVol % 1000) / 10);
+      // 箱数・占有率・残量計算 (1箱 = 1000vol)
+      const BOX_CAPACITY = 1000;
+      let currentBoxNum = Math.floor(totalVol / BOX_CAPACITY) + 1;
+      let currentBoxVol = totalVol % BOX_CAPACITY;
       
-      document.getElementById('box-ratio').innerText = boxCount;
-      document.getElementById('box-pct').innerText = boxPct > 100 ? 100 : boxPct;
-      document.getElementById('p-bar').style.width = `${boxPct > 100 ? 100 : boxPct}%`;
+      // ちょうど1000, 2000...の場合はピッタリ100%扱い
+      if (totalVol > 0 && currentBoxVol === 0) {
+        currentBoxNum -= 1;
+        currentBoxVol = BOX_CAPACITY;
+      }
+
+      const pct = Math.round((currentBoxVol / BOX_CAPACITY) * 100);
+      const remainingVol = totalVol === 0 ? BOX_CAPACITY : (BOX_CAPACITY - currentBoxVol);
+
+      document.getElementById('box-count').innerText = currentBoxNum;
+      document.getElementById('box-pct').innerText = totalVol === 0 ? 0 : pct;
+      document.getElementById('p-bar').style.width = `${totalVol === 0 ? 0 : pct}%`;
+      document.getElementById('remaining-vol').innerText = remainingVol;
+
+      // おすすめ提案の更新
+      renderRecommendations(remainingVol);
 
       const btn = document.getElementById('submit-btn');
-      btn.innerText = `注文を確定する (${totalItems}点)`;
+      btn.innerText = `注文内容を確認する (${totalItems}点)`;
       btn.disabled = totalItems === 0;
+    }
+
+    // 残りvolに収まるおすすめ商品を提案
+    function renderRecommendations(remVol) {
+      const recBox = document.getElementById('recommend-box');
+      const recItems = document.getElementById('recommend-items');
+      
+      if (remVol <= 0 || remVol >= 1000) {
+        recBox.style.display = 'none';
+        return;
+      }
+
+      // 残りvol以下で買える＆在庫のある商品を抽出
+      const candidates = allProducts.filter(p => p.vol > 0 && p.vol <= remVol && (p.stock - (cart[p.id] || 0)) > 0);
+
+      if (candidates.length === 0) {
+        recBox.style.display = 'none';
+        return;
+      }
+
+      document.getElementById('rec-vol').innerText = remVol;
+      recItems.innerHTML = '';
+
+      // ランダムまたは先頭5件を表示
+      candidates.slice(0, 5).forEach(p => {
+        const chip = document.createElement('div');
+        chip.className = 'recommend-chip';
+        chip.innerHTML = `${p.name} <strong>(+${p.vol}vol)</strong>`;
+        chip.onclick = () => {
+          updateQty(p.id, 1);
+          // 該当カテゴリに自動切り替え
+          if (p.category !== currentCategory) switchCategory(p.category);
+        };
+        recItems.appendChild(chip);
+      });
+
+      recBox.style.display = 'block';
+    }
+
+    // 注文確認モーダルを開く
+    function openConfirmModal() {
+      const confirmList = document.getElementById('confirm-list');
+      const confirmSummary = document.getElementById('confirm-summary');
+      confirmList.innerHTML = '';
+
+      let totalAmount = 0;
+      let totalVol = 0;
+      let count = 0;
+
+      allProducts.forEach(p => {
+        const qty = cart[p.id] || 0;
+        if (qty > 0) {
+          count += qty;
+          const subtotal = p.price * qty;
+          totalAmount += subtotal;
+          totalVol += p.vol * qty;
+
+          const row = document.createElement('div');
+          row.className = 'confirm-item';
+          row.innerHTML = `
+            <span>[${p.category}] ${p.name} × ${qty}</span>
+            <span>¥${subtotal.toLocaleString()}</span>
+          `;
+          confirmList.appendChild(row);
+        }
+      });
+
+      const boxCount = (totalVol / 1000).toFixed(1);
+      confirmSummary.innerHTML = `
+        数量: 計 ${count} 点 / 容積: ${totalVol} vol (約${boxCount}箱)<br>
+        <strong>合計金額: ¥${totalAmount.toLocaleString()} (税込)</strong>
+      `;
+
+      document.getElementById('confirm-modal').style.display = 'flex';
+    }
+
+    function closeConfirmModal() {
+      document.getElementById('confirm-modal').style.display = 'none';
     }
 
     async function submitOrder() {
@@ -232,9 +375,9 @@
 
       if (orderItems.length === 0) return;
 
-      const btn = document.getElementById('submit-btn');
-      btn.disabled = true;
-      btn.innerText = "在庫確認＆送信中...";
+      const sendBtn = document.getElementById('final-send-btn');
+      sendBtn.disabled = true;
+      sendBtn.innerText = "送信中...";
 
       try {
         const res = await fetch(GAS_API_URL, {
@@ -250,7 +393,7 @@
           return;
         }
 
-        // LINE用メッセージ生成（カテゴリ毎に表示）
+        // LINE共有用テキスト生成
         let totalVol = 0;
         let totalAmount = 0;
         let msg = "【ご注文内容】\n";
@@ -271,8 +414,8 @@
 
       } catch (e) {
         alert('注文処理中に通信エラーが発生しました。時間を置いて再度お試しください。');
-        btn.disabled = false;
-        calculateTotal();
+        sendBtn.disabled = false;
+        sendBtn.innerText = "送信してLINE共有";
       }
     }
 
