@@ -644,21 +644,17 @@
       sendBtn.innerText = "送信中...";
 
       try {
-        const res = await fetch(GAS_API_URL, {
+        // 1. GASへデータを送信 (no-corsモードで確実にGASへPOSTを到達させる)
+        await fetch(GAS_API_URL, {
           method: 'POST',
+          mode: 'no-cors',
+          headers: {
+            'Content-Type': 'application/json'
+          },
           body: JSON.stringify({ items: orderItems })
         });
-        
-        const result = await res.json();
 
-        if (result.status === "stock_error" || result.status === "error") {
-          alert(result.message);
-          sendBtn.disabled = false;
-          backBtn.disabled = false;
-          sendBtn.innerText = "送信してLINE共有";
-          return;
-        }
-
+        // 2. LINE送信用テキストの生成
         let totalVol = 0;
         let totalAmount = 0;
         let msg = "【ご注文内容】\n";
@@ -673,16 +669,26 @@
 
         msg += `\n合計金額: ¥${totalAmount.toLocaleString()}`;
         msg += `\n合計容積: ${totalVol.toLocaleString()} vol（約 ${boxCount} 箱分）\n`;
-        
-        if (result.invoiceUrl) {
-          msg += `\n📄 納品書スプレッドシート:\n${result.invoiceUrl}`;
-        }
 
+        // 3. LINE共有画面を開く
         const lineUrl = `https://line.me/R/share?text=${encodeURIComponent(msg)}`;
-        window.location.href = lineUrl;
+        window.open(lineUrl, '_blank');
+
+        // 4. カートを初期状態（0）にリセットして画面を初期化
+        Object.keys(cart).forEach(id => {
+          cart[id] = 0;
+        });
+        
+        closeModal();
+        renderProducts();
+        updateSummary();
+
+        // 最新の在庫情報をバックグラウンドで再取得
+        fetchProducts();
 
       } catch (e) {
         alert('注文処理中にエラーが発生しました。通信環境等を確認して再度お試しください。');
+      } finally {
         sendBtn.disabled = false;
         backBtn.disabled = false;
         sendBtn.innerText = "送信してLINE共有";
