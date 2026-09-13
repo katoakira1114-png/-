@@ -419,7 +419,15 @@
       const container = document.getElementById('product-container');
       try {
         const res = await fetch(GAS_API_URL);
-        allProducts = await res.json();
+        const rawProducts = await res.json();
+
+        // データの型（数値）を保証
+        allProducts = rawProducts.map(p => ({
+          ...p,
+          price: Number(p.price) || 0,
+          vol: Number(p.vol) || 0,
+          stock: Number(p.stock) || 0
+        }));
 
         allProducts.forEach(p => {
           if (cart[p.id] === undefined) {
@@ -432,6 +440,261 @@
       } catch (err) {
         console.error("商品データの取得エラー:", err);
         container.innerHTML = '<div class="loading-text" style="color:red;">商品データの読み込みに失敗しました。</div>';
+      }
+    }
+
+    function switchCategory(cat) {
+      currentCategory = cat;
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.innerText === cat);
+      });
+      renderProducts();
+    }
+
+    function formatImgUrl(url) {
+      if (!url) return '';
+      const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+      if (match && match[1]) {
+        return `https://lh3.googleusercontent.com/d/${match[1]}`;
+      }
+      return url;
+    }
+
+    function renderProducts() {
+      const container = document.getElementById('product-container');
+      container.innerHTML = '';
+
+      const filtered = allProducts.filter(p => p.category === currentCategory);
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="loading-text">該当する商品は現在ありません。</div>';
+        return;
+      }
+
+      filtered.forEach(p => {
+        const qty = cart[p.id] || 0;
+        const card = document.createElement('div');
+        card.className = 'product-card';
+        const dummyImg = 'https://via.placeholder.com/300x160?text=No+Image';
+        const imgSrc = p.img ? formatImgUrl(p.img) : dummyImg;
+
+        card.innerHTML = `
+          <img src="${imgSrc}" class="product-img" alt="${p.name}" loading="lazy" onerror="this.onerror=null; this.src='${dummyImg}';" onclick="openImageModal('${imgSrc}')">
+          <div class="product-title">${p.name} ${p.isNew ? '<span style="color:red; font-size:0.75rem;">[NEW]</span>' : ''}</div>
+          <div class="product-meta">サイズ:${p.size || '規格なし'} / ${p.vol}vol / 在庫:${p.stock}</div>
+          <div class="product-price">¥${p.price.toLocaleString()}</div>
+          <div class="qty-control">
+            <button class="qty-btn" onclick="changeQty('${p.id}', -1)">-</button>
+            <input type="text" class="qty-input" value="${qty}" readonly>
+            <button class="qty-btn" onclick="changeQty('${p.id}', 1)">+</button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function openImageModal(src) {
+      document.getElementById('zoomed-img').src = src;
+      document.getElementById('img-zoom-modal').classList.add('active');
+    }
+
+    function closeImageModal() {
+      document.getElementById('img-zoom-modal').classList.remove('active');
+    }
+
+    function changeQty(id, delta) {
+      const product = allProducts.find(p => String(p.id) === String(id));
+      if (!product) return;
+
+      let newQty = (cart[id] || 0) + delta;
+      if (newQty < 0) newQty = 0;
+      if (newQty > product.stock) {
+        alert(`在庫上限は ${product.stock} 個です。`);
+        return;
+      }
+
+      cart[id] = newQty;
+      renderProducts();
+      updateSummary();
+    }
+
+    function updateSummary() {
+      let totalAmount = 0;
+      let totalVol = 0;
+      let totalCount = 0;
+
+      allProducts.forEach(p => {
+        const qty = cart[p.id] || 0;
+        totalAmount += p.price * qty;
+        totalVol += p.vol * qty;
+        totalCount += qty;
+      });
+
+      document.getElementById('total-price-text').innerText = `合計金額: ${totalAmount.toLocaleString()} 円`;
+      document.getElementById('total-vol-text').innerText = `合計容量: ${totalVol.toLocaleString()} vol`;
+
+      const currentBoxIndex = Math.floor(totalVol / 1000) + 1;
+      const volInCurrentBox = totalVol % 1000;
+      const boxUsageRate = totalVol === 0 ? 0 : Math.round((volInCurrentBox === 0 ? 1000 : volInCurrentBox) / 1000 * 100);
+      const remainingVol = volInCurrentBox === 0 && totalVol > 0 ? 0 : 1000 - volInCurrentBox;
+
+      document.getElementById('progress-bar').style.width = `${boxUsageRate}%`;
+      document.getElementById('box-rate-text').innerText = `${currentBoxIndex}箱目の使用率: ${boxUsageRate}%`;
+      document.getElementById('box-empty-text').innerText = `箱の空き: 残り ${remainingVol} vol`;
+
+      document.getElementById('confirm-btn').innerText = `注文内容を確認する (${totalCount}点)`;
+
+      const recommendBox = document.getElementById('recommend-box');
+      const recommendItemsDiv = document.getElementById('recommend-items');
+
+      if (remainingVol > 0 && remainingVol <= 300 && totalVol > 0) {
+        recommendBox.style.display = 'flex';
+        document.getElementById('recommend-text').innerText = `💡 箱にあと ${remainingVol} vol 入ります！一緒にいかがですか？`;
+        
+        // 残り容量に収まる商品（vol > 0 かつ 在庫あり）
+        const fits = allProducts.filter(p => p.vol > 0 && p.vol <= remainingVol && p.stock > 0);
+
+        // 商品名で重複排除
+        const uniqueNameMap = new Map();
+        fits.forEach(p => {
+          if (!uniqueNameMap.has(p.name)) {
+            uniqueNameMap.set(p.name, p);
+          } else {
+            if (p.vol < uniqueNameMap.get(p.name).vol) {
+              uniqueNameMap.set(p.name, p);
+            }
+          }
+        });
+
+        const uniqueFits = Array.from(uniqueNameMap.values());
+
+        if (uniqueFits.length > 0) {
+          recommendItemsDiv.innerHTML = uniqueFits.map(f => 
+            `<span class="recommend-badge" onclick="switchCategory('${f.category}')">${f.name} (+${f.vol}vol)</span>`
+          ).join('');
+        } else {
+          recommendBox.style.display = 'none';
+        }
+      } else {
+        recommendBox.style.display = 'none';
+      }
+    }
+
+    function openModal() {
+      const modal = document.getElementById('order-modal');
+      const listContainer = document.getElementById('modal-item-list');
+      const summaryBox = document.getElementById('modal-summary-box');
+
+      listContainer.innerHTML = '';
+      let totalAmount = 0;
+      let totalVol = 0;
+      let totalCount = 0;
+
+      allProducts.forEach(p => {
+        const qty = cart[p.id] || 0;
+        if (qty > 0) {
+          const subtotal = p.price * qty;
+          totalAmount += subtotal;
+          totalVol += p.vol * qty;
+          totalCount += qty;
+
+          const row = document.createElement('div');
+          row.className = 'order-item-row';
+          row.innerHTML = `
+            <span>[${p.category}] ${p.name} × ${qty}</span>
+            <span>¥${subtotal.toLocaleString()}</span>
+          `;
+          listContainer.appendChild(row);
+        }
+      });
+
+      if (totalCount === 0) {
+        alert('商品が選択されていません。');
+        return;
+      }
+
+      const boxCount = (totalVol / 1000).toFixed(1);
+      summaryBox.innerHTML = `
+        <div>数量: 計 ${totalCount} 点 / 容積: ${totalVol} vol (約${boxCount}箱)</div>
+        <div class="total-price">合計金額: ¥${totalAmount.toLocaleString()} (税込)</div>
+      `;
+
+      modal.classList.add('active');
+    }
+
+    function closeModal() {
+      document.getElementById('order-modal').classList.remove('active');
+    }
+
+    async function submitOrder() {
+      const orderItems = allProducts.filter(p => cart[p.id] > 0).map(p => ({
+        id: p.id,
+        category: p.category,
+        name: p.name,
+        price: p.price,
+        vol: p.vol,
+        qty: cart[p.id],
+        subtotal: p.price * cart[p.id]
+      }));
+
+      if (orderItems.length === 0) return;
+
+      const sendBtn = document.getElementById('final-send-btn');
+      const backBtn = document.getElementById('btn-back');
+      
+      sendBtn.disabled = true;
+      backBtn.disabled = true;
+      sendBtn.innerText = "送信中...";
+
+      try {
+        const res = await fetch(GAS_API_URL, {
+          method: 'POST',
+          body: JSON.stringify({ items: orderItems })
+        });
+        
+        const result = await res.json();
+
+        if (result.status === "stock_error" || result.status === "error") {
+          alert(result.message);
+          sendBtn.disabled = false;
+          backBtn.disabled = false;
+          sendBtn.innerText = "送信してLINE共有";
+          return;
+        }
+
+        let totalVol = 0;
+        let totalAmount = 0;
+        let msg = "【ご注文内容】\n";
+        
+        orderItems.forEach(item => {
+          msg += `・[${item.category}] ${item.name} × ${item.qty}（¥${item.subtotal.toLocaleString()}）\n`;
+          totalAmount += item.subtotal;
+          totalVol += item.vol * item.qty;
+        });
+
+        const boxCount = (totalVol / 1000).toFixed(1);
+
+        msg += `\n合計金額: ¥${totalAmount.toLocaleString()}`;
+        msg += `\n合計容積: ${totalVol.toLocaleString()} vol（約 ${boxCount} 箱分）\n`;
+        
+        if (result.invoiceUrl) {
+          msg += `\n📄 納品書スプレッドシート:\n${result.invoiceUrl}`;
+        }
+
+        const lineUrl = `https://line.me/R/share?text=${encodeURIComponent(msg)}`;
+        window.location.href = lineUrl;
+
+      } catch (e) {
+        alert('注文処理中にエラーが発生しました。通信環境等を確認して再度お試しください。');
+        sendBtn.disabled = false;
+        backBtn.disabled = false;
+        sendBtn.innerText = "送信してLINE共有";
+      }
+    }
+  </script>
+</body>
+</html>
+タの読み込みに失敗しました。</div>';
       }
     }
 
