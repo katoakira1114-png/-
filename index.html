@@ -364,7 +364,7 @@
   <div class="summary-card">
     <div class="summary-info">
       <span id="total-price-text">合計金額: 0 円</span>
-      <span id="total-vol-text">合計容積: 0 vol</span>
+      <span id="total-vol-text">合計容量: 0 vol</span>
     </div>
     <div class="progress-bar-bg">
       <div class="progress-bar-fill" id="progress-bar"></div>
@@ -448,12 +448,12 @@
       renderProducts();
     }
 
-    // 画像URLの補正（Google Drive形式ならuc?id=に変換、それ以外はそのまま）
+    // Google Drive URLからファイルIDを抽出して直接表示可能な画像URLに変換
     function formatImgUrl(url) {
       if (!url) return '';
-      if (url.includes('drive.google.com/file/d/')) {
-        const id = url.split('/file/d/')[1].split('/')[0];
-        return `https://drive.google.com/uc?id=${id}`;
+      const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+      if (match && match[1]) {
+        return `https://lh3.googleusercontent.com/d/${match[1]}`;
       }
       return url;
     }
@@ -477,7 +477,7 @@
         const imgSrc = p.img ? formatImgUrl(p.img) : dummyImg;
 
         card.innerHTML = `
-          <img src="${imgSrc}" class="product-img" alt="${p.name}" onerror="this.src='${dummyImg}'" onclick="openImageModal('${imgSrc}')">
+          <img src="${imgSrc}" class="product-img" alt="${p.name}" loading="lazy" onerror="this.onerror=null; this.src='${dummyImg}';" onclick="openImageModal('${imgSrc}')">
           <div class="product-title">${p.name} ${p.isNew ? '<span style="color:red; font-size:0.75rem;">[NEW]</span>' : ''}</div>
           <div class="product-meta">サイズ:${p.size || '規格なし'} / ${p.vol}vol / 在庫:${p.stock}</div>
           <div class="product-price">¥${p.price.toLocaleString()}</div>
