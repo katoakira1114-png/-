@@ -541,7 +541,9 @@
       document.getElementById('box-rate-text').innerText = `${currentBoxIndex}箱目の使用率: ${boxUsageRate}%`;
       document.getElementById('box-empty-text').innerText = `箱の空き: 残り ${remainingVol} vol`;
 
-      document.getElementById('confirm-btn').innerText = `注文内容を確認する (${totalCount}点)`;
+      const confirmBtn = document.getElementById('confirm-btn');
+      confirmBtn.innerText = `注文内容を確認する (${totalCount}点)`;
+      confirmBtn.disabled = totalCount === 0;
 
       const recommendBox = document.getElementById('recommend-box');
       const recommendItemsDiv = document.getElementById('recommend-items');
@@ -672,7 +674,7 @@
 
         // 3. LINE共有画面を開く
         const lineUrl = `https://line.me/R/share?text=${encodeURIComponent(msg)}`;
-        window.open(lineUrl, '_blank');
+        window.location.href = lineUrl;
 
         // 4. カートを初期状態（0）にリセットして画面を初期化
         Object.keys(cart).forEach(id => {
