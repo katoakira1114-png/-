@@ -646,47 +646,58 @@
       sendBtn.innerText = "送信中...";
 
       try {
-        // 1. GASへデータを送信 (no-corsモードで確実にGASへPOSTを到達させる)
-        await fetch(GAS_API_URL, {
+        // GASへPOST送信（CORS通信でレスポンスを受け取る）
+        const response = await fetch(GAS_API_URL, {
           method: 'POST',
-          mode: 'no-cors',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'text/plain' // GASのWeb AppでCORSエラーを防ぐためtext/plain指定が有効
           },
           body: JSON.stringify({ items: orderItems })
         });
 
-        // 2. LINE送信用テキストの生成
-        let totalVol = 0;
-        let totalAmount = 0;
-        let msg = "【ご注文内容】\n";
-        
-        orderItems.forEach(item => {
-          msg += `・[${item.category}] ${item.name} × ${item.qty}（¥${item.subtotal.toLocaleString()}）\n`;
-          totalAmount += item.subtotal;
-          totalVol += item.vol * item.qty;
-        });
+        const result = await response.json();
 
-        const boxCount = (totalVol / 1000).toFixed(1);
+        if (result.status === "success") {
+          let totalVol = 0;
+          let totalAmount = 0;
+          let msg = "【ご注文内容】\n";
+          
+          orderItems.forEach(item => {
+            msg += `・[${item.category}] ${item.name} × ${item.qty}（¥${item.subtotal.toLocaleString()}）\n`;
+            totalAmount += item.subtotal;
+            totalVol += item.vol * item.qty;
+          });
 
-        msg += `\n合計金額: ¥${totalAmount.toLocaleString()}`;
-        msg += `\n合計容積: ${totalVol.toLocaleString()} vol（約 ${boxCount} 箱分）\n`;
+          const boxCount = (totalVol / 1000).toFixed(1);
 
-        // 3. LINE共有画面を開く
-        const lineUrl = `https://line.me/R/share?text=${encodeURIComponent(msg)}`;
-        window.location.href = lineUrl;
+          msg += `\n合計金額: ¥${totalAmount.toLocaleString()}`;
+          msg += `\n合計容積: ${totalVol.toLocaleString()} vol（約 ${boxCount} 箱分）\n`;
+          
+          // GASから返された納品書URLをLINEテキストに追加
+          if (result.invoiceUrl) {
+            msg += `\n📄 納品書URL:\n${result.invoiceUrl}\n`;
+          }
 
-        // 4. カートを初期状態（0）にリセットして画面を初期化
-        Object.keys(cart).forEach(id => {
-          cart[id] = 0;
-        });
-        
-        closeModal();
-        renderProducts();
-        updateSummary();
+          // LINE共有画面へ遷移
+          const lineUrl = `https://line.me/R/share?text=${encodeURIComponent(msg)}`;
+          window.location.href = lineUrl;
 
-        // 最新の在庫情報をバックグラウンドで再取得
-        fetchProducts();
+          // カートリセット＆表示更新
+          Object.keys(cart).forEach(id => { cart[id] = 0; });
+          closeModal();
+          renderProducts();
+          updateSummary();
+
+          // 最新の在庫情報をバックグラウンドで再取得
+          fetchProducts();
+
+        } else if (result.status === "stock_error") {
+          alert(result.message);
+          // 在庫不足時は最新情報を再取得して画面を更新
+          fetchProducts();
+        } else {
+          alert("エラーが発生しました: " + result.message);
+        }
 
       } catch (e) {
         alert('注文処理中にエラーが発生しました。通信環境等を確認して再度お試しください。');
