@@ -308,16 +308,21 @@
 
     .modal-actions {
       display: flex;
+      flex-direction: column;
       gap: 8px;
     }
 
     .modal-btn {
-      flex: 1;
+      width: 100%;
       padding: 12px;
       border: none;
       border-radius: 6px;
       font-weight: bold;
       cursor: pointer;
+      text-decoration: none;
+      text-align: center;
+      box-sizing: border-box;
+      display: inline-block;
     }
 
     .modal-btn:disabled {
@@ -326,7 +331,8 @@
     }
 
     .btn-back { background: #7f8c8d; color: #fff; }
-    .btn-send { background: #27ae60; color: #fff; }
+    .btn-send { background: #06C755; color: #fff; font-size: 1rem; }
+    .btn-invoice { background: #005bac; color: #fff; }
 
     .img-modal-overlay {
       position: fixed;
@@ -390,12 +396,12 @@
 
   <div class="modal-overlay" id="order-modal">
     <div class="modal-content">
-      <div class="modal-header">ご注文内容の確認</div>
+      <div class="modal-header" id="modal-title">ご注文内容の確認</div>
       <div class="modal-body" id="modal-item-list"></div>
       <div class="modal-summary" id="modal-summary-box"></div>
-      <div class="modal-actions">
-        <button class="modal-btn btn-back" id="btn-back" onclick="closeModal()">戻る</button>
-        <button class="modal-btn btn-send" id="final-send-btn" onclick="submitOrder()">送信してLINE共有</button>
+      <div class="modal-actions" id="modal-actions-box">
+        <button class="modal-btn btn-send" id="final-send-btn" onclick="submitOrder()">注文を確定してLINEで送信</button>
+        <button class="modal-btn btn-back" id="btn-back" onclick="closeModal()">キャンセル・戻る</button>
       </div>
     </div>
   </div>
@@ -581,6 +587,9 @@
       const modal = document.getElementById('order-modal');
       const listContainer = document.getElementById('modal-item-list');
       const summaryBox = document.getElementById('modal-summary-box');
+      const actionsBox = document.getElementById('modal-actions-box');
+      
+      document.getElementById('modal-title').innerText = "ご注文内容の確認";
 
       listContainer.innerHTML = '';
       let totalAmount = 0;
@@ -616,6 +625,12 @@
         <div class="total-price">合計金額: ¥${totalAmount.toLocaleString()} (税込)</div>
       `;
 
+      // アクションボタン初期状態
+      actionsBox.innerHTML = `
+        <button class="modal-btn btn-send" id="final-send-btn" onclick="submitOrder()">注文を確定してLINEで送信</button>
+        <button class="modal-btn btn-back" id="btn-back" onclick="closeModal()">キャンセル・戻る</button>
+      `;
+
       modal.classList.add('active');
     }
 
@@ -641,18 +656,25 @@
       
       sendBtn.disabled = true;
       backBtn.disabled = true;
-      sendBtn.innerText = "送信中...";
+      sendBtn.innerText = "納品書を作成中...";
 
       try {
-        // 1. GASへデータを送信 (no-corsモードで確実にGASへPOSTを到達させる)
-        await fetch(GAS_API_URL, {
+        // 1. GASへデータを送信 (no-corsを取り除き、JSONとして結果を受け取る)
+        const response = await fetch(GAS_API_URL, {
           method: 'POST',
-          mode: 'no-cors',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'text/plain;charset=utf-8'
           },
           body: JSON.stringify({ items: orderItems })
         });
+
+        const result = await response.json();
+
+        if (result.status !== 'success') {
+          throw new Error(result.message || '納品書の作成に失敗しました。');
+        }
+
+        const invoiceUrl = result.invoiceUrl;
 
         // 2. LINE送信用テキストの生成
         let totalVol = 0;
@@ -670,30 +692,27 @@
         msg += `\n合計金額: ¥${totalAmount.toLocaleString()}`;
         msg += `\n合計容積: ${totalVol.toLocaleString()} vol（約 ${boxCount} 箱分）\n`;
 
-        // 3. LINE共有画面を開く
-        const lineUrl = `https://line.me/R/share?text=${encodeURIComponent(msg)}`;
-        window.open(lineUrl, '_blank');
+        if (invoiceUrl) {
+          msg += `\n📑 納品書スプレッドシート:\n${invoiceUrl}`;
+        }
 
-        // 4. カートを初期状態（0）にリセットして画面を初期化
-        Object.keys(cart).forEach(id => {
-          cart[id] = 0;
-        });
-        
-        closeModal();
+        // 3. LINE共有URLの生成
+        const lineUrl = `https://line.me/R/share?text=${encodeURIComponent(msg)}`;
+
+        // 4. カートリセット
+        Object.keys(cart).forEach(id => { cart[id] = 0; });
         renderProducts();
         updateSummary();
-
-        // 最新の在庫情報をバックグラウンドで再取得
         fetchProducts();
 
-      } catch (e) {
-        alert('注文処理中にエラーが発生しました。通信環境等を確認して再度お試しください。');
-      } finally {
-        sendBtn.disabled = false;
-        backBtn.disabled = false;
-        sendBtn.innerText = "送信してLINE共有";
-      }
-    }
-  </script>
-</body>
-</html>
+        // 5. モーダル画面を「送信完了画面」に切り替えて確実にLINE送信ボタンを押せるようにする
+        document.getElementById('modal-title').innerText = "注文が確定しました！";
+        document.getElementById('modal-item-list').innerHTML = `
+          <p style="text-align:center; color:#27ae60; font-weight:bold; margin: 15px 0;">
+            納品書スプレッドシートが作成されました。<br>下のボタンを押してLINEで送信してください。
+          </p>
+        `;
+        document.getElementById('modal-summary-box').style.display = 'none';
+
+        const actionsBox = document.getElementById('modal-actions-box');
+        actionsBox.i
