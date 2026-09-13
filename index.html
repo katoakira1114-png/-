@@ -115,7 +115,12 @@
       border-radius: 6px;
       font-size: 0.85rem;
       display: flex;
-      align-items: center;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .recommend-items {
+      display: flex;
       flex-wrap: wrap;
       gap: 6px;
     }
@@ -123,7 +128,7 @@
     .recommend-badge {
       background-color: #fff;
       border: 1px solid #ffd54f;
-      padding: 2px 8px;
+      padding: 4px 8px;
       border-radius: 12px;
       color: #d81b60;
       font-weight: bold;
@@ -322,6 +327,11 @@
       cursor: pointer;
     }
 
+    .modal-btn:disabled {
+      background-color: #ccc !important;
+      cursor: not-allowed;
+    }
+
     .btn-back { background: #7f8c8d; color: #fff; }
     .btn-send { background: #27ae60; color: #fff; }
 
@@ -378,7 +388,7 @@
   <!-- 空き容量提案 -->
   <div class="recommend-box" id="recommend-box" style="display: none;">
     <span id="recommend-text">💡 箱にあと 120 vol 入ります！一緒にいかがですか？</span>
-    <div id="recommend-items"></div>
+    <div class="recommend-items" id="recommend-items"></div>
   </div>
 
   <!-- 商品リスト -->
@@ -398,7 +408,7 @@
       <div class="modal-body" id="modal-item-list"></div>
       <div class="modal-summary" id="modal-summary-box"></div>
       <div class="modal-actions">
-        <button class="modal-btn btn-back" onclick="closeModal()">戻る</button>
+        <button class="modal-btn btn-back" id="btn-back" onclick="closeModal()">戻る</button>
         <button class="modal-btn btn-send" id="final-send-btn" onclick="submitOrder()">送信してLINE共有</button>
       </div>
     </div>
@@ -448,7 +458,6 @@
       renderProducts();
     }
 
-    // Google Drive URLからファイルIDを抽出して直接表示可能な画像URLに変換
     function formatImgUrl(url) {
       if (!url) return '';
       const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
@@ -545,14 +554,34 @@
       const recommendBox = document.getElementById('recommend-box');
       const recommendItemsDiv = document.getElementById('recommend-items');
 
+      // オススメ表示（空き容量が300vol以下かつカートに商品が入っている場合）
       if (remainingVol > 0 && remainingVol <= 300 && totalVol > 0) {
         recommendBox.style.display = 'flex';
         document.getElementById('recommend-text').innerText = `💡 箱にあと ${remainingVol} vol 入ります！一緒にいかがですか？`;
         
+        // 1. 容量に入る在庫アリ商品を抽出
         const fits = allProducts.filter(p => p.vol <= remainingVol && p.stock > 0);
-        recommendItemsDiv.innerHTML = fits.map(f => 
-          `<span class="recommend-badge" onclick="switchCategory('${f.category}')">${f.name} (+${f.vol}vol)</span>`
-        ).join('');
+
+        // 2. 重複商品名を除外し、各カテゴリ毎に最小volの商品を1点ずつピックアップ
+        const categories = [...new Set(fits.map(p => p.category))];
+        const selectedRecommendations = [];
+
+        categories.forEach(cat => {
+          const catItems = fits.filter(p => p.category === cat);
+          if (catItems.length > 0) {
+            // volが最小のものを1つ選出
+            catItems.sort((a, b) => a.vol - b.vol);
+            selectedRecommendations.push(catItems[0]);
+          }
+        });
+
+        if (selectedRecommendations.length > 0) {
+          recommendItemsDiv.innerHTML = selectedRecommendations.map(f => 
+            `<span class="recommend-badge" onclick="switchCategory('${f.category}')">${f.name} (+${f.vol}vol)</span>`
+          ).join('');
+        } else {
+          recommendBox.style.display = 'none';
+        }
       } else {
         recommendBox.style.display = 'none';
       }
@@ -617,8 +646,12 @@
 
       if (orderItems.length === 0) return;
 
+      // 送信ボタン・戻るボタンの即時無効化（二重送信・離脱防止）
       const sendBtn = document.getElementById('final-send-btn');
+      const backBtn = document.getElementById('btn-back');
+      
       sendBtn.disabled = true;
+      backBtn.disabled = true;
       sendBtn.innerText = "送信中...";
 
       try {
@@ -632,6 +665,7 @@
         if (result.status === "stock_error" || result.status === "error") {
           alert(result.message);
           sendBtn.disabled = false;
+          backBtn.disabled = false;
           sendBtn.innerText = "送信してLINE共有";
           return;
         }
@@ -651,16 +685,18 @@
         msg += `\n合計金額: ¥${totalAmount.toLocaleString()}`;
         msg += `\n合計容積: ${totalVol.toLocaleString()} vol（約 ${boxCount} 箱分）\n`;
         
-        if (result.sheetUrl) {
-          msg += `\n\n📊 受注スプレッドシート:\n${result.sheetUrl}`;
+        if (result.invoiceUrl) {
+          msg += `\n📄 仮納品書スプレッドシート:\n${result.invoiceUrl}`;
         }
 
+        // LINE共有を開く
         const lineUrl = `https://line.me/R/share?text=${encodeURIComponent(msg)}`;
         window.location.href = lineUrl;
 
       } catch (e) {
         alert('注文処理中にエラーが発生しました。通信環境等を確認して再度お試しください。');
         sendBtn.disabled = false;
+        backBtn.disabled = false;
         sendBtn.innerText = "送信してLINE共有";
       }
     }
