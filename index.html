@@ -131,12 +131,16 @@
       cursor: pointer;
     }
 
-    /* 商品カード一覧 */
+    /* 商品カード一覧（2列グリッドレイアウト） */
     .product-list {
       padding: 0 12px;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
     }
 
     .loading-text {
+      grid-column: 1 / -1;
       text-align: center;
       padding: 40px 0;
       color: #666;
@@ -146,34 +150,36 @@
     .product-card {
       background: var(--card-bg);
       border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 12px;
+      padding: 10px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.1);
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      justify-content: space-between;
+      gap: 6px;
     }
 
     .product-img {
       width: 100%;
-      height: 160px;
+      height: 120px;
       object-fit: cover;
       border-radius: 6px;
       background-color: #eee;
+      cursor: pointer;
     }
 
     .product-title {
-      font-size: 1rem;
+      font-size: 0.9rem;
       font-weight: bold;
+      line-height: 1.2;
     }
 
     .product-meta {
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       color: #777;
     }
 
     .product-price {
-      font-size: 1.1rem;
+      font-size: 1rem;
       font-weight: bold;
       color: var(--primary-color);
     }
@@ -185,25 +191,26 @@
       border-radius: 4px;
       width: fit-content;
       overflow: hidden;
+      margin-top: 4px;
     }
 
     .qty-btn {
-      width: 36px;
-      height: 32px;
+      width: 32px;
+      height: 28px;
       background: #f0f0f0;
       border: none;
-      font-size: 1.2rem;
+      font-size: 1.1rem;
       font-weight: bold;
       cursor: pointer;
     }
 
     .qty-input {
-      width: 50px;
-      height: 32px;
+      width: 40px;
+      height: 28px;
       text-align: center;
       border: none;
       font-weight: bold;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
     }
 
     /* 下部固定ボタン */
@@ -216,6 +223,7 @@
       padding: 10px 12px;
       border-top: 1px solid var(--border-color);
       box-shadow: 0 -2px 6px rgba(0,0,0,0.05);
+      z-index: 100;
     }
 
     .confirm-btn {
@@ -235,7 +243,7 @@
       cursor: not-allowed;
     }
 
-    /* モーダル */
+    /* モーダル共通スタイル */
     .modal-overlay {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
@@ -317,6 +325,28 @@
 
     .btn-back { background: #7f8c8d; color: #fff; }
     .btn-send { background: #27ae60; color: #fff; }
+
+    /* 画像拡大モーダル専用スタイル */
+    .img-modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 300;
+    }
+
+    .img-modal-overlay.active {
+      display: flex;
+    }
+
+    .img-modal-content {
+      max-width: 90%;
+      max-height: 80vh;
+      border-radius: 8px;
+      object-fit: contain;
+    }
   </style>
 </head>
 <body>
@@ -375,6 +405,11 @@
     </div>
   </div>
 
+  <!-- 画像拡大ビューアー用モーダル -->
+  <div class="img-modal-overlay" id="img-zoom-modal" onclick="closeImageModal()">
+    <img class="img-modal-content" id="zoomed-img" src="" alt="拡大画像">
+  </div>
+
   <script>
     // 指定のGASデプロイURL
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxl2wEanAHUJ2Je7ToufKy-V4UOMSSsZDIpqFAgvvqKLxUNM0DN4cb55uEmzoORswpBDg/exec";
@@ -396,7 +431,9 @@
 
         // カートの初期化（IDをキーにする）
         allProducts.forEach(p => {
-          cart[p.id] = 0;
+          if (cart[p.id] === undefined) {
+            cart[p.id] = 0;
+          }
         });
 
         renderProducts();
@@ -415,6 +452,18 @@
       renderProducts();
     }
 
+    // Google Drive URLを直接表示用ダイレクトリンクに補正
+    function formatImgUrl(url) {
+      if (!url) return '';
+      if (url.includes('drive.google.com')) {
+        const match = url.match(/[-\w]{25,}/);
+        if (match) {
+          return `https://drive.google.com/uc?export=view&id=${match[0]}`;
+        }
+      }
+      return url;
+    }
+
     function renderProducts() {
       const container = document.getElementById('product-container');
       container.innerHTML = '';
@@ -431,10 +480,11 @@
         const card = document.createElement('div');
         card.className = 'product-card';
         const dummyImg = 'https://via.placeholder.com/300x160?text=No+Image';
-        const imgSrc = p.img ? p.img : dummyImg;
+        const rawImg = formatImgUrl(p.img);
+        const imgSrc = rawImg ? rawImg : dummyImg;
 
         card.innerHTML = `
-          <img src="${imgSrc}" class="product-img" alt="${p.name}" onerror="this.src='${dummyImg}'">
+          <img src="${imgSrc}" class="product-img" alt="${p.name}" onerror="this.src='${dummyImg}'" onclick="openImageModal('${imgSrc}')">
           <div class="product-title">${p.name} ${p.isNew ? '<span style="color:red; font-size:0.8rem;">[NEW]</span>' : ''}</div>
           <div class="product-meta">サイズ:${p.size || '規格なし'} / ${p.vol}vol / 在庫:${p.stock}</div>
           <div class="product-price">¥${p.price.toLocaleString()}</div>
@@ -446,6 +496,15 @@
         `;
         container.appendChild(card);
       });
+    }
+
+    function openImageModal(src) {
+      document.getElementById('zoomed-img').src = src;
+      document.getElementById('img-zoom-modal').classList.add('active');
+    }
+
+    function closeImageModal() {
+      document.getElementById('img-zoom-modal').classList.remove('active');
     }
 
     function changeQty(id, delta) {
@@ -477,7 +536,7 @@
       });
 
       document.getElementById('total-price-text').innerText = `合計金額: ${totalAmount.toLocaleString()} 円`;
-      document.getElementById('total-vol-text').innerText = `合計容量: ${totalVol.toLocaleString()} vol`;
+      document.getElementById('total-vol-text').innerText = `合計容積: ${totalVol.toLocaleString()} vol`;
 
       // 箱数計算 (1000vol = 1箱)
       const currentBoxIndex = Math.floor(totalVol / 1000) + 1;
@@ -496,7 +555,7 @@
       const recommendItemsDiv = document.getElementById('recommend-items');
 
       if (remainingVol > 0 && remainingVol <= 300 && totalVol > 0) {
-        recommendBox.style.display = 'block';
+        recommendBox.style.display = 'flex';
         document.getElementById('recommend-text').innerText = `💡 箱にあと ${remainingVol} vol 入ります！一緒にいかがですか？`;
         
         // 収まる商品を抽出
@@ -603,9 +662,9 @@
         msg += `\n合計金額: ¥${totalAmount.toLocaleString()}`;
         msg += `\n合計容積: ${totalVol.toLocaleString()} vol（約 ${boxCount} 箱分）\n`;
         
-        // GASから返ってきた納品書スプレッドシートのURLをLINEメッセージに添付
+        // GASから返ってきたスプレッドシートのURLをLINEメッセージに添付
         if (result.sheetUrl) {
-          msg += `\n📊 納品書スプレッドシート:\n${result.sheetUrl}`;
+          msg += `\n📊 受注スプレッドシート:\n${result.sheetUrl}`;
         }
 
         const lineUrl = `https://line.me/R/share?text=${encodeURIComponent(msg)}`;
