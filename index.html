@@ -308,21 +308,16 @@
 
     .modal-actions {
       display: flex;
-      flex-direction: column;
       gap: 8px;
     }
 
     .modal-btn {
-      width: 100%;
+      flex: 1;
       padding: 12px;
       border: none;
       border-radius: 6px;
       font-weight: bold;
       cursor: pointer;
-      text-decoration: none;
-      text-align: center;
-      box-sizing: border-box;
-      display: inline-block;
     }
 
     .modal-btn:disabled {
@@ -331,8 +326,7 @@
     }
 
     .btn-back { background: #7f8c8d; color: #fff; }
-    .btn-send { background: #06C755; color: #fff; font-size: 1rem; }
-    .btn-invoice { background: #005bac; color: #fff; }
+    .btn-send { background: #27ae60; color: #fff; }
 
     .img-modal-overlay {
       position: fixed;
@@ -396,12 +390,12 @@
 
   <div class="modal-overlay" id="order-modal">
     <div class="modal-content">
-      <div class="modal-header" id="modal-title">ご注文内容の確認</div>
+      <div class="modal-header">ご注文内容の確認</div>
       <div class="modal-body" id="modal-item-list"></div>
       <div class="modal-summary" id="modal-summary-box"></div>
-      <div class="modal-actions" id="modal-actions-box">
-        <button class="modal-btn btn-send" id="final-send-btn" onclick="submitOrder()">注文を確定してLINEで送信</button>
-        <button class="modal-btn btn-back" id="btn-back" onclick="closeModal()">キャンセル・戻る</button>
+      <div class="modal-actions">
+        <button class="modal-btn btn-back" id="btn-back" onclick="closeModal()">戻る</button>
+        <button class="modal-btn btn-send" id="final-send-btn" onclick="submitOrder()">送信してLINE共有</button>
       </div>
     </div>
   </div>
@@ -424,8 +418,7 @@
     async function fetchProducts() {
       const container = document.getElementById('product-container');
       try {
-        // GET通信は単純に呼び出す（CORSを回避）
-        const res = await fetch(GAS_API_URL, { method: 'GET' });
+        const res = await fetch(GAS_API_URL);
         const rawProducts = await res.json();
 
         allProducts = rawProducts.map(p => ({
@@ -445,7 +438,7 @@
         updateSummary();
       } catch (err) {
         console.error("商品データの取得エラー:", err);
-        container.innerHTML = '<div class="loading-text" style="color:red;">商品データの読み込みに失敗しました。<br>再読み込みをお試しください。</div>';
+        container.innerHTML = '<div class="loading-text" style="color:red;">商品データの読み込みに失敗しました。</div>';
       }
     }
 
@@ -588,9 +581,6 @@
       const modal = document.getElementById('order-modal');
       const listContainer = document.getElementById('modal-item-list');
       const summaryBox = document.getElementById('modal-summary-box');
-      const actionsBox = document.getElementById('modal-actions-box');
-      
-      document.getElementById('modal-title').innerText = "ご注文内容の確認";
 
       listContainer.innerHTML = '';
       let totalAmount = 0;
@@ -626,11 +616,6 @@
         <div class="total-price">合計金額: ¥${totalAmount.toLocaleString()} (税込)</div>
       `;
 
-      actionsBox.innerHTML = `
-        <button class="modal-btn btn-send" id="final-send-btn" onclick="submitOrder()">注文を確定してLINEで送信</button>
-        <button class="modal-btn btn-back" id="btn-back" onclick="closeModal()">キャンセル・戻る</button>
-      `;
-
       modal.classList.add('active');
     }
 
@@ -656,65 +641,59 @@
       
       sendBtn.disabled = true;
       backBtn.disabled = true;
-      sendBtn.innerText = "注文処理中...";
-
-      let invoiceUrl = "";
+      sendBtn.innerText = "送信中...";
 
       try {
-        // POST送信処理（CORS制限を考慮してno-corsフォールバック対応）
-        const response = await fetch(GAS_API_URL, {
+        // 1. GASへデータを送信 (no-corsモードで確実にGASへPOSTを到達させる)
+        await fetch(GAS_API_URL, {
           method: 'POST',
-          mode: 'cors',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          mode: 'no-cors',
+          headers: {
+            'Content-Type': 'application/json'
+          },
           body: JSON.stringify({ items: orderItems })
         });
 
-        const result = await response.json();
-        if (result && result.invoiceUrl) {
-          invoiceUrl = result.invoiceUrl;
-        }
+        // 2. LINE送信用テキストの生成
+        let totalVol = 0;
+        let totalAmount = 0;
+        let msg = "【ご注文内容】\n";
+        
+        orderItems.forEach(item => {
+          msg += `・[${item.category}] ${item.name} × ${item.qty}（¥${item.subtotal.toLocaleString()}）\n`;
+          totalAmount += item.subtotal;
+          totalVol += item.vol * item.qty;
+        });
+
+        const boxCount = (totalVol / 1000).toFixed(1);
+
+        msg += `\n合計金額: ¥${totalAmount.toLocaleString()}`;
+        msg += `\n合計容積: ${totalVol.toLocaleString()} vol（約 ${boxCount} 箱分）\n`;
+
+        // 3. LINE共有画面を開く
+        const lineUrl = `https://line.me/R/share?text=${encodeURIComponent(msg)}`;
+        window.open(lineUrl, '_blank');
+
+        // 4. カートを初期状態（0）にリセットして画面を初期化
+        Object.keys(cart).forEach(id => {
+          cart[id] = 0;
+        });
+        
+        closeModal();
+        renderProducts();
+        updateSummary();
+
+        // 最新の在庫情報をバックグラウンドで再取得
+        fetchProducts();
+
       } catch (e) {
-        console.warn("通常のPOST通信でCORS例外が発生したため、no-corsで送信を補完します:", e);
-        // CORSでブロックされた場合でもGAS側の処理を発動させるためのフォールバック送信
-        try {
-          await fetch(GAS_API_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ items: orderItems })
-          });
-        } catch (err) {
-          console.error("送信エラー:", err);
-        }
+        alert('注文処理中にエラーが発生しました。通信環境等を確認して再度お試しください。');
+      } finally {
+        sendBtn.disabled = false;
+        backBtn.disabled = false;
+        sendBtn.innerText = "送信してLINE共有";
       }
-
-      // LINE送信用メッセージ組み立て
-      let totalVol = 0;
-      let totalAmount = 0;
-      let msg = "【ご注文内容】\n";
-      
-      orderItems.forEach(item => {
-        msg += `・[${item.category}] ${item.name} × ${item.qty}（¥${item.subtotal.toLocaleString()}）\n`;
-        totalAmount += item.subtotal;
-        totalVol += item.vol * item.qty;
-      });
-
-      const boxCount = (totalVol / 1000).toFixed(1);
-      msg += `\n合計金額: ¥${totalAmount.toLocaleString()}`;
-      msg += `\n合計容積: ${totalVol.toLocaleString()} vol（約 ${boxCount} 箱分）\n`;
-
-      if (invoiceUrl) {
-        msg += `\n📑 納品書スプレッドシート:\n${invoiceUrl}`;
-      }
-
-      const lineUrl = `https://line.me/R/share?text=${encodeURIComponent(msg)}`;
-
-      // カートリセット＆再読み込み
-      Object.keys(cart).forEach(id => { cart[id] = 0; });
-      renderProducts();
-      updateSummary();
-      fetchProducts();
-
-      // 完了画面の表示
-      document.getElementById('modal-title').innerText = "注文を確定しました！";
-      document.getElementById('modal-item-list').i
+    }
+  </script>
+</body>
+</html>
