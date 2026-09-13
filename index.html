@@ -650,7 +650,7 @@
         const response = await fetch(GAS_API_URL, {
           method: 'POST',
           headers: {
-            'Content-Type': 'text/plain' // GASのWeb AppでCORSエラーを防ぐためtext/plain指定が有効
+            'Content-Type': 'text/plain' // GASのWeb AppでCORSエラーを防ぐためtext/plain指定
           },
           body: JSON.stringify({ items: orderItems })
         });
@@ -678,22 +678,30 @@
             msg += `\n📄 納品書URL:\n${result.invoiceUrl}\n`;
           }
 
-          // LINE共有画面へ遷移
-          const lineUrl = `https://line.me/R/share?text=${encodeURIComponent(msg)}`;
-          window.location.href = lineUrl;
-
-          // カートリセット＆表示更新
+          // カートリセット＆画面表示更新
           Object.keys(cart).forEach(id => { cart[id] = 0; });
           closeModal();
           renderProducts();
           updateSummary();
+          fetchProducts(); // バックグラウンドで最新在庫再取得
 
-          // 最新の在庫情報をバックグラウンドで再取得
-          fetchProducts();
+          // --- 共有処理（外部ブラウザ対策） ---
+          // 1. スマホの標準共有機能（Web Share API）が使える場合
+          if (navigator.share) {
+            try {
+              await navigator.share({ text: msg });
+              return;
+            } catch (shareErr) {
+              console.log("Web Shareがキャンセルされたか非対応です", shareErr);
+            }
+          }
+
+          // 2. Web Share非対応やキャンセルの場合のフォールバック（外部ブラウザ用LINEスキーム）
+          const lineUrl = `https://line.me/R/msg/text/?${encodeURIComponent(msg)}`;
+          window.location.href = lineUrl;
 
         } else if (result.status === "stock_error") {
           alert(result.message);
-          // 在庫不足時は最新情報を再取得して画面を更新
           fetchProducts();
         } else {
           alert("エラーが発生しました: " + result.message);
