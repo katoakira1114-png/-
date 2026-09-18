@@ -354,7 +354,6 @@
 
   <header>商品一覧</header>
 
-  <!-- タブはJavaScript側でスプレッドシートのシート名に合わせて自動生成されます -->
   <div class="tabs" id="category-tabs"></div>
 
   <div class="summary-card">
@@ -431,7 +430,6 @@
           }
         });
 
-        // スプレッドシートにあるシート名（カテゴリ）を重複なく抽出
         categories = [...new Set(allProducts.map(p => p.category))];
 
         if (categories.length > 0 && (!currentCategory || !categories.includes(currentCategory))) {
@@ -639,7 +637,7 @@
       modal.classList.add('active');
     }
 
-  function closeModal() {
+    function closeModal() {
       document.getElementById('order-modal').classList.remove('active');
     }
 
