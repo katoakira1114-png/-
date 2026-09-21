@@ -364,7 +364,7 @@
       font-weight: bold;
       margin-bottom: 3px;
     }
-    .form-input, .form-select {
+    .form-input {
       width: 100%;
       padding: 8px;
       border: 1px solid var(--border-color);
@@ -450,7 +450,6 @@
     </div>
   </header>
 
-  <!-- 未登録ユーザー用警告エリア -->
   <div class="unregistered-alert" id="unregistered-alert" style="display: none;">
     ⚠️ 取引先マスタに未登録のアカウントです。<br>
     仕入れ価格の確認・ご注文には事前登録が必要です。<br>
@@ -486,7 +485,6 @@
     <button class="confirm-btn" id="confirm-btn" onclick="openModal()">注文内容を確認する (0点)</button>
   </div>
 
-  <!-- 確認モーダル -->
   <div class="modal-overlay" id="order-modal">
     <div class="modal-content">
       <div class="modal-header">ご注文内容の確認</div>
@@ -500,14 +498,6 @@
           <div class="form-group">
             <label>電話番号</label>
             <input type="tel" id="cust-phone" class="form-input" placeholder="例: 090-1234-5678">
-          </div>
-          <div class="form-group">
-            <label>配送エリア（送料自動適用）</label>
-            <select id="shipping-select" class="form-select" onchange="calculateModalTotal()">
-              <option value="0">沖縄県内 (送料 0円)</option>
-              <option value="1500">本州・四国・九州 (+1,500円)</option>
-              <option value="2200">北海道・離島 (+2,200円)</option>
-            </select>
           </div>
         </div>
 
@@ -550,11 +540,10 @@
         if (liff.isLoggedIn()) {
           lineProfile = await liff.getProfile();
         } else if (liff.isInClient()) {
-          // LINE内ブラウザなら自動ログイン
           liff.login();
         }
       } catch (err) {
-        console.warn("LIFF初期化スキップ(外部ブラウザ等):", err);
+        console.warn("LIFF初期化スキップ:", err);
       }
     }
 
@@ -591,9 +580,6 @@
           
           document.getElementById('cust-name').value = customerMaster.name || '';
           document.getElementById('cust-phone').value = customerMaster.phone || '';
-          if (customerMaster.area) {
-            document.getElementById('shipping-select').value = customerMaster.area;
-          }
         }
 
         const discountRate = (isRegistered && customerMaster) ? customerMaster.discountRate : 1.0;
@@ -625,12 +611,12 @@
         updateSummary();
       } catch (err) {
         console.error("データ取得エラー:", err);
-        container.innerHTML = '<div class="loading-text" style="color:red;">データの読み込みに失敗しました。<br>通信環境をご確認の上、再読み込みしてください。</div>';
+        container.innerHTML = '<div class="loading-text" style="color:red;">データの読み込みに失敗しました。</div>';
       }
     }
 
     function requestRegistration() {
-      const uid = lineProfile ? lineProfile.userId : '不明';
+      const uid = lineProfile ? lineProfile.userId : '未取得';
       const name = lineProfile ? lineProfile.displayName : '未取得';
       const msg = `川畑水産様\n仕入れ取引のアカウント登録をお願いします。\n【店舗名】:\n【お名前】: ${name}\n【ユーザーID】: ${uid}`;
       const lineUrl = `https://line.me/R/oaMessage/@877qwvyc/?${encodeURIComponent(msg)}`;
@@ -819,7 +805,6 @@
     function calculateModalTotal() {
       const listContainer = document.getElementById('modal-item-list');
       const summaryBox = document.getElementById('modal-summary-box');
-      const shippingFee = Number(document.getElementById('shipping-select').value) || 0;
 
       listContainer.innerHTML = '';
       let subtotalAmount = 0;
@@ -852,13 +837,11 @@
         }
       });
 
-      const grandTotal = subtotalAmount + shippingFee;
       const boxCount = (totalVol / 1000).toFixed(1);
 
       summaryBox.innerHTML = `
-        <div>商品小計: ¥${subtotalAmount.toLocaleString()}${hasAsk ? ' + ASK' : ''} / 送料: ¥${shippingFee.toLocaleString()}</div>
         <div>数量: 計 ${totalCount} 点 / 容積: ${totalVol} vol (約${boxCount}箱)</div>
-        <div class="total-price">お支払い合計: ¥${grandTotal.toLocaleString()} (税込)${hasAsk ? ' + ASK' : ''}</div>
+        <div class="total-price">お支払い合計: ¥${subtotalAmount.toLocaleString()} (税込)${hasAsk ? ' + ASK' : ''}</div>
       `;
     }
 
@@ -869,7 +852,6 @@
     async function submitOrder() {
       const custName = document.getElementById('cust-name').value.trim();
       const custPhone = document.getElementById('cust-phone').value.trim();
-      const shippingFee = Number(document.getElementById('shipping-select').value) || 0;
 
       if (!custName) {
         alert('店舗名またはお名前を入力してください。');
@@ -902,7 +884,6 @@
       try {
         const payload = {
           items: orderItems,
-          shippingFee: shippingFee,
           customer: {
             name: custName,
             phone: custPhone,
