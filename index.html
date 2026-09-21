@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>商品注文フォーム</title>
+  <!-- LINE LIFF SDK -->
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     :root {
       --primary-color: #005bac;
@@ -36,6 +38,13 @@
       position: sticky;
       top: 0;
       z-index: 100;
+    }
+
+    .user-badge {
+      font-size: 0.8rem;
+      color: #00c300;
+      margin-top: 4px;
+      font-weight: normal;
     }
 
     .tabs {
@@ -124,12 +133,16 @@
     .recommend-badge {
       background-color: #fff;
       border: 1px solid #ffd54f;
-      padding: 4px 8px;
+      padding: 6px 10px;
       border-radius: 12px;
       color: #d81b60;
       font-weight: bold;
       font-size: 0.75rem;
       cursor: pointer;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    .recommend-badge:active {
+      transform: scale(0.96);
     }
 
     .product-list {
@@ -156,6 +169,25 @@
       flex-direction: column;
       justify-content: space-between;
       gap: 6px;
+      position: relative;
+    }
+
+    /* 売り切れスタイル */
+    .product-card.soldout {
+      opacity: 0.6;
+    }
+
+    .soldout-tag {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      background: rgba(217, 83, 79, 0.9);
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: bold;
+      padding: 4px 8px;
+      border-radius: 4px;
+      z-index: 2;
     }
 
     .product-img {
@@ -201,6 +233,11 @@
       font-size: 1.1rem;
       font-weight: bold;
       cursor: pointer;
+    }
+
+    .qty-btn:disabled {
+      color: #ccc;
+      cursor: not-allowed;
     }
 
     .qty-input {
@@ -263,7 +300,7 @@
       border-radius: 10px;
       padding: 16px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      max-height: 85vh;
+      max-height: 90vh;
       display: flex;
       flex-direction: column;
     }
@@ -283,6 +320,24 @@
       margin-bottom: 12px;
     }
 
+    .form-group {
+      margin-bottom: 10px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: bold;
+      margin-bottom: 4px;
+
+    }
+    .form-input, .form-select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+
     .order-item-row {
       display: flex;
       justify-content: space-between;
@@ -300,7 +355,7 @@
     }
 
     .modal-summary .total-price {
-      font-size: 1rem;
+      font-size: 1.1rem;
       font-weight: bold;
       color: var(--primary-color);
       margin-top: 4px;
@@ -309,6 +364,7 @@
     .modal-actions {
       display: flex;
       gap: 8px;
+      margin-top: 10px;
     }
 
     .modal-btn {
@@ -352,7 +408,10 @@
 </head>
 <body>
 
-  <header>商品一覧</header>
+  <header>
+    商品一覧
+    <div class="user-badge" id="user-badge" style="display:none;"></div>
+  </header>
 
   <div class="tabs" id="category-tabs"></div>
 
@@ -371,7 +430,7 @@
   </div>
 
   <div class="recommend-box" id="recommend-box" style="display: none;">
-    <span id="recommend-text">💡 箱にあと 0 vol 入ります！一緒にいかがですか？</span>
+    <span id="recommend-text">💡 箱にあと 0 vol 入ります！タップで追加できます！</span>
     <div class="recommend-items" id="recommend-items"></div>
   </div>
 
@@ -383,11 +442,36 @@
     <button class="confirm-btn" id="confirm-btn" onclick="openModal()">注文内容を確認する (0点)</button>
   </div>
 
+  <!-- 注文内容・配送先入力 モーダル -->
   <div class="modal-overlay" id="order-modal">
     <div class="modal-content">
       <div class="modal-header">ご注文内容の確認</div>
-      <div class="modal-body" id="modal-item-list"></div>
-      <div class="modal-summary" id="modal-summary-box"></div>
+      <div class="modal-body">
+        
+        <!-- お客様情報入力 -->
+        <div style="background:#eef6ff; padding:8px; border-radius:6px; margin-bottom:12px;">
+          <div class="form-group">
+            <label>お名前（必須）</label>
+            <input type="text" id="cust-name" class="form-input" placeholder="例: 川畑 太郎">
+          </div>
+          <div class="form-group">
+            <label>電話番号</label>
+            <input type="tel" id="cust-phone" class="form-input" placeholder="例: 090-1234-5678">
+          </div>
+          <div class="form-group">
+            <label>配送エリア（送料自動適用）</label>
+            <select id="shipping-select" class="form-select" onchange="calculateModalTotal()">
+              <option value="0">沖縄県内 (送料 0円 / 送料無料)</option>
+              <option value="1500">本州・四国・九州 (+1,500円)</option>
+              <option value="2200">北海道・離島 (+2,200円)</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="modal-item-list"></div>
+        <div class="modal-summary" id="modal-summary-box"></div>
+      </div>
+      
       <div class="modal-actions">
         <button class="modal-btn btn-back" id="btn-back" onclick="closeModal()">戻る</button>
         <button class="modal-btn btn-send" id="final-send-btn" onclick="submitOrder()">送信してLINE共有</button>
@@ -401,21 +485,43 @@
 
   <script>
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxl2wEanAHUJ2Je7ToufKy-V4UOMSSsZDIpqFAgvvqKLxUNM0DN4cb55uEmzoORswpBDg/exec";
+    const LIFF_ID = ""; // ※LINE Developersで取得したLIFF IDがあればここに入力（空欄でも動作します）
 
     let allProducts = [];
     let categories = [];
     let currentCategory = '';
     let cart = {};
+    let lineProfile = null;
 
     window.addEventListener('DOMContentLoaded', async () => {
+      initLIFF();
       await fetchProducts();
     });
+
+    // LIFF初期化 & ユーザー情報取得
+    async function initLIFF() {
+      if (!LIFF_ID) return;
+      try {
+        await liff.init({ liffId: LIFF_ID });
+        if (liff.isLoggedIn()) {
+          lineProfile = await liff.getProfile();
+          const badge = document.getElementById('user-badge');
+          badge.innerText = `👤 LINE: ${lineProfile.displayName}`;
+          badge.style.display = 'block';
+          
+          // 名前入力欄の初期値にLINEプロフ名を補完
+          document.getElementById('cust-name').value = lineProfile.displayName;
+        }
+      } catch (err) {
+        console.log("LIFF initialization failed:", err);
+      }
+    }
 
     async function fetchProducts() {
       const container = document.getElementById('product-container');
       try {
         const res = await fetch(GAS_API_URL);
-        if (!res.ok) throw new Error("HTTP error " + res.status);
+        if (!res.ok) throw new Error("HTTP " + res.status);
         const rawProducts = await res.json();
 
         allProducts = rawProducts.map(p => ({
@@ -489,20 +595,22 @@
 
       filtered.forEach(p => {
         const qty = cart[p.id] || 0;
+        const isSoldOut = p.stock <= 0;
         const card = document.createElement('div');
-        card.className = 'product-card';
+        card.className = `product-card ${isSoldOut ? 'soldout' : ''}`;
         const dummyImg = 'https://via.placeholder.com/300x160?text=No+Image';
         const imgSrc = p.img ? formatImgUrl(p.img) : dummyImg;
 
         card.innerHTML = `
+          ${isSoldOut ? '<div class="soldout-tag">売り切れ</div>' : ''}
           <img src="${imgSrc}" class="product-img" alt="${p.name}" loading="lazy" onerror="this.onerror=null; this.src='${dummyImg}';" onclick="openImageModal('${imgSrc}')">
           <div class="product-title">${p.name} ${p.isNew ? '<span style="color:red; font-size:0.75rem;">[NEW]</span>' : ''}</div>
           <div class="product-meta">サイズ:${p.size || '規格なし'} / ${p.vol}vol / 在庫:${p.stock}</div>
           <div class="product-price">¥${p.price.toLocaleString()}</div>
           <div class="qty-control">
-            <button class="qty-btn" onclick="changeQty('${p.id}', -1)">-</button>
+            <button class="qty-btn" onclick="changeQty('${p.id}', -1)" ${isSoldOut ? 'disabled' : ''}>-</button>
             <input type="text" class="qty-input" value="${qty}" readonly>
-            <button class="qty-btn" onclick="changeQty('${p.id}', 1)">+</button>
+            <button class="qty-btn" onclick="changeQty('${p.id}', 1)" ${isSoldOut ? 'disabled' : ''}>+</button>
           </div>
         `;
         container.appendChild(card);
@@ -532,6 +640,11 @@
       cart[id] = newQty;
       renderProducts();
       updateSummary();
+    }
+
+    // ワンタップついで買い機能
+    function quickAdd(id) {
+      changeQty(id, 1);
     }
 
     function updateSummary() {
@@ -567,26 +680,15 @@
 
       if (remainingVol > 0 && remainingVol <= 300 && totalVol > 0) {
         recommendBox.style.display = 'flex';
-        document.getElementById('recommend-text').innerText = `💡 箱にあと ${remainingVol} vol 入ります！一緒にいかがですか？`;
+        document.getElementById('recommend-text').innerText = `💡 箱にあと ${remainingVol} vol 入ります！タップで追加できます！`;
 
-        const fits = allProducts.filter(p => p.vol > 0 && p.vol <= remainingVol && p.stock > 0);
+        const fits = allProducts.filter(p => p.vol > 0 && p.vol <= remainingVol && p.stock > (cart[p.id] || 0));
 
-        const uniqueNameMap = new Map();
-        fits.forEach(p => {
-          if (!uniqueNameMap.has(p.name)) {
-            uniqueNameMap.set(p.name, p);
-          } else {
-            if (p.vol < uniqueNameMap.get(p.name).vol) {
-              uniqueNameMap.set(p.name, p);
-            }
-          }
-        });
-
-        const uniqueFits = Array.from(uniqueNameMap.values());
+        const uniqueFits = Array.from(new Map(fits.map(p => [p.name, p])).values());
 
         if (uniqueFits.length > 0) {
           recommendItemsDiv.innerHTML = uniqueFits.map(f => 
-            `<span class="recommend-badge" onclick="switchCategory('${f.category}')">${f.name} (+${f.vol}vol)</span>`
+            `<span class="recommend-badge" onclick="quickAdd('${f.id}')">＋ ${f.name} (+${f.vol}vol)</span>`
           ).join('');
         } else {
           recommendBox.style.display = 'none';
@@ -598,11 +700,17 @@
 
     function openModal() {
       const modal = document.getElementById('order-modal');
+      calculateModalTotal();
+      modal.classList.add('active');
+    }
+
+    function calculateModalTotal() {
       const listContainer = document.getElementById('modal-item-list');
       const summaryBox = document.getElementById('modal-summary-box');
+      const shippingFee = Number(document.getElementById('shipping-select').value) || 0;
 
       listContainer.innerHTML = '';
-      let totalAmount = 0;
+      let subtotalAmount = 0;
       let totalVol = 0;
       let totalCount = 0;
 
@@ -610,7 +718,7 @@
         const qty = cart[p.id] || 0;
         if (qty > 0) {
           const subtotal = p.price * qty;
-          totalAmount += subtotal;
+          subtotalAmount += subtotal;
           totalVol += p.vol * qty;
           totalCount += qty;
 
@@ -624,18 +732,14 @@
         }
       });
 
-      if (totalCount === 0) {
-        alert('商品が選択されていません。');
-        return;
-      }
-
+      const grandTotal = subtotalAmount + shippingFee;
       const boxCount = (totalVol / 1000).toFixed(1);
-      summaryBox.innerHTML = `
-        <div>数量: 計 ${totalCount} 点 / 容積: ${totalVol} vol (約${boxCount}箱)</div>
-        <div class="total-price">合計金額: ¥${totalAmount.toLocaleString()} (税込)</div>
-      `;
 
-      modal.classList.add('active');
+      summaryBox.innerHTML = `
+        <div>商品小計: ¥${subtotalAmount.toLocaleString()} / 送料: ¥${shippingFee.toLocaleString()}</div>
+        <div>数量: 計 ${totalCount} 点 / 容積: ${totalVol} vol (約${boxCount}箱)</div>
+        <div class="total-price">お支払い合計: ¥${grandTotal.toLocaleString()} (税込)</div>
+      `;
     }
 
     function closeModal() {
@@ -643,6 +747,15 @@
     }
 
     async function submitOrder() {
+      const custName = document.getElementById('cust-name').value.trim();
+      const custPhone = document.getElementById('cust-phone').value.trim();
+      const shippingFee = Number(document.getElementById('shipping-select').value) || 0;
+
+      if (!custName) {
+        alert('お名前を入力してください。');
+        return;
+      }
+
       const orderItems = allProducts.filter(p => cart[p.id] > 0).map(p => ({
         id: p.id,
         category: p.category,
@@ -663,46 +776,67 @@
       sendBtn.innerText = "送信中...";
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20秒タイムアウト
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
 
       try {
+        const payload = {
+          items: orderItems,
+          shippingFee: shippingFee,
+          customer: {
+            name: custName,
+            phone: custPhone,
+            lineName: lineProfile ? lineProfile.displayName : '',
+            lineId: lineProfile ? lineProfile.userId : ''
+          }
+        };
+
         const response = await fetch(GAS_API_URL, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'text/plain;charset=utf-8'
-          },
-          body: JSON.stringify({ items: orderItems }),
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload),
           signal: controller.signal
         });
 
         clearTimeout(timeoutId);
-
         const result = await response.json();
 
         if (result.status === "success") {
           let totalVol = 0;
-          let totalAmount = 0;
-          let msg = "【ご注文内容】\n";
+          let subtotalAmount = 0;
+          let msg = `【ご注文確認】\nお名前: ${custName} 様\n`;
+          if (custPhone) msg += `TEL: ${custPhone}\n`;
+          msg += `-------------------\n`;
           
           orderItems.forEach(item => {
-            msg += `・${item.name} × ${item.qty}（¥${item.subtotal.toLocaleString()}）\n`;
-            totalAmount += item.subtotal;
+            msg += `・${item.name} × ${item.qty} (¥${item.subtotal.toLocaleString()})\n`;
+            subtotalAmount += item.subtotal;
             totalVol += item.vol * item.qty;
           });
 
+          const grandTotal = subtotalAmount + shippingFee;
           const boxCount = (totalVol / 1000).toFixed(1);
 
-          msg += `\n合計金額: ¥${totalAmount.toLocaleString()}`;
-          msg += `\n合計容積: ${totalVol.toLocaleString()} vol（約 ${boxCount} 箱分）\n`;
+          msg += `-------------------\n`;
+          msg += `商品計: ¥${subtotalAmount.toLocaleString()}\n`;
+          msg += `送料: ¥${shippingFee.toLocaleString()}\n`;
+          msg += `合計: ¥${grandTotal.toLocaleString()} (税込)\n`;
+          msg += `容量: ${totalVol.toLocaleString()} vol (${boxCount}箱)\n`;
           
           if (result.invoiceUrl) {
-            msg += `\n📄 納品書:\n${result.invoiceUrl}\n`;
+            msg += `\n📄 納品書PDF:\n${result.invoiceUrl}\n`;
           }
 
           Object.keys(cart).forEach(id => { cart[id] = 0; });
           closeModal();
           renderProducts();
           updateSummary();
+
+          // LIFFトーク画面直接送信、またはWeb Share / LINE共有
+          if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
+            await liff.sendMessages([{ type: 'text', text: msg }]);
+            liff.closeWindow();
+            return;
+          }
 
           if (navigator.share) {
             try {
@@ -716,18 +850,15 @@
           const lineUrl = `https://line.me/R/msg/text/?${encodeURIComponent(msg)}`;
           window.location.href = lineUrl;
 
-        } else if (result.status === "stock_error") {
-          alert(result.message);
-          fetchProducts();
         } else {
           alert("エラーが発生しました: " + (result.message || '不明なエラー'));
         }
 
       } catch (e) {
         if (e.name === 'AbortError') {
-          alert('送信処理がタイムアウトしました。通信環境をご確認の上もう一度お試しください。');
+          alert('通信がタイムアウトしました。送信環境をご確認ください。');
         } else {
-          alert('注文処理中にエラーが発生しました。通信環境等を確認して再度お試しください。');
+          alert('注文処理中にエラーが発生しました。通信環境を確認して再度お試しください。');
         }
       } finally {
         sendBtn.disabled = false;
