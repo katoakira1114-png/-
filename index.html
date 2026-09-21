@@ -415,6 +415,7 @@
       const container = document.getElementById('product-container');
       try {
         const res = await fetch(GAS_API_URL);
+        if (!res.ok) throw new Error("HTTP error " + res.status);
         const rawProducts = await res.json();
 
         allProducts = rawProducts.map(p => ({
@@ -661,14 +662,20 @@
       backBtn.disabled = true;
       sendBtn.innerText = "送信中...";
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20秒タイムアウト
+
       try {
         const response = await fetch(GAS_API_URL, {
           method: 'POST',
           headers: {
-            'Content-Type': 'text/plain'
+            'Content-Type': 'text/plain;charset=utf-8'
           },
-          body: JSON.stringify({ items: orderItems })
+          body: JSON.stringify({ items: orderItems }),
+          signal: controller.signal
         });
+
+        clearTimeout(timeoutId);
 
         const result = await response.json();
 
@@ -678,7 +685,7 @@
           let msg = "【ご注文内容】\n";
           
           orderItems.forEach(item => {
-            msg += `・[${item.category}] ${item.name} × ${item.qty}（¥${item.subtotal.toLocaleString()}）\n`;
+            msg += `・${item.name} × ${item.qty}（¥${item.subtotal.toLocaleString()}）\n`;
             totalAmount += item.subtotal;
             totalVol += item.vol * item.qty;
           });
@@ -689,21 +696,20 @@
           msg += `\n合計容積: ${totalVol.toLocaleString()} vol（約 ${boxCount} 箱分）\n`;
           
           if (result.invoiceUrl) {
-            msg += `\n📄 納品書URL:\n${result.invoiceUrl}\n`;
+            msg += `\n📄 納品書:\n${result.invoiceUrl}\n`;
           }
 
           Object.keys(cart).forEach(id => { cart[id] = 0; });
           closeModal();
           renderProducts();
           updateSummary();
-          fetchProducts();
 
           if (navigator.share) {
             try {
               await navigator.share({ text: msg });
               return;
             } catch (shareErr) {
-              console.log("Web Shareがキャンセルされたか非対応です", shareErr);
+              if (shareErr.name === 'AbortError') return;
             }
           }
 
@@ -714,11 +720,15 @@
           alert(result.message);
           fetchProducts();
         } else {
-          alert("エラーが発生しました: " + result.message);
+          alert("エラーが発生しました: " + (result.message || '不明なエラー'));
         }
 
       } catch (e) {
-        alert('注文処理中にエラーが発生しました。通信環境等を確認して再度お試しください。');
+        if (e.name === 'AbortError') {
+          alert('送信処理がタイムアウトしました。通信環境をご確認の上もう一度お試しください。');
+        } else {
+          alert('注文処理中にエラーが発生しました。通信環境等を確認して再度お試しください。');
+        }
       } finally {
         sendBtn.disabled = false;
         backBtn.disabled = false;
