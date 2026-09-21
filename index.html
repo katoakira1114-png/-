@@ -29,25 +29,31 @@
       padding-bottom: 90px;
     }
 
-    header {
-      background-color: var(--card-bg);
-      text-align: center;
-      padding: 12px 15px;
-      font-size: 1.1rem;
-      font-weight: bold;
-      border-bottom: 1px solid var(--border-color);
+    /* 上部固定コンテナ */
+    .sticky-header-container {
       position: sticky;
       top: 0;
       z-index: 100;
+      background-color: var(--bg-color);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+    }
+
+    header {
+      background-color: var(--card-bg);
+      text-align: center;
+      padding: 10px 15px;
+      font-size: 1.05rem;
+      font-weight: bold;
+      border-bottom: 1px solid var(--border-color);
     }
 
     .user-badge {
       font-size: 0.8rem;
       color: #008000;
-      margin-top: 4px;
+      margin-top: 3px;
       font-weight: bold;
       background: #eef9ee;
-      padding: 3px 8px;
+      padding: 2px 8px;
       border-radius: 10px;
       display: inline-block;
     }
@@ -55,7 +61,7 @@
     .unregistered-alert {
       background-color: #ffebee;
       color: #c62828;
-      padding: 12px;
+      padding: 10px;
       font-size: 0.85rem;
       font-weight: bold;
       text-align: center;
@@ -84,11 +90,11 @@
 
     .tab-btn {
       flex: 1;
-      padding: 12px 10px;
+      padding: 10px 12px;
       text-align: center;
       background: none;
       border: none;
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       font-weight: bold;
       color: #666;
       cursor: pointer;
@@ -103,27 +109,27 @@
 
     .summary-card {
       background: var(--card-bg);
-      margin: 12px;
-      padding: 12px;
+      margin: 8px 12px;
+      padding: 10px 12px;
       border-radius: 8px;
       border: 1px solid #bce1ff;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
 
     .summary-info {
       display: flex;
       justify-content: space-between;
       font-weight: bold;
-      font-size: 0.9rem;
-      margin-bottom: 6px;
+      font-size: 0.85rem;
+      margin-bottom: 5px;
     }
 
     .progress-bar-bg {
       background-color: #e0e0e0;
-      height: 10px;
-      border-radius: 5px;
+      height: 8px;
+      border-radius: 4px;
       overflow: hidden;
-      margin-bottom: 6px;
+      margin-bottom: 5px;
     }
 
     .progress-bar-fill {
@@ -143,13 +149,13 @@
     .recommend-box {
       background-color: #fffde7;
       border: 1px solid #ffe082;
-      margin: 0 12px 12px 12px;
-      padding: 10px;
+      margin: 0 12px 10px 12px;
+      padding: 8px 10px;
       border-radius: 6px;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 5px;
     }
 
     .recommend-items {
@@ -161,7 +167,7 @@
     .recommend-badge {
       background-color: #fff;
       border: 1px solid #ffd54f;
-      padding: 6px 10px;
+      padding: 4px 8px;
       border-radius: 12px;
       color: var(--danger-color);
       font-weight: bold;
@@ -171,7 +177,7 @@
     }
 
     .product-list {
-      padding: 0 8px;
+      padding: 6px 8px;
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 8px;
@@ -444,42 +450,45 @@
 </head>
 <body>
 
-  <header>
-    商品注文フォーム
-    <div>
-      <span class="user-badge" id="user-badge" style="display:none;"></span>
-    </div>
-  </header>
+  <!-- スクロールしても上部に固定されるヘッダー群 -->
+  <div class="sticky-header-container">
+    <header>
+      商品注文フォーム
+      <div>
+        <span class="user-badge" id="user-badge" style="display:none;"></span>
+      </div>
+    </header>
 
-  <div class="unregistered-alert" id="unregistered-alert" style="display: none;">
-    ⚠️ 取引先マスタに未登録のアカウントです。<br>
-    仕入れ価格の確認・ご注文には事前登録が必要です。<br>
-    <button class="request-reg-btn" onclick="requestRegistration()">管理者へ登録を依頼する</button>
-  </div>
-
-  <div class="tabs" id="category-tabs"></div>
-
-  <div class="summary-card">
-    <div class="summary-info">
-      <span id="total-price-text">合計金額: 0 円</span>
-      <span id="total-vol-text">合計容量: 0 vol</span>
+    <div class="unregistered-alert" id="unregistered-alert" style="display: none;">
+      ⚠️ 取引先マスタに未登録のアカウントです。<br>
+      仕入れ価格の確認・ご注文には事前登録が必要です。<br>
+      <button class="request-reg-btn" onclick="requestRegistration()">管理者へ登録を依頼する</button>
     </div>
-    <div class="progress-bar-bg">
-      <div class="progress-bar-fill" id="progress-bar"></div>
-    </div>
-    <div class="summary-sub">
-      <span id="box-rate-text">1箱目の使用率: 0%</span>
-      <span id="box-empty-text">箱の空き: 残り 1000 vol</span>
-    </div>
-  </div>
 
-  <div class="recommend-box" id="recommend-box" style="display: none;">
-    <span id="recommend-text">💡 箱にあと 0 vol 入ります！タップで追加できます！</span>
-    <div class="recommend-items" id="recommend-items"></div>
+    <div class="tabs" id="category-tabs"></div>
+
+    <div class="summary-card">
+      <div class="summary-info">
+        <span id="total-price-text">合計金額: 0 円</span>
+        <span id="total-vol-text">合計容量: 0 vol</span>
+      </div>
+      <div class="progress-bar-bg">
+        <div class="progress-bar-fill" id="progress-bar"></div>
+      </div>
+      <div class="summary-sub">
+        <span id="box-rate-text">1箱目の使用率: 0%</span>
+        <span id="box-empty-text">箱の空き: 残り 1000 vol</span>
+      </div>
+    </div>
+
+    <div class="recommend-box" id="recommend-box" style="display: none;">
+      <span id="recommend-text">💡 箱にあと 0 vol 入ります！タップで追加できます！</span>
+      <div class="recommend-items" id="recommend-items"></div>
+    </div>
   </div>
 
   <div class="product-list" id="product-container">
-    <div class="loading-text">商品を読み込み中...</div>
+    <div class="loading-text">商品データを読み込み中...</div>
   </div>
 
   <div class="footer-bar">
@@ -508,7 +517,7 @@
       
       <div class="modal-actions">
         <button class="modal-btn btn-back" id="btn-back" onclick="closeModal()">戻る</button>
-        <button class="modal-btn btn-send" id="final-send-btn" onclick="submitOrder()">注文を確定して送信</button>
+        <button class="modal-btn btn-send" id="final-send-btn" onclick="submitOrder()">送信してLINEに送る</button>
       </div>
     </div>
   </div>
@@ -530,7 +539,6 @@
     let customerMaster = null;
 
     window.addEventListener('DOMContentLoaded', () => {
-      // LIFF初期化とデータ取得を安全に実行
       Promise.race([
         initLIFF(),
         new Promise(resolve => setTimeout(resolve, 2500))
@@ -910,15 +918,54 @@
         const result = await response.json();
 
         if (result.status === "success") {
-          alert('ご注文ありがとうございました！\n公式LINE宛に注文明細と納品書PDFを送信しました。');
+          // 注文文面の作成
+          let subtotalAmount = 0;
+          let totalVol = 0;
+          let hasAsk = false;
+          let msgText = `【新規ご注文】\n`;
+          msgText += `店舗/氏名: ${custName} 様\n`;
+          if (custPhone) msgText += `TEL: ${custPhone}\n`;
+          msgText += `-------------------\n`;
+
+          orderItems.forEach(item => {
+            if (item.isAsk) {
+              msgText += `・${item.name} × ${item.qty} (ASK)\n`;
+              hasAsk = true;
+            } else {
+              msgText += `・${item.name} × ${item.qty} (¥${(item.appliedPrice * item.qty).toLocaleString()})\n`;
+              subtotalAmount += item.appliedPrice * item.qty;
+            }
+            totalVol += item.vol * item.qty;
+          });
+
+          const boxCount = (totalVol / 1000).toFixed(1);
+          msgText += `-------------------\n`;
+          msgText += `商品計: ¥${subtotalAmount.toLocaleString()}${hasAsk ? ' + ASK' : ''}\n`;
+          msgText += `容量: ${totalVol.toLocaleString()} vol (約${boxCount}箱)\n\n`;
+          if (result.invoiceUrl) {
+            msgText += `📄 納品書PDF:\n${result.invoiceUrl}`;
+          }
+
           Object.keys(cart).forEach(id => { cart[id] = 0; });
           closeModal();
           renderProducts();
           updateSummary();
 
+          // 1. LIFFアプリ内から直接メッセージを送信（履歴に残す）
           if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
-            liff.closeWindow();
+            try {
+              await liff.sendMessages([{ type: 'text', text: msgText }]);
+              alert('ご注文が完了しました！公式LINEに送信されました。');
+              liff.closeWindow();
+              return;
+            } catch (liffSendErr) {
+              console.warn("liff.sendMessages失敗、フォールバックへ:", liffSendErr);
+            }
           }
+
+          // 2. フォールバック：公式LINEへのトーク遷移（100%確実に送信履歴が残る）
+          const lineUrl = `https://line.me/R/oaMessage/@877qwvyc/?${encodeURIComponent(msgText)}`;
+          window.location.href = lineUrl;
 
         } else {
           alert("エラーが発生しました: " + (result.message || '不明なエラー'));
@@ -933,7 +980,7 @@
       } finally {
         sendBtn.disabled = false;
         backBtn.disabled = false;
-        sendBtn.innerText = "注文を確定して送信";
+        sendBtn.innerText = "送信してLINEに送る";
       }
     }
   </script>
