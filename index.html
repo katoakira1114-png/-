@@ -1,3 +1,304 @@
+アクセストークンの発行、ありがとうございます！画像（LINE Official Account Manager）も確認いたしました。
+
+ご要望の **「ASK商品の仕様変更」** を含め、すべて組み込んだ最新の **GAS全文** と **HTML全文** を作成いたしました！
+
+---
+
+### 🌟 ASK商品の新しい仕様
+1. **カート追加**: ASK商品も通常通りカートに入れて数量変更できるように変更。
+2. **画面金額表示**: 画面の合計金額にASK商品が含まれている場合、**`合計金額: ¥12,000 + ASK`** と分かりやすく表示。
+3. **納品書スプレッドシート & PDF**: 
+   - ASK商品の単価列に **`"ASK"`** と文字を直接流し込みます。
+   - 金額列の数式（`C*D`）がエラーにならないよう、GAS側で自動調整して作成します。
+4. **LINE通知文面**: ASK商品が含まれている場合、**`合計金額: ¥12,000 (税込) + ASK`** と明記されます。
+
+---
+
+### 📝 1. Google Apps Script（GAS）全文
+
+スプレッドシートの `コード.gs` にすべて貼り付けて保存・再デプロイしてください。
+
+```javascript
+const SPREADSHEET_ID = "1l5uJihoagHbMAwiCulpt9Zy9PIV6RRDneUYJ6QbiBbU"; 
+const LINE_CHANNEL_ACCESS_TOKEN = "4z5y4BBsTTTEZgfmcaUF7cbc1T1k6qePWr/xKn3Yuk0E1pi4wxY3uPtSar9xW3F8FxIDpqTpma7lfn3HXhQ19LyTaDkNU6s779LkSLtPCUCZNb3nKg/tDSJXLNuADTfjDGoD8SQMw/CYDBdUAgkq3gdB04t89/1O/w1cDnyilFU=";
+
+/**
+ * 初期化用：納品書テンプレート作成
+ */
+function createDeliveryNoteTemplate() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName('納品書テンプレート');
+  
+  if (!sheet) {
+    sheet = ss.insertSheet('納品書テンプレート');
+  } else {
+    sheet.clear();
+  }
+  
+  sheet.setHiddenGridlines(false);
+  const columnWidths = [40, 220, 60, 90, 100, 120];
+  columnWidths.forEach((w, idx) => sheet.setColumnWidth(idx + 1, w));
+
+  sheet.getRange("B2:D2").merge().setValue("納品書").setFontSize(16).setFontWeight("bold").setHorizontalAlignment("center");
+  
+  const dateRange = sheet.getRange("E2:F2");
+  dateRange.merge().setHorizontalAlignment("right").setFontSize(10);
+  dateRange.setNumberFormat('yyyy"年"m"月"d"日"');
+
+  sheet.getRange("A4:C4").merge().setValue("").setFontSize(11).setFontWeight("bold");
+  sheet.getRange("A4:C4").setBorder(null, null, true, null, null, null, "black", SpreadsheetApp.BorderStyle.SOLID);
+  sheet.getRange("A6").setValue("下記の通り納品致しました。");
+
+  const sellerInfo = [
+    ["川畑水産 代表者 川畑ジョナタス"],
+    ["907-0452"],
+    ["沖縄県石垣市崎枝530-133"],
+    ["TEL: 080-5616-1301 fax:050-3164-9497"],
+    [""],
+    ["ゆうちょ銀行"],
+    ["記号 15490"],
+    ["番号 38098281"],
+    ["川畑 ジョナタス"],
+    [""],
+    ["他銀行から振込の場合 : ゆうちょ銀行"],
+    ["店名 : 五四八"],
+    ["店番 : ５４８"],
+    ["口座番号 : ３８０９８２８"]
+  ];
+  sheet.getRange(4, 5, sellerInfo.length, 1).setValues(sellerInfo).setFontSize(9);
+
+  const headers = [["項目", "商品名", "数量", "単価", "金額", "備考"]];
+  sheet.getRange("A19:F19").setValues(headers).setBackground("#d9d9d9").setFontWeight("bold").setHorizontalAlignment("center");
+
+  const detailRows = [];
+  const formulas = [];
+  for (let i = 1; i <= 22; i++) {
+    const r = 19 + i;
+    detailRows.push([i, "", "", "", "", ""]);
+    // 単価が数値の時のみ計算、ASK等の文字列の場合は"ASK"と表示する安全数式
+    formulas.push([`=IF(C${r}="","", IF(ISNUMBER(D${r}), C${r}*D${r}, "ASK"))`]);
+  }
+  sheet.getRange(20, 1, 22, 6).setValues(detailRows);
+  sheet.getRange(20, 5, 22, 1).setFormulas(formulas);
+
+  const extraRows = [
+    ["", "梱包", "", "", "=IF(AND(C42<>\"\",ISNUMBER(D42)), C42*D42, \"\")", ""],
+    ["", "送料", "", "", "=IF(AND(C43<>\"\",ISNUMBER(D43)), C43*D43, \"\")", ""],
+    ["", "小計", "", "", "=SUM(E20:E43)", ""],
+    ["", "消費税", "", "", "=INT(E44*0.1)", ""]
+  ];
+  sheet.getRange(42, 1, 4, 6).setValues(extraRows);
+  sheet.getRange("B42:B45").setFontWeight("bold").setHorizontalAlignment("center");
+
+  sheet.getRange("B46:D46").merge().setValue("合計（税込）").setFontWeight("bold").setHorizontalAlignment("center").setBackground("#f3f3f3");
+  sheet.getRange("E46").setFormula("=E44+E45").setFontWeight("bold").setFontSize(11);
+
+  sheet.getRange("D20:E46").setNumberFormat("#,##0");
+  sheet.getRange("C20:C43").setHorizontalAlignment("center");
+  sheet.getRange(19, 1, 28, 6).setBorder(true, true, true, true, true, true, "black", SpreadsheetApp.BorderStyle.SOLID);
+}
+
+/**
+ * 商品一覧 & 顧客マスタ認証 (GET API)
+ */
+function doGet(e) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  
+  let customerInfo = null;
+  const lineUserId = e.parameter.userId;
+  
+  if (lineUserId) {
+    const cSheet = ss.getSheetByName('顧客マスタ');
+    if (cSheet) {
+      const cData = cSheet.getDataRange().getValues();
+      for (let i = 1; i < cData.length; i++) {
+        if (String(cData[i][0]).trim() === String(lineUserId).trim()) {
+          customerInfo = {
+            lineUserId: cData[i][0],
+            name: cData[i][1] || '',
+            discountRate: Number(cData[i][2]) || 1.0,
+            phone: cData[i][3] || '',
+            address: cData[i][4] || '',
+            area: String(cData[i][5] || '0')
+          };
+          break;
+        }
+      }
+    }
+  }
+
+  const pSheet = ss.getSheetByName('商品一覧') || ss.getSheets()[0];
+  const pData = pSheet.getDataRange().getValues();
+  const products = [];
+  
+  for (let i = 1; i < pData.length; i++) {
+    const row = pData[i];
+    if (!row[0]) continue;
+    
+    const priceVal = String(row[3]).trim().toLowerCase();
+    const isAsk = priceVal === 'ask' || priceVal === '';
+    const numericPrice = isAsk ? 0 : (Number(row[3]) || 0);
+
+    products.push({
+      id: String(row[0]),
+      name: String(row[1] || ''),
+      category: String(row[2] || 'その他'),
+      price: numericPrice,
+      isAsk: isAsk,
+      vol: Number(row[4]) || 0,
+      stock: Number(row[5]) || 0,
+      size: String(row[6] || ''),
+      img: String(row[7] || ''),
+      isNew: Boolean(row[8])
+    });
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({
+    isRegistered: !!customerInfo,
+    customer: customerInfo,
+    products: products
+  })).setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * 注文処理 & 公式LINEメッセージ自動送信 (POST API)
+ */
+function doPost(e) {
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: "混雑しております。時間をおいて再度お試しください。"
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  try {
+    const contents = JSON.parse(e.postData.contents);
+    const items = contents.items;
+    const customer = contents.customer || {};
+    const shippingFee = Number(contents.shippingFee) || 0;
+
+    if (!items || items.length === 0) {
+      throw new Error("注文データが空です。");
+    }
+
+    const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    let templateSheet = ss.getSheetByName('納品書テンプレート');
+    if (!templateSheet) {
+      createDeliveryNoteTemplate();
+      templateSheet = ss.getSheetByName('納品書テンプレート');
+    }
+
+    const dateStr = Utilities.formatDate(new Date(), "JST", "yyyyMMdd_HHmmss");
+    const sheetName = "納品書_" + (customer.name || 'お客様') + "_" + dateStr;
+    const newSheet = templateSheet.copyTo(ss).setName(sheetName);
+
+    newSheet.getRange("E2").setValue(new Date());
+    newSheet.getRange("A4").setValue(`${customer.name || ''} 様`);
+
+    // 明細セット（ASKの場合は単価セルに "ASK" とテキストを入力）
+    const itemRows = [];
+    items.forEach((item, index) => {
+      if (index < 22) {
+        const unitPrice = item.isAsk ? "ASK" : item.appliedPrice;
+        itemRows.push([item.name, item.qty, unitPrice]);
+      }
+    });
+
+    if (itemRows.length > 0) {
+      newSheet.getRange(20, 2, itemRows.length, 3).setValues(itemRows);
+    }
+
+    if (shippingFee > 0) {
+      newSheet.getRange("C43").setValue(1);
+      newSheet.getRange("D43").setValue(shippingFee);
+    }
+
+    SpreadsheetApp.flush();
+
+    const pdfUrl = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=pdf&gid=${newSheet.getSheetId()}&portrait=true&size=A4&fitw=true`;
+
+    if (customer.lineUserId) {
+      sendLineMessage(customer.lineUserId, items, customer, shippingFee, pdfUrl);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "success",
+      invoiceUrl: pdfUrl
+    })).setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: err.message
+    })).setMimeType(ContentService.MimeType.JSON);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * LINE Messaging API メッセージ送信
+ */
+function sendLineMessage(userId, items, customer, shippingFee, pdfUrl) {
+  let subtotalAmount = 0;
+  let totalVol = 0;
+  let hasAsk = false;
+  
+  let msgText = `【新規ご注文受付】\n`;
+  msgText += `店舗/お名前: ${customer.name} 様\n`;
+  if (customer.phone) msgText += `TEL: ${customer.phone}\n`;
+  msgText += `-------------------\n`;
+
+  items.forEach(item => {
+    if (item.isAsk) {
+      msgText += `・${item.name} × ${item.qty} (ASK)\n`;
+      hasAsk = true;
+    } else {
+      msgText += `・${item.name} × ${item.qty} (¥${(item.appliedPrice * item.qty).toLocaleString()})\n`;
+      subtotalAmount += item.appliedPrice * item.qty;
+    }
+    totalVol += item.vol * item.qty;
+  });
+
+  const grandTotal = subtotalAmount + shippingFee;
+  const boxCount = (totalVol / 1000).toFixed(1);
+
+  msgText += `-------------------\n`;
+  msgText += `商品計: ¥${subtotalAmount.toLocaleString()}${hasAsk ? ' + ASK' : ''}\n`;
+  msgText += `送料: ¥${shippingFee.toLocaleString()}\n`;
+  msgText += `合計金額: ¥${grandTotal.toLocaleString()} (税込)${hasAsk ? ' + ASK' : ''}\n`;
+  msgText += `合計容積: ${totalVol.toLocaleString()} vol (約${boxCount}箱)\n\n`;
+  msgText += `📄 納品書PDF:\n${pdfUrl}`;
+
+  const payload = {
+    to: userId,
+    messages: [{
+      type: "text",
+      text: msgText
+    }]
+  };
+
+  UrlFetchApp.fetch("https://api.line.me/v2/bot/message/push", {
+    method: "post",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + LINE_CHANNEL_ACCESS_TOKEN
+    },
+    payload: JSON.stringify(payload)
+  });
+}
+```
+
+---
+
+### 💻 2. HTML ファイル全文 (`index.html`)
+
+GitHub等に保存する `index.html` です。
+
+```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -31,8 +332,8 @@
     header {
       background-color: var(--card-bg);
       text-align: center;
-      padding: 15px;
-      font-size: 1.2rem;
+      padding: 12px 15px;
+      font-size: 1.1rem;
       font-weight: bold;
       border-bottom: 1px solid var(--border-color);
       position: sticky;
@@ -42,9 +343,23 @@
 
     .user-badge {
       font-size: 0.8rem;
-      color: #00c300;
+      color: #008000;
       margin-top: 4px;
-      font-weight: normal;
+      font-weight: bold;
+      background: #eef9ee;
+      padding: 3px 8px;
+      border-radius: 10px;
+      display: inline-block;
+    }
+
+    .unregistered-alert {
+      background-color: #ffebee;
+      color: #c62828;
+      padding: 10px 12px;
+      font-size: 0.85rem;
+      font-weight: bold;
+      text-align: center;
+      border-bottom: 1px solid #ffcdd2;
     }
 
     .tabs {
@@ -141,9 +456,6 @@
       cursor: pointer;
       box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
-    .recommend-badge:active {
-      transform: scale(0.96);
-    }
 
     .product-list {
       padding: 0 8px;
@@ -172,8 +484,7 @@
       position: relative;
     }
 
-    /* 売り切れスタイル */
-    .product-card.soldout {
+    .product-card.disabled {
       opacity: 0.6;
     }
 
@@ -210,10 +521,22 @@
       color: #777;
     }
 
+    .product-price-box {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
     .product-price {
       font-size: 1rem;
       font-weight: bold;
       color: var(--primary-color);
+    }
+
+    .price-ask {
+      font-size: 1rem;
+      font-weight: bold;
+      color: #d81b60;
     }
 
     .qty-control {
@@ -321,14 +644,13 @@
     }
 
     .form-group {
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
     .form-group label {
       display: block;
       font-size: 0.8rem;
       font-weight: bold;
-      margin-bottom: 4px;
-
+      margin-bottom: 3px;
     }
     .form-input, .form-select {
       width: 100%;
@@ -409,9 +731,13 @@
 <body>
 
   <header>
-    商品一覧
+    商品注文フォーム
     <div class="user-badge" id="user-badge" style="display:none;"></div>
   </header>
+
+  <div class="unregistered-alert" id="unregistered-alert" style="display: none;">
+    ⚠️ 取引先マスタに未登録のアカウントです。<br>閲覧・ご注文には管理者による事前登録が必要です。
+  </div>
 
   <div class="tabs" id="category-tabs"></div>
 
@@ -442,17 +768,16 @@
     <button class="confirm-btn" id="confirm-btn" onclick="openModal()">注文内容を確認する (0点)</button>
   </div>
 
-  <!-- 注文内容・配送先入力 モーダル -->
+  <!-- モーダル -->
   <div class="modal-overlay" id="order-modal">
     <div class="modal-content">
       <div class="modal-header">ご注文内容の確認</div>
       <div class="modal-body">
         
-        <!-- お客様情報入力 -->
         <div style="background:#eef6ff; padding:8px; border-radius:6px; margin-bottom:12px;">
           <div class="form-group">
-            <label>お名前（必須）</label>
-            <input type="text" id="cust-name" class="form-input" placeholder="例: 川畑 太郎">
+            <label>店舗名 / お名前（必須）</label>
+            <input type="text" id="cust-name" class="form-input" placeholder="例: ○○居酒屋 / 川畑太郎">
           </div>
           <div class="form-group">
             <label>電話番号</label>
@@ -461,7 +786,7 @@
           <div class="form-group">
             <label>配送エリア（送料自動適用）</label>
             <select id="shipping-select" class="form-select" onchange="calculateModalTotal()">
-              <option value="0">沖縄県内 (送料 0円 / 送料無料)</option>
+              <option value="0">沖縄県内 (送料 0円)</option>
               <option value="1500">本州・四国・九州 (+1,500円)</option>
               <option value="2200">北海道・離島 (+2,200円)</option>
             </select>
@@ -474,7 +799,7 @@
       
       <div class="modal-actions">
         <button class="modal-btn btn-back" id="btn-back" onclick="closeModal()">戻る</button>
-        <button class="modal-btn btn-send" id="final-send-btn" onclick="submitOrder()">送信してLINE共有</button>
+        <button class="modal-btn btn-send" id="final-send-btn" onclick="submitOrder()">注文を確定して送信</button>
       </div>
     </div>
   </div>
@@ -485,51 +810,84 @@
 
   <script>
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxl2wEanAHUJ2Je7ToufKy-V4UOMSSsZDIpqFAgvvqKLxUNM0DN4cb55uEmzoORswpBDg/exec";
-    const LIFF_ID = ""; // ※LINE Developersで取得したLIFF IDがあればここに入力（空欄でも動作します）
+    const LIFF_ID = "2011653892-RjIQ6YBe";
 
     let allProducts = [];
     let categories = [];
     let currentCategory = '';
     let cart = {};
     let lineProfile = null;
+    let isRegistered = false;
+    let customerMaster = null;
 
     window.addEventListener('DOMContentLoaded', async () => {
-      initLIFF();
+      await initLIFF();
       await fetchProducts();
     });
 
-    // LIFF初期化 & ユーザー情報取得
     async function initLIFF() {
       if (!LIFF_ID) return;
       try {
         await liff.init({ liffId: LIFF_ID });
         if (liff.isLoggedIn()) {
           lineProfile = await liff.getProfile();
-          const badge = document.getElementById('user-badge');
-          badge.innerText = `👤 LINE: ${lineProfile.displayName}`;
-          badge.style.display = 'block';
-          
-          // 名前入力欄の初期値にLINEプロフ名を補完
-          document.getElementById('cust-name').value = lineProfile.displayName;
+        } else {
+          liff.login();
         }
       } catch (err) {
-        console.log("LIFF initialization failed:", err);
+        console.log("LIFF Init Failed:", err);
       }
     }
 
     async function fetchProducts() {
       const container = document.getElementById('product-container');
       try {
-        const res = await fetch(GAS_API_URL);
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const rawProducts = await res.json();
+        let fetchUrl = GAS_API_URL;
+        if (lineProfile && lineProfile.userId) {
+          fetchUrl += `?userId=${encodeURIComponent(lineProfile.userId)}`;
+        }
 
-        allProducts = rawProducts.map(p => ({
-          ...p,
-          price: Number(p.price) || 0,
-          vol: Number(p.vol) || 0,
-          stock: Number(p.stock) || 0
-        }));
+        const res = await fetch(fetchUrl);
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+
+        isRegistered = data.isRegistered;
+        customerMaster = data.customer;
+
+        const alertBox = document.getElementById('unregistered-alert');
+        const badge = document.getElementById('user-badge');
+
+        if (!isRegistered) {
+          alertBox.style.display = 'block';
+          if (lineProfile) {
+            badge.innerText = `👤 LINE: ${lineProfile.displayName} (未登録)`;
+            badge.style.display = 'inline-block';
+            document.getElementById('cust-name').value = lineProfile.displayName;
+          }
+        } else {
+          alertBox.style.display = 'none';
+          const discountPct = Math.round(customerMaster.discountRate * 100);
+          badge.innerText = `🏢 ${customerMaster.name} 様 (卸率: ${discountPct}%)`;
+          badge.style.display = 'inline-block';
+          
+          document.getElementById('cust-name').value = customerMaster.name || '';
+          document.getElementById('cust-phone').value = customerMaster.phone || '';
+          if (customerMaster.area) {
+            document.getElementById('shipping-select').value = customerMaster.area;
+          }
+        }
+
+        const discountRate = (isRegistered && customerMaster) ? customerMaster.discountRate : 1.0;
+
+        allProducts = data.products.map(p => {
+          const appliedPrice = p.isAsk ? 0 : Math.floor(p.price * discountRate);
+          return {
+            ...p,
+            price: appliedPrice,
+            vol: Number(p.vol) || 0,
+            stock: Number(p.stock) || 0
+          };
+        });
 
         allProducts.forEach(p => {
           if (cart[p.id] === undefined) {
@@ -547,8 +905,8 @@
         renderProducts();
         updateSummary();
       } catch (err) {
-        console.error("商品データの取得エラー:", err);
-        container.innerHTML = '<div class="loading-text" style="color:red;">商品データの読み込みに失敗しました。</div>';
+        console.error("データ取得エラー:", err);
+        container.innerHTML = '<div class="loading-text" style="color:red;">データの読み込みに失敗しました。</div>';
       }
     }
 
@@ -596,21 +954,32 @@
       filtered.forEach(p => {
         const qty = cart[p.id] || 0;
         const isSoldOut = p.stock <= 0;
+        const isDisabled = !isRegistered || isSoldOut;
+        
         const card = document.createElement('div');
-        card.className = `product-card ${isSoldOut ? 'soldout' : ''}`;
+        card.className = `product-card ${isDisabled ? 'disabled' : ''}`;
         const dummyImg = 'https://via.placeholder.com/300x160?text=No+Image';
         const imgSrc = p.img ? formatImgUrl(p.img) : dummyImg;
+
+        let priceDisplay = '';
+        if (!isRegistered) {
+          priceDisplay = '<span class="price-ask">非公開 (要登録)</span>';
+        } else if (p.isAsk) {
+          priceDisplay = '<span class="price-ask">ASK</span>';
+        } else {
+          priceDisplay = `<span class="product-price">¥${p.price.toLocaleString()}</span>`;
+        }
 
         card.innerHTML = `
           ${isSoldOut ? '<div class="soldout-tag">売り切れ</div>' : ''}
           <img src="${imgSrc}" class="product-img" alt="${p.name}" loading="lazy" onerror="this.onerror=null; this.src='${dummyImg}';" onclick="openImageModal('${imgSrc}')">
           <div class="product-title">${p.name} ${p.isNew ? '<span style="color:red; font-size:0.75rem;">[NEW]</span>' : ''}</div>
           <div class="product-meta">サイズ:${p.size || '規格なし'} / ${p.vol}vol / 在庫:${p.stock}</div>
-          <div class="product-price">¥${p.price.toLocaleString()}</div>
+          <div class="product-price-box">${priceDisplay}</div>
           <div class="qty-control">
-            <button class="qty-btn" onclick="changeQty('${p.id}', -1)" ${isSoldOut ? 'disabled' : ''}>-</button>
+            <button class="qty-btn" onclick="changeQty('${p.id}', -1)" ${isDisabled ? 'disabled' : ''}>-</button>
             <input type="text" class="qty-input" value="${qty}" readonly>
-            <button class="qty-btn" onclick="changeQty('${p.id}', 1)" ${isSoldOut ? 'disabled' : ''}>+</button>
+            <button class="qty-btn" onclick="changeQty('${p.id}', 1)" ${isDisabled ? 'disabled' : ''}>+</button>
           </div>
         `;
         container.appendChild(card);
@@ -627,6 +996,11 @@
     }
 
     function changeQty(id, delta) {
+      if (!isRegistered) {
+        alert('未登録のアカウントです。ご注文には事前登録が必要です。');
+        return;
+      }
+
       const product = allProducts.find(p => String(p.id) === String(id));
       if (!product) return;
 
@@ -642,7 +1016,6 @@
       updateSummary();
     }
 
-    // ワンタップついで買い機能
     function quickAdd(id) {
       changeQty(id, 1);
     }
@@ -651,15 +1024,27 @@
       let totalAmount = 0;
       let totalVol = 0;
       let totalCount = 0;
+      let hasAsk = false;
 
       allProducts.forEach(p => {
         const qty = cart[p.id] || 0;
-        totalAmount += p.price * qty;
-        totalVol += p.vol * qty;
-        totalCount += qty;
+        if (qty > 0) {
+          if (p.isAsk) {
+            hasAsk = true;
+          } else {
+            totalAmount += p.price * qty;
+          }
+          totalVol += p.vol * qty;
+          totalCount += qty;
+        }
       });
 
-      document.getElementById('total-price-text').innerText = `合計金額: ${totalAmount.toLocaleString()} 円`;
+      let priceText = '---- 円';
+      if (isRegistered) {
+        priceText = `${totalAmount.toLocaleString()} 円${hasAsk ? ' + ASK' : ''}`;
+      }
+
+      document.getElementById('total-price-text').innerText = `合計金額: ${priceText}`;
       document.getElementById('total-vol-text').innerText = `合計容量: ${totalVol.toLocaleString()} vol`;
 
       const currentBoxIndex = Math.floor(totalVol / 1000) + 1;
@@ -672,18 +1057,17 @@
       document.getElementById('box-empty-text').innerText = `箱の空き: 残り ${remainingVol} vol`;
 
       const confirmBtn = document.getElementById('confirm-btn');
-      confirmBtn.innerText = `注文内容を確認する (${totalCount}点)`;
-      confirmBtn.disabled = totalCount === 0;
+      confirmBtn.innerText = isRegistered ? `注文内容を確認する (${totalCount}点)` : '未登録のため注文できません';
+      confirmBtn.disabled = !isRegistered || totalCount === 0;
 
       const recommendBox = document.getElementById('recommend-box');
       const recommendItemsDiv = document.getElementById('recommend-items');
 
-      if (remainingVol > 0 && remainingVol <= 300 && totalVol > 0) {
+      if (isRegistered && remainingVol > 0 && remainingVol <= 300 && totalVol > 0) {
         recommendBox.style.display = 'flex';
         document.getElementById('recommend-text').innerText = `💡 箱にあと ${remainingVol} vol 入ります！タップで追加できます！`;
 
         const fits = allProducts.filter(p => p.vol > 0 && p.vol <= remainingVol && p.stock > (cart[p.id] || 0));
-
         const uniqueFits = Array.from(new Map(fits.map(p => [p.name, p])).values());
 
         if (uniqueFits.length > 0) {
@@ -699,6 +1083,7 @@
     }
 
     function openModal() {
+      if (!isRegistered) return;
       const modal = document.getElementById('order-modal');
       calculateModalTotal();
       modal.classList.add('active');
@@ -713,12 +1098,20 @@
       let subtotalAmount = 0;
       let totalVol = 0;
       let totalCount = 0;
+      let hasAsk = false;
 
       allProducts.forEach(p => {
         const qty = cart[p.id] || 0;
         if (qty > 0) {
-          const subtotal = p.price * qty;
-          subtotalAmount += subtotal;
+          let priceStr = '';
+          if (p.isAsk) {
+            priceStr = 'ASK';
+            hasAsk = true;
+          } else {
+            const subtotal = p.price * qty;
+            subtotalAmount += subtotal;
+            priceStr = `¥${subtotal.toLocaleString()}`;
+          }
           totalVol += p.vol * qty;
           totalCount += qty;
 
@@ -726,7 +1119,7 @@
           row.className = 'order-item-row';
           row.innerHTML = `
             <span>[${p.category}] ${p.name} × ${qty}</span>
-            <span>¥${subtotal.toLocaleString()}</span>
+            <span>${priceStr}</span>
           `;
           listContainer.appendChild(row);
         }
@@ -736,9 +1129,9 @@
       const boxCount = (totalVol / 1000).toFixed(1);
 
       summaryBox.innerHTML = `
-        <div>商品小計: ¥${subtotalAmount.toLocaleString()} / 送料: ¥${shippingFee.toLocaleString()}</div>
+        <div>商品小計: ¥${subtotalAmount.toLocaleString()}${hasAsk ? ' + ASK' : ''} / 送料: ¥${shippingFee.toLocaleString()}</div>
         <div>数量: 計 ${totalCount} 点 / 容積: ${totalVol} vol (約${boxCount}箱)</div>
-        <div class="total-price">お支払い合計: ¥${grandTotal.toLocaleString()} (税込)</div>
+        <div class="total-price">お支払い合計: ¥${grandTotal.toLocaleString()} (税込)${hasAsk ? ' + ASK' : ''}</div>
       `;
     }
 
@@ -752,7 +1145,7 @@
       const shippingFee = Number(document.getElementById('shipping-select').value) || 0;
 
       if (!custName) {
-        alert('お名前を入力してください。');
+        alert('店舗名またはお名前を入力してください。');
         return;
       }
 
@@ -760,7 +1153,8 @@
         id: p.id,
         category: p.category,
         name: p.name,
-        price: p.price,
+        appliedPrice: p.price,
+        isAsk: p.isAsk,
         vol: p.vol,
         qty: cart[p.id],
         subtotal: p.price * cart[p.id]
@@ -773,10 +1167,10 @@
       
       sendBtn.disabled = true;
       backBtn.disabled = true;
-      sendBtn.innerText = "送信中...";
+      sendBtn.innerText = "注文送信中...";
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 20000);
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
 
       try {
         const payload = {
@@ -785,8 +1179,7 @@
           customer: {
             name: custName,
             phone: custPhone,
-            lineName: lineProfile ? lineProfile.displayName : '',
-            lineId: lineProfile ? lineProfile.userId : ''
+            lineUserId: lineProfile ? lineProfile.userId : ''
           }
         };
 
@@ -801,54 +1194,15 @@
         const result = await response.json();
 
         if (result.status === "success") {
-          let totalVol = 0;
-          let subtotalAmount = 0;
-          let msg = `【ご注文確認】\nお名前: ${custName} 様\n`;
-          if (custPhone) msg += `TEL: ${custPhone}\n`;
-          msg += `-------------------\n`;
-          
-          orderItems.forEach(item => {
-            msg += `・${item.name} × ${item.qty} (¥${item.subtotal.toLocaleString()})\n`;
-            subtotalAmount += item.subtotal;
-            totalVol += item.vol * item.qty;
-          });
-
-          const grandTotal = subtotalAmount + shippingFee;
-          const boxCount = (totalVol / 1000).toFixed(1);
-
-          msg += `-------------------\n`;
-          msg += `商品計: ¥${subtotalAmount.toLocaleString()}\n`;
-          msg += `送料: ¥${shippingFee.toLocaleString()}\n`;
-          msg += `合計: ¥${grandTotal.toLocaleString()} (税込)\n`;
-          msg += `容量: ${totalVol.toLocaleString()} vol (${boxCount}箱)\n`;
-          
-          if (result.invoiceUrl) {
-            msg += `\n📄 納品書PDF:\n${result.invoiceUrl}\n`;
-          }
-
+          alert('ご注文ありがとうございました！\n公式LINE宛に注文明細と納品書PDFを送信しました。');
           Object.keys(cart).forEach(id => { cart[id] = 0; });
           closeModal();
           renderProducts();
           updateSummary();
 
-          // LIFFトーク画面直接送信、またはWeb Share / LINE共有
           if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
-            await liff.sendMessages([{ type: 'text', text: msg }]);
             liff.closeWindow();
-            return;
           }
-
-          if (navigator.share) {
-            try {
-              await navigator.share({ text: msg });
-              return;
-            } catch (shareErr) {
-              if (shareErr.name === 'AbortError') return;
-            }
-          }
-
-          const lineUrl = `https://line.me/R/msg/text/?${encodeURIComponent(msg)}`;
-          window.location.href = lineUrl;
 
         } else {
           alert("エラーが発生しました: " + (result.message || '不明なエラー'));
@@ -863,9 +1217,10 @@
       } finally {
         sendBtn.disabled = false;
         backBtn.disabled = false;
-        sendBtn.innerText = "送信してLINE共有";
+        sendBtn.innerText = "注文を確定して送信";
       }
     }
   </script>
 </body>
 </html>
+```
