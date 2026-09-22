@@ -25,11 +25,8 @@
     .progress-bar-bg { background-color: #e0e0e0; height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 5px; }
     .progress-bar-fill { background-color: var(--primary-color); height: 100%; width: 0%; transition: width 0.3s ease; }
     .summary-sub { display: flex; justify-content: space-between; font-size: 0.75rem; color: #666; }
-    .recommend-box { background-color: #fffde7; border: 1px solid #ffe082; margin: 0 12px 10px 12px; padding: 8px 10px; border-radius: 6px; font-size: 0.8rem; display: flex; flex-direction: column; gap: 5px; }
-    .recommend-items { display: flex; flex-wrap: wrap; gap: 6px; }
-    .recommend-badge { background-color: #fff; border: 1px solid #ffd54f; padding: 4px 8px; border-radius: 12px; color: var(--danger-color); font-weight: bold; font-size: 0.75rem; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
     .product-list { padding: 6px 8px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-    .loading-text { grid-column: 1 / -1; text-align: center; padding: 40px 0; color: #666; font-size: 0.95rem; }
+    .loading-text { grid-column: 1 / -1; text-align: center; padding: 40px 0; color: #666; font-size: 0.95rem; line-height: 1.5; }
     .product-card { background: var(--card-bg); border-radius: 8px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: space-between; gap: 6px; position: relative; }
     .product-card.disabled { opacity: 0.6; }
     .soldout-tag { position: absolute; top: 15px; left: 15px; background: rgba(217, 83, 79, 0.95); color: #fff; font-size: 0.75rem; font-weight: bold; padding: 4px 8px; border-radius: 4px; z-index: 2; }
@@ -94,14 +91,10 @@
       <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-bar"></div></div>
       <div class="summary-sub"><span id="box-rate-text">1箱目の使用率: 0%</span><span id="box-empty-text">箱の空き: 残り 1000 vol</span></div>
     </div>
-    <div class="recommend-box" id="recommend-box" style="display: none;">
-      <span id="recommend-text">💡 箱にあと 0 vol 入ります！タップで追加できます！</span>
-      <div class="recommend-items" id="recommend-items"></div>
-    </div>
   </div>
 
   <div class="product-list" id="product-container">
-    <div class="loading-text">データを読み込み中...</div>
+    <div class="loading-text">商品データを読み込んでいます...</div>
   </div>
 
   <div class="footer-bar">
@@ -158,15 +151,19 @@
       try {
         let fetchUrl = GAS_API_URL;
         if (lineProfile && lineProfile.userId) fetchUrl += `?userId=${encodeURIComponent(lineProfile.userId)}`;
-        const res = await fetch(fetchUrl);
-        if (!res.ok) throw new Error("HTTP " + res.status);
         
+        const res = await fetch(fetchUrl);
+        if (!res.ok) throw new Error(`HTTPエラー ${res.status}`);
+        
+        const text = await res.text();
         let data;
         try {
-          data = await res.json();
-        } catch(e) {
-          throw new Error("サーバーから不正なデータが返されました");
+          data = JSON.parse(text);
+        } catch (e) {
+          throw new Error("スプレッドシートの権限設定が完了していません。<br>管理者に「デプロイの更新」を依頼してください。");
         }
+
+        if (data.error) throw new Error(data.error);
 
         isRegistered = !!data.isRegistered;
         customerMaster = data.customer;
@@ -202,7 +199,7 @@
         renderTabs(); renderProducts(); updateSummary();
       } catch (err) {
         console.error("データ取得エラー:", err);
-        container.innerHTML = `<div class="loading-text" style="color:red;">読込エラー: ${err.message}<br>画面を再読み込みしてください。</div>`;
+        container.innerHTML = `<div class="loading-text" style="color:red; font-weight:bold;">${err.message}</div>`;
       }
     }
 
@@ -241,11 +238,10 @@
       let filtered = allProducts.filter(p => p.category === currentCategory);
       if (filtered.length === 0) return container.innerHTML = '<div class="loading-text">該当する商品は現在ありません。</div>';
 
-      // 【追加】在庫があるものを上、在庫0(売り切れ)を下にするソート処理
       filtered.sort((a, b) => {
         if (a.stock > 0 && b.stock <= 0) return -1;
         if (a.stock <= 0 && b.stock > 0) return 1;
-        return 0; // それ以外は元の順序を維持
+        return 0; 
       });
 
       filtered.forEach(p => {
@@ -311,15 +307,6 @@
       const confirmBtn = document.getElementById('confirm-btn');
       confirmBtn.innerText = isRegistered ? `注文内容を確認する (${totalCount}点)` : '未登録のため注文できません';
       confirmBtn.disabled = !isRegistered || totalCount === 0;
-
-      const recommendBox = document.getElementById('recommend-box');
-      if (isRegistered && remainingVol > 0 && remainingVol <= 300 && totalVol > 0) {
-        recommendBox.style.display = 'flex';
-        document.getElementById('recommend-text').innerText = `💡 箱にあと ${remainingVol} vol 入ります！`;
-        const fits = allProducts.filter(p => !p.isAsk && p.vol > 0 && p.vol <= remainingVol && p.stock > (cart[p.id] || 0));
-        const uniqueFits = Array.from(new Map(fits.map(p => [p.name, p])).values());
-        document.getElementById('recommend-items').innerHTML = uniqueFits.map(f => `<span class="recommend-badge" onclick="quickAdd('${f.id}')">＋ ${f.name} (+${f.vol}vol)</span>`).join('');
-      } else { recommendBox.style.display = 'none'; }
     }
 
     function openModal() {
@@ -368,7 +355,10 @@
         const payload = { items: orderItems, customer: { name: custName, phone: custPhone, lineUserId: lineProfile ? lineProfile.userId : '' } };
         const response = await fetch(GAS_API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload), signal: controller.signal });
         clearTimeout(timeoutId);
-        const result = await response.json();
+        
+        const text = await response.text();
+        let result;
+        try { result = JSON.parse(text); } catch (e) { throw new Error("サーバーとの通信に失敗しました。"); }
 
         if (result.status === "success") {
           let subtotalAmount = 0, totalVol = 0, hasAsk = false;
