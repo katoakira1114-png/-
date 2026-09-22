@@ -9,11 +9,13 @@
   <style>
     :root {
       --primary-color: #005bac;
+      --primary-dark: #004080;
       --bg-color: #f4f6f9;
       --card-bg: #ffffff;
       --text-color: #333333;
       --border-color: #e0e0e0;
       --danger-color: #d81b60;
+      --success-color: #27ae60;
     }
 
     * {
@@ -29,6 +31,7 @@
       padding-bottom: 90px;
     }
 
+    /* 上部固定ヘッダー */
     .sticky-header-container {
       position: sticky;
       top: 0;
@@ -319,6 +322,7 @@
       cursor: not-allowed;
     }
 
+    /* モーダル基本スタイル */
     .modal-overlay {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
@@ -423,8 +427,9 @@
     }
 
     .btn-back { background: #7f8c8d; color: #fff; }
-    .btn-send { background: #27ae60; color: #fff; }
+    .btn-send { background: var(--success-color); color: #fff; }
 
+    /* 画像拡大モーダル */
     .img-modal-overlay {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
@@ -445,10 +450,96 @@
       border-radius: 8px;
       object-fit: contain;
     }
+
+    /* 送信中ローディング画面（全画面スピナー） */
+    .loading-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255, 255, 255, 0.9);
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 500;
+    }
+    .loading-overlay.active {
+      display: flex;
+    }
+    .spinner {
+      width: 48px;
+      height: 48px;
+      border: 5px solid #e0e0e0;
+      border-top: 5px solid var(--primary-color);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 16px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .loading-msg {
+      font-size: 0.95rem;
+      font-weight: bold;
+      color: #333;
+    }
+
+    /* 注文完了サンクスモーダル */
+    .success-icon {
+      font-size: 3rem;
+      color: var(--success-color);
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .success-title {
+      font-size: 1.15rem;
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .success-desc {
+      font-size: 0.85rem;
+      color: #666;
+      line-height: 1.5;
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .pdf-open-btn {
+      display: block;
+      width: 100%;
+      background-color: var(--primary-color);
+      color: #fff;
+      text-align: center;
+      text-decoration: none;
+      padding: 12px;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 0.95rem;
+      margin-bottom: 8px;
+    }
+    .close-liff-btn {
+      width: 100%;
+      background-color: #eee;
+      color: #444;
+      border: none;
+      padding: 10px;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
 
+  <!-- 全画面ローディング -->
+  <div class="loading-overlay" id="loading-overlay">
+    <div class="spinner"></div>
+    <div class="loading-msg">注文を処理し、納品書を発行中...</div>
+    <div style="font-size: 0.75rem; color:#888; margin-top: 4px;">画面を閉じずにお待ちください</div>
+  </div>
+
+  <!-- スクロール固定ヘッダー -->
   <div class="sticky-header-container">
     <header>
       商品注文フォーム
@@ -485,14 +576,17 @@
     </div>
   </div>
 
+  <!-- 商品一覧 -->
   <div class="product-list" id="product-container">
     <div class="loading-text">商品データを読み込み中...</div>
   </div>
 
+  <!-- 下部固定バー -->
   <div class="footer-bar">
     <button class="confirm-btn" id="confirm-btn" onclick="openModal()">注文内容を確認する (0点)</button>
   </div>
 
+  <!-- 注文確認モーダル -->
   <div class="modal-overlay" id="order-modal">
     <div class="modal-content">
       <div class="modal-header">ご注文内容の確認</div>
@@ -514,11 +608,26 @@
       
       <div class="modal-actions">
         <button class="modal-btn btn-back" id="btn-back" onclick="closeModal()">戻る</button>
-        <button class="modal-btn btn-send" id="final-send-btn" onclick="submitOrder()">送信してLINEに送る</button>
+        <button class="modal-btn btn-send" id="final-send-btn" onclick="submitOrder()">注文を確定する</button>
       </div>
     </div>
   </div>
 
+  <!-- 注文完了サンクスモーダル -->
+  <div class="modal-overlay" id="success-modal">
+    <div class="modal-content" style="text-align: center;">
+      <div class="success-icon">✓</div>
+      <div class="success-title">ご注文が完了しました</div>
+      <div class="success-desc">
+        公式LINEに注文明細と納品書PDFを送信いたしました。<br>
+        下記ボタンからも納品書をご確認いただけます。
+      </div>
+      <a href="#" target="_blank" class="pdf-open-btn" id="success-pdf-btn">📄 納品書PDFを開く</a>
+      <button class="close-liff-btn" onclick="finishAndClose()">画面を閉じる</button>
+    </div>
+  </div>
+
+  <!-- 画像拡大モーダル -->
   <div class="img-modal-overlay" id="img-zoom-modal" onclick="closeImageModal()">
     <img class="img-modal-content" id="zoomed-img" src="" alt="拡大画像">
   </div>
@@ -609,6 +718,9 @@
         allProducts.forEach(p => {
           if (cart[p.id] === undefined) {
             cart[p.id] = 0;
+          } else if (cart[p.id] > p.stock) {
+            // 在庫オーバーしていれば安全に補正
+            cart[p.id] = p.stock;
           }
         });
 
@@ -732,7 +844,7 @@
       let newQty = (cart[id] || 0) + delta;
       if (newQty < 0) newQty = 0;
       if (newQty > product.stock) {
-        alert(`在庫上限は ${product.stock} 個です。`);
+        alert(`「${product.name}」の在庫上限は ${product.stock} 個です。`);
         return;
       }
 
@@ -861,6 +973,9 @@
       document.getElementById('order-modal').classList.remove('active');
     }
 
+    /**
+     * 発展版：注文確定処理
+     */
     async function submitOrder() {
       const custName = document.getElementById('cust-name').value.trim();
       const custPhone = document.getElementById('cust-phone').value.trim();
@@ -883,15 +998,12 @@
 
       if (orderItems.length === 0) return;
 
-      const sendBtn = document.getElementById('final-send-btn');
-      const backBtn = document.getElementById('btn-back');
-      
-      sendBtn.disabled = true;
-      backBtn.disabled = true;
-      sendBtn.innerText = "納品書作成 & 注文送信中...";
+      // ローディングオーバーレイを表示（画面全体の操作をロック）
+      const loadingOverlay = document.getElementById('loading-overlay');
+      loadingOverlay.classList.add('active');
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 35000);
+      const timeoutId = setTimeout(() => controller.abort(), 40000); // 余裕を持って40秒に設定
 
       try {
         const payload = {
@@ -914,65 +1026,42 @@
         const result = await response.json();
 
         if (result.status === "success") {
-          let subtotalAmount = 0;
-          let totalVol = 0;
-          let hasAsk = false;
-          let msgText = `【新規ご注文】\n`;
-          msgText += `店舗/氏名: ${custName} 様\n`;
-          if (custPhone) msgText += `TEL: ${custPhone}\n`;
-          msgText += `-------------------\n`;
-
-          orderItems.forEach(item => {
-            if (item.isAsk) {
-              msgText += `・${item.name} × ${item.qty} (ASK)\n`;
-              hasAsk = true;
-            } else {
-              msgText += `・${item.name} × ${item.qty} (¥${(item.appliedPrice * item.qty).toLocaleString()})\n`;
-              subtotalAmount += item.appliedPrice * item.qty;
-            }
-            totalVol += item.vol * item.qty;
-          });
-
-          const boxCount = (totalVol / 1000).toFixed(1);
-          msgText += `-------------------\n`;
-          msgText += `商品計: ¥${subtotalAmount.toLocaleString()}${hasAsk ? ' + ASK' : ''}\n`;
-          msgText += `容量: ${totalVol.toLocaleString()} vol (約${boxCount}箱)\n\n`;
-          if (result.invoiceUrl) {
-            msgText += `📄 納品書PDF:\n${result.invoiceUrl}`;
-          }
-
+          // カートを初期化
           Object.keys(cart).forEach(id => { cart[id] = 0; });
           closeModal();
-          
-          // LIFFトークン送信またはLINE遷移
-          if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
-            try {
-              await liff.sendMessages([{ type: 'text', text: msgText }]);
-              alert('ご注文が完了しました！公式LINEに送信されました。');
-              liff.closeWindow();
-              return;
-            } catch (liffSendErr) {
-              console.warn("liff.sendMessages失敗、フォールバックへ:", liffSendErr);
-            }
-          }
+          updateSummary();
 
-          const lineUrl = `https://line.me/R/oaMessage/@877qwvyc/?${encodeURIComponent(msgText)}`;
-          window.location.href = lineUrl;
+          // サンクスモーダルを表示し、PDFリンクを設定
+          document.getElementById('success-pdf-btn').href = result.invoiceUrl;
+          document.getElementById('success-modal').classList.add('active');
 
         } else {
-          alert("エラーが発生しました: " + (result.message || '不明なエラー'));
+          // 在庫不足などエラーが発生した場合
+          alert("【ご注文を受け付けられませんでした】\n" + (result.message || '不明なエラー'));
+          // 最新の在庫情報をバックグラウンドで再取得して画面を更新
+          await fetchProducts();
         }
 
       } catch (e) {
         if (e.name === 'AbortError') {
-          alert('通信がタイムアウトしました。通信環境をご確認いただくか、管理者へ直接お問い合わせください。');
+          alert('通信がタイムアウトしました。電波の良い場所で再度お試しいただくか、LINEトークで直接ご連絡ください。');
         } else {
           alert('注文処理中にエラーが発生しました。通信環境を確認して再度お試しください。');
         }
       } finally {
-        sendBtn.disabled = false;
-        backBtn.disabled = false;
-        sendBtn.innerText = "送信してLINEに送る";
+        loadingOverlay.classList.remove('active');
+      }
+    }
+
+    /**
+     * 完了後のLIFF終了または閉じる処理
+     */
+    function finishAndClose() {
+      if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
+        liff.closeWindow();
+      } else {
+        document.getElementById('success-modal').classList.remove('active');
+        fetchProducts(); // 念のため再ロード
       }
     }
   </script>
