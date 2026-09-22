@@ -29,7 +29,6 @@
       padding-bottom: 90px;
     }
 
-    /* 上部固定コンテナ */
     .sticky-header-container {
       position: sticky;
       top: 0;
@@ -450,7 +449,6 @@
 </head>
 <body>
 
-  <!-- スクロールしても上部に固定されるヘッダー群 -->
   <div class="sticky-header-container">
     <header>
       商品注文フォーム
@@ -499,7 +497,6 @@
     <div class="modal-content">
       <div class="modal-header">ご注文内容の確認</div>
       <div class="modal-body">
-        
         <div style="background:#eef6ff; padding:10px; border-radius:6px; margin-bottom:12px;">
           <div class="form-group">
             <label>店舗名 / お名前（必須）</label>
@@ -563,7 +560,6 @@
       const container = document.getElementById('product-container');
       try {
         let fetchUrl = GAS_API_URL;
-        
         if (lineProfile && lineProfile.userId) {
           fetchUrl += `?userId=${encodeURIComponent(lineProfile.userId)}`;
         }
@@ -892,10 +888,10 @@
       
       sendBtn.disabled = true;
       backBtn.disabled = true;
-      sendBtn.innerText = "注文送信中...";
+      sendBtn.innerText = "納品書作成 & 注文送信中...";
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      const timeoutId = setTimeout(() => controller.abort(), 35000);
 
       try {
         const payload = {
@@ -918,7 +914,6 @@
         const result = await response.json();
 
         if (result.status === "success") {
-          // 注文文面の作成
           let subtotalAmount = 0;
           let totalVol = 0;
           let hasAsk = false;
@@ -948,10 +943,8 @@
 
           Object.keys(cart).forEach(id => { cart[id] = 0; });
           closeModal();
-          renderProducts();
-          updateSummary();
-
-          // 1. LIFFアプリ内から直接メッセージを送信（履歴に残す）
+          
+          // LIFFトークン送信またはLINE遷移
           if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
             try {
               await liff.sendMessages([{ type: 'text', text: msgText }]);
@@ -963,7 +956,6 @@
             }
           }
 
-          // 2. フォールバック：公式LINEへのトーク遷移（100%確実に送信履歴が残る）
           const lineUrl = `https://line.me/R/oaMessage/@877qwvyc/?${encodeURIComponent(msgText)}`;
           window.location.href = lineUrl;
 
@@ -973,7 +965,7 @@
 
       } catch (e) {
         if (e.name === 'AbortError') {
-          alert('通信がタイムアウトしました。送信環境をご確認ください。');
+          alert('通信がタイムアウトしました。通信環境をご確認いただくか、管理者へ直接お問い合わせください。');
         } else {
           alert('注文処理中にエラーが発生しました。通信環境を確認して再度お試しください。');
         }
