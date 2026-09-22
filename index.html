@@ -138,7 +138,6 @@
 
     window.addEventListener('DOMContentLoaded', async () => {
       try {
-        // LIFF初期化に3秒のタイムアウトを設けて安全にスキップ
         await Promise.race([
           liff.init({ liffId: LIFF_ID }),
           new Promise((_, reject) => setTimeout(() => reject(new Error('LIFF init timeout')), 3000))
@@ -151,7 +150,7 @@
       } catch (err) {
         console.warn("LIFF Error:", err);
       }
-      fetchProducts(); // 認証状況に関わらず必ずデータ読み込みを走らせる
+      fetchProducts();
     });
 
     async function fetchProducts() {
@@ -238,8 +237,16 @@
     function renderProducts() {
       const container = document.getElementById('product-container');
       container.innerHTML = '';
-      const filtered = allProducts.filter(p => p.category === currentCategory);
+      
+      let filtered = allProducts.filter(p => p.category === currentCategory);
       if (filtered.length === 0) return container.innerHTML = '<div class="loading-text">該当する商品は現在ありません。</div>';
+
+      // 【追加】在庫があるものを上、在庫0(売り切れ)を下にするソート処理
+      filtered.sort((a, b) => {
+        if (a.stock > 0 && b.stock <= 0) return -1;
+        if (a.stock <= 0 && b.stock > 0) return 1;
+        return 0; // それ以外は元の順序を維持
+      });
 
       filtered.forEach(p => {
         const qty = cart[p.id] || 0;
