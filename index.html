@@ -15,8 +15,13 @@
     .sticky-header-container { position: sticky; top: 0; z-index: 100; background-color: var(--bg-color); box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
     header { background-color: var(--card-bg); text-align: center; padding: 10px 15px; font-size: 1.05rem; font-weight: bold; border-bottom: 1px solid var(--border-color); }
     .user-badge { font-size: 0.8rem; color: #008000; margin-top: 3px; font-weight: bold; background: #eef9ee; padding: 2px 8px; border-radius: 10px; display: inline-block; }
-    .unregistered-alert { background-color: #ffebee; color: #c62828; padding: 10px; font-size: 0.85rem; font-weight: bold; text-align: center; border-bottom: 1px solid #ffcdd2; }
-    .request-reg-btn { display: inline-block; margin-top: 6px; background: #c62828; color: #fff; padding: 6px 12px; border-radius: 4px; font-size: 0.75rem; text-decoration: none; cursor: pointer; border: none; }
+    
+    /* 登録フォーム用デザイン */
+    .register-box { background: #fff; margin: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); overflow: hidden; }
+    .register-header { background: var(--danger-color); color: #fff; text-align: center; padding: 12px; font-weight: bold; font-size: 1rem; }
+    .register-body { padding: 15px; }
+    .register-desc { font-size: 0.85rem; color: #555; margin-bottom: 15px; line-height: 1.4; }
+    
     .tabs { display: flex; background-color: var(--card-bg); border-bottom: 1px solid var(--border-color); overflow-x: auto; }
     .tab-btn { flex: 1; padding: 10px 12px; text-align: center; background: none; border: none; font-size: 0.9rem; font-weight: bold; color: #666; cursor: pointer; white-space: nowrap; }
     .tab-btn.active { color: #fff; background-color: var(--primary-color); border-radius: 4px; }
@@ -71,7 +76,7 @@
 <body>
   <div class="loading-overlay" id="loading-overlay">
     <div class="spinner"></div>
-    <div style="font-weight:bold; color:#333;">注文を処理し、納品書を発行中...</div>
+    <div style="font-weight:bold; color:#333;">処理中...</div>
     <div style="font-size: 0.75rem; color:#888; margin-top: 4px;">画面を閉じずにお待ちください</div>
   </div>
 
@@ -80,16 +85,34 @@
       商品注文フォーム
       <div><span class="user-badge" id="user-badge" style="display:none;"></span></div>
     </header>
-    <div class="unregistered-alert" id="unregistered-alert" style="display: none;">
-      ⚠️ 取引先マスタに未登録のアカウントです。<br>
-      仕入れ価格の確認・ご注文には事前登録が必要です。<br>
-      <button class="request-reg-btn" onclick="requestRegistration()">管理者へ登録を依頼する</button>
+
+    <!-- 自動登録フォーム -->
+    <div id="unregistered-alert" style="display: none;">
+      <div class="register-box">
+        <div class="register-header">初回アカウント登録</div>
+        <div class="register-body">
+          <div class="register-desc">仕入れ取引をご利用いただくには、初回のみアカウント登録が必要です。<br>以下の情報を入力して「登録」ボタンを押してください。<br><span style="color:var(--primary-color);font-size:0.75rem;">※次回以降は自動でログインされます。</span></div>
+          <div class="form-group">
+            <label>店舗名 / お名前（必須）</label>
+            <input type="text" id="reg-name" class="form-input" placeholder="例: ○○アクアリウム">
+          </div>
+          <div class="form-group">
+            <label>電話番号（必須）</label>
+            <input type="tel" id="reg-phone" class="form-input" placeholder="例: 090-1234-5678">
+          </div>
+          <button class="confirm-btn" style="margin-top:10px; background:var(--success-color);" onclick="submitRegistration()">登録して注文を始める</button>
+        </div>
+      </div>
     </div>
-    <div class="tabs" id="category-tabs"></div>
-    <div class="summary-card">
-      <div class="summary-info"><span id="total-price-text">合計金額: 0 円</span><span id="total-vol-text">合計容量: 0 vol</span></div>
-      <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-bar"></div></div>
-      <div class="summary-sub"><span id="box-rate-text">1箱目の使用率: 0%</span><span id="box-empty-text">箱の空き: 残り 1000 vol</span></div>
+
+    <!-- メインコンテンツ群 (未登録時は隠す) -->
+    <div id="main-ui" style="display: none;">
+      <div class="tabs" id="category-tabs"></div>
+      <div class="summary-card">
+        <div class="summary-info"><span id="total-price-text">合計金額: 0 円</span><span id="total-vol-text">合計容量: 0 vol</span></div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-bar"></div></div>
+        <div class="summary-sub"><span id="box-rate-text">1箱目の使用率: 0%</span><span id="box-empty-text">箱の空き: 残り 1000 vol</span></div>
+      </div>
     </div>
   </div>
 
@@ -97,17 +120,18 @@
     <div class="loading-text">商品データを読み込んでいます...</div>
   </div>
 
-  <div class="footer-bar">
+  <div class="footer-bar" id="footer-bar" style="display:none;">
     <button class="confirm-btn" id="confirm-btn" onclick="openModal()">注文内容を確認する (0点)</button>
   </div>
 
+  <!-- 注文確認モーダル -->
   <div class="modal-overlay" id="order-modal">
     <div class="modal-content">
       <div class="modal-header">ご注文内容の確認</div>
       <div class="modal-body">
         <div style="background:#eef6ff; padding:10px; border-radius:6px; margin-bottom:12px;">
-          <div class="form-group"><label>店舗名 / お名前（必須）</label><input type="text" id="cust-name" class="form-input" placeholder="例: ○○アクアリウム"></div>
-          <div class="form-group"><label>電話番号</label><input type="tel" id="cust-phone" class="form-input" placeholder="例: 090-1234-5678"></div>
+          <div class="form-group"><label>店舗名 / お名前</label><input type="text" id="cust-name" class="form-input" readonly style="background:#f0f0f0;"></div>
+          <div class="form-group"><label>電話番号</label><input type="tel" id="cust-phone" class="form-input" readonly style="background:#f0f0f0;"></div>
         </div>
         <div id="modal-item-list"></div>
         <div class="modal-summary" id="modal-summary-box"></div>
@@ -130,27 +154,29 @@
     let lineProfile = null, isRegistered = false, customerMaster = null;
 
     window.addEventListener('DOMContentLoaded', async () => {
+      // LINEログインの強制を廃止し、外部ブラウザでも見れるように変更
       try {
         await Promise.race([
           liff.init({ liffId: LIFF_ID }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('LIFF init timeout')), 3000))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('LIFF init timeout')), 2500))
         ]);
-        if (!liff.isLoggedIn()) {
-          liff.login({ redirectUri: window.location.href });
-          return;
+        if (liff.isLoggedIn()) {
+          lineProfile = await liff.getProfile();
         }
-        lineProfile = await liff.getProfile();
       } catch (err) {
-        console.warn("LIFF Error:", err);
+        console.warn("LIFF info: ", err);
       }
-      fetchProducts();
+      // ブラウザに記憶された電話番号を取得
+      const savedPhone = localStorage.getItem('kawabata_phone') || "";
+      fetchProducts(savedPhone);
     });
 
-    async function fetchProducts() {
+    async function fetchProducts(savedPhone = "") {
       const container = document.getElementById('product-container');
       try {
-        let fetchUrl = GAS_API_URL;
-        if (lineProfile && lineProfile.userId) fetchUrl += `?userId=${encodeURIComponent(lineProfile.userId)}`;
+        let fetchUrl = GAS_API_URL + "?";
+        if (lineProfile && lineProfile.userId) fetchUrl += `userId=${encodeURIComponent(lineProfile.userId)}&`;
+        if (savedPhone) fetchUrl += `phone=${encodeURIComponent(savedPhone)}&`;
         
         const res = await fetch(fetchUrl);
         if (!res.ok) throw new Error(`HTTPエラー ${res.status}`);
@@ -160,30 +186,46 @@
         try {
           data = JSON.parse(text);
         } catch (e) {
-          throw new Error("スプレッドシートの権限設定が完了していません。<br>管理者に「デプロイの更新」を依頼してください。");
+          throw new Error("スプレッドシートの権限設定が完了していません。");
         }
 
         if (data.error) throw new Error(data.error);
 
         isRegistered = !!data.isRegistered;
         customerMaster = data.customer;
+        
         const alertBox = document.getElementById('unregistered-alert');
+        const mainUI = document.getElementById('main-ui');
+        const footerBar = document.getElementById('footer-bar');
         const badge = document.getElementById('user-badge');
 
         if (!isRegistered) {
           alertBox.style.display = 'block';
+          mainUI.style.display = 'none';
+          footerBar.style.display = 'none';
+          container.style.display = 'none';
+          
           if (lineProfile) {
             badge.innerText = `👤 LINE: ${lineProfile.displayName}`;
             badge.style.display = 'inline-block';
-            document.getElementById('cust-name').value = lineProfile.displayName;
+            document.getElementById('reg-name').value = lineProfile.displayName;
           }
         } else {
           alertBox.style.display = 'none';
+          mainUI.style.display = 'block';
+          footerBar.style.display = 'block';
+          container.style.display = 'grid';
+
           const discountPct = Math.round((customerMaster.discountRate || 1) * 100);
           badge.innerText = `🏢 ${customerMaster.name} 様 (掛率: ${discountPct}%)`;
           badge.style.display = 'inline-block';
           document.getElementById('cust-name').value = customerMaster.name || '';
           document.getElementById('cust-phone').value = customerMaster.phone || '';
+          
+          // 自動ログイン後、電話番号をストレージに記憶しておく
+          if (customerMaster.phone) {
+            localStorage.setItem('kawabata_phone', customerMaster.phone);
+          }
         }
 
         const discountRate = (isRegistered && customerMaster) ? customerMaster.discountRate : 1.0;
@@ -196,17 +238,45 @@
         categories = [...new Set(allProducts.map(p => p.category))];
         if (categories.length > 0 && !categories.includes(currentCategory)) currentCategory = categories[0];
 
-        renderTabs(); renderProducts(); updateSummary();
+        if (isRegistered) {
+          renderTabs(); renderProducts(); updateSummary();
+        }
       } catch (err) {
-        console.error("データ取得エラー:", err);
+        container.style.display = 'block';
         container.innerHTML = `<div class="loading-text" style="color:red; font-weight:bold;">${err.message}</div>`;
       }
     }
 
-    function requestRegistration() {
-      const uid = lineProfile ? lineProfile.userId : '未取得';
-      const name = lineProfile ? lineProfile.displayName : '未取得';
-      window.location.href = `https://line.me/R/oaMessage/@877qwvyc/?${encodeURIComponent(`川畑水産様\n仕入れ取引のアカウント登録をお願いします。\n【店舗名】:\n【お名前】: ${name}\n【ユーザーID】: ${uid}`)}`;
+    async function submitRegistration() {
+      const regName = document.getElementById('reg-name').value.trim();
+      const regPhone = document.getElementById('reg-phone').value.trim();
+      
+      if (!regName || !regPhone) {
+        alert("店舗名とお電話番号を入力してください。");
+        return;
+      }
+
+      document.getElementById('loading-overlay').classList.add('active');
+      try {
+        const payload = {
+          action: "register",
+          customer: { name: regName, phone: regPhone, lineUserId: lineProfile ? lineProfile.userId : '' }
+        };
+        const response = await fetch(GAS_API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
+        const result = await response.json();
+        
+        if (result.status === "success") {
+          localStorage.setItem('kawabata_phone', regPhone);
+          alert("登録が完了しました！商品一覧を表示します。");
+          await fetchProducts(regPhone);
+        } else {
+          alert("エラーが発生しました: " + result.message);
+        }
+      } catch (e) {
+        alert('通信エラーが発生しました。電波の良い場所で再度お試しください。');
+      } finally {
+        document.getElementById('loading-overlay').classList.remove('active');
+      }
     }
 
     function renderTabs() {
@@ -274,7 +344,7 @@
     function closeImageModal() { document.getElementById('img-zoom-modal').classList.remove('active'); }
 
     function changeQty(id, delta) {
-      if (!isRegistered) return alert('未登録のアカウントです。ご注文には事前登録が必要です。');
+      if (!isRegistered) return;
       const product = allProducts.find(p => String(p.id) === String(id));
       if (!product) return;
       let newQty = (cart[id] || 0) + delta;
@@ -282,116 +352,10 @@
       if (newQty > product.stock) return alert(`在庫上限は ${product.stock} 個です。`);
       cart[id] = newQty; renderProducts(); updateSummary();
     }
-    function quickAdd(id) { changeQty(id, 1); }
 
     function updateSummary() {
       let totalAmount = 0, totalVol = 0, totalCount = 0, hasAsk = false;
       allProducts.forEach(p => {
         const qty = cart[p.id] || 0;
         if (qty > 0) {
-          if (p.isAsk) hasAsk = true; else totalAmount += p.price * qty;
-          totalVol += p.vol * qty; totalCount += qty;
-        }
-      });
-
-      document.getElementById('total-price-text').innerText = `合計金額: ${isRegistered ? totalAmount.toLocaleString() + ' 円' + (hasAsk ? ' + ASK' : '') : '---- 円'}`;
-      document.getElementById('total-vol-text').innerText = `合計容量: ${totalVol.toLocaleString()} vol`;
-      const volInCurrentBox = totalVol % 1000;
-      const boxUsageRate = totalVol === 0 ? 0 : Math.round((volInCurrentBox === 0 ? 1000 : volInCurrentBox) / 1000 * 100);
-      const remainingVol = volInCurrentBox === 0 && totalVol > 0 ? 0 : 1000 - volInCurrentBox;
-
-      document.getElementById('progress-bar').style.width = `${boxUsageRate}%`;
-      document.getElementById('box-rate-text').innerText = `${Math.floor(totalVol / 1000) + 1}箱目の使用率: ${boxUsageRate}%`;
-      document.getElementById('box-empty-text').innerText = `箱の空き: 残り ${remainingVol} vol`;
-
-      const confirmBtn = document.getElementById('confirm-btn');
-      confirmBtn.innerText = isRegistered ? `注文内容を確認する (${totalCount}点)` : '未登録のため注文できません';
-      confirmBtn.disabled = !isRegistered || totalCount === 0;
-    }
-
-    function openModal() {
-      if (!isRegistered) return;
-      calculateModalTotal(); document.getElementById('order-modal').classList.add('active');
-    }
-
-    function calculateModalTotal() {
-      const listContainer = document.getElementById('modal-item-list');
-      const summaryBox = document.getElementById('modal-summary-box');
-      listContainer.innerHTML = '';
-      let subtotalAmount = 0, totalVol = 0, totalCount = 0, hasAsk = false;
-
-      allProducts.forEach(p => {
-        const qty = cart[p.id] || 0;
-        if (qty > 0) {
-          let priceStr = p.isAsk ? 'ASK' : `¥${(p.price * qty).toLocaleString()}`;
-          if (p.isAsk) hasAsk = true; else subtotalAmount += p.price * qty;
-          totalVol += p.vol * qty; totalCount += qty;
-          const row = document.createElement('div');
-          row.className = 'order-item-row';
-          row.innerHTML = `<span>[${p.category}] ${p.name} × ${qty}</span><span>${priceStr}</span>`;
-          listContainer.appendChild(row);
-        }
-      });
-      summaryBox.innerHTML = `<div>数量: 計 ${totalCount} 点 / 容積: ${totalVol} vol (約${(totalVol / 1000).toFixed(1)}箱)</div><div class="total-price">お支払い合計: ¥${subtotalAmount.toLocaleString()} (税込)${hasAsk ? ' + ASK' : ''}</div>`;
-    }
-
-    function closeModal() { document.getElementById('order-modal').classList.remove('active'); }
-
-    async function submitOrder() {
-      const custName = document.getElementById('cust-name').value.trim();
-      const custPhone = document.getElementById('cust-phone').value.trim();
-      if (!custName) return alert('店舗名またはお名前を入力してください。');
-
-      const orderItems = allProducts.filter(p => cart[p.id] > 0).map(p => ({
-        id: p.id, category: p.category, name: p.name, appliedPrice: p.price, isAsk: p.isAsk, vol: p.vol, qty: cart[p.id]
-      }));
-      if (orderItems.length === 0) return;
-
-      document.getElementById('loading-overlay').classList.add('active');
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 35000);
-
-      try {
-        const payload = { items: orderItems, customer: { name: custName, phone: custPhone, lineUserId: lineProfile ? lineProfile.userId : '' } };
-        const response = await fetch(GAS_API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload), signal: controller.signal });
-        clearTimeout(timeoutId);
-        
-        const text = await response.text();
-        let result;
-        try { result = JSON.parse(text); } catch (e) { throw new Error("サーバーとの通信に失敗しました。"); }
-
-        if (result.status === "success") {
-          let subtotalAmount = 0, totalVol = 0, hasAsk = false;
-          let msgText = `【新規ご注文】\n店舗/氏名: ${custName} 様\n`;
-          if (custPhone) msgText += `TEL: ${custPhone}\n`;
-          msgText += `-------------------\n`;
-          orderItems.forEach(item => {
-            msgText += `・${item.name} × ${item.qty} ${item.isAsk ? '(ASK)' : '(¥'+(item.appliedPrice * item.qty).toLocaleString()+')'}\n`;
-            if (item.isAsk) hasAsk = true; else subtotalAmount += item.appliedPrice * item.qty;
-            totalVol += item.vol * item.qty;
-          });
-          msgText += `-------------------\n商品計: ¥${subtotalAmount.toLocaleString()}${hasAsk ? ' + ASK' : ''}\n容量: ${totalVol.toLocaleString()} vol (約${(totalVol/1000).toFixed(1)}箱)\n\n`;
-          if (result.invoiceUrl) msgText += `📄 納品書PDF:\n${result.invoiceUrl}`;
-
-          Object.keys(cart).forEach(id => { cart[id] = 0; });
-          closeModal(); renderProducts(); updateSummary();
-
-          if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
-            try {
-              await liff.sendMessages([{ type: 'text', text: msgText }]);
-              alert('ご注文が完了しました！公式LINEに控えが送信されました。');
-              liff.closeWindow(); return;
-            } catch (e) {}
-          }
-          window.location.href = `https://line.me/R/oaMessage/@877qwvyc/?${encodeURIComponent(msgText)}`;
-        } else alert("エラーが発生しました: " + (result.message || '不明なエラー'));
-      } catch (e) {
-        if (e.name === 'AbortError') alert('通信がタイムアウトしました。電波の良い場所で再度お試しください。');
-        else alert('注文処理中にエラーが発生しました。通信環境を確認して再度お試しください。');
-      } finally {
-        document.getElementById('loading-overlay').classList.remove('active');
-      }
-    }
-  </script>
-</body>
-</html>
+          if (p.isAsk) hasAsk = t
