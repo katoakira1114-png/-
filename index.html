@@ -16,7 +16,6 @@
     header { background-color: var(--card-bg); text-align: center; padding: 10px 15px; font-size: 1.05rem; font-weight: bold; border-bottom: 1px solid var(--border-color); }
     .user-badge { font-size: 0.8rem; color: #008000; margin-top: 3px; font-weight: bold; background: #eef9ee; padding: 2px 8px; border-radius: 10px; display: inline-block; }
     
-    /* 登録フォーム用デザイン */
     .register-box { background: #fff; margin: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); overflow: hidden; }
     .register-header { background: var(--danger-color); color: #fff; text-align: center; padding: 12px; font-weight: bold; font-size: 1rem; }
     .register-body { padding: 15px; }
@@ -86,7 +85,6 @@
       <div><span class="user-badge" id="user-badge" style="display:none;"></span></div>
     </header>
 
-    <!-- 自動登録フォーム -->
     <div id="unregistered-alert" style="display: none;">
       <div class="register-box">
         <div class="register-header">初回アカウント登録</div>
@@ -105,7 +103,6 @@
       </div>
     </div>
 
-    <!-- メインコンテンツ群 (未登録時は隠す) -->
     <div id="main-ui" style="display: none;">
       <div class="tabs" id="category-tabs"></div>
       <div class="summary-card">
@@ -117,14 +114,13 @@
   </div>
 
   <div class="product-list" id="product-container">
-    <div class="loading-text">商品データを読み込んでいます...</div>
+    <div class="loading-text">システムを起動しています...</div>
   </div>
 
   <div class="footer-bar" id="footer-bar" style="display:none;">
     <button class="confirm-btn" id="confirm-btn" onclick="openModal()">注文内容を確認する (0点)</button>
   </div>
 
-  <!-- 注文確認モーダル -->
   <div class="modal-overlay" id="order-modal">
     <div class="modal-content">
       <div class="modal-header">ご注文内容の確認</div>
@@ -154,25 +150,42 @@
     let lineProfile = null, isRegistered = false, customerMaster = null;
 
     window.addEventListener('DOMContentLoaded', async () => {
-      // LINEログインの強制を廃止し、外部ブラウザでも見れるように変更
+      const container = document.getElementById('product-container');
       try {
-        await Promise.race([
-          liff.init({ liffId: LIFF_ID }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('LIFF init timeout')), 2500))
-        ]);
-        if (liff.isLoggedIn()) {
-          lineProfile = await liff.getProfile();
+        // LIFFの初期化（エラーが起きても絶対にクラッシュさせない）
+        try {
+          await Promise.race([
+            liff.init({ liffId: LIFF_ID }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('LIFF init timeout')), 2500))
+          ]);
+          if (liff.isLoggedIn()) {
+            lineProfile = await liff.getProfile();
+          }
+        } catch (liffErr) {
+          console.warn("LIFF init skipped:", liffErr);
         }
-      } catch (err) {
-        console.warn("LIFF info: ", err);
+
+        // スマホの記憶領域へのアクセス（フリーズの最大の原因。ブロックされても無視する）
+        let savedPhone = "";
+        try {
+          savedPhone = localStorage.getItem('kawabata_phone') || "";
+        } catch (storageErr) {
+          console.warn("localStorage access denied:", storageErr);
+        }
+
+        await fetchProducts(savedPhone);
+
+      } catch (mainErr) {
+        // 万が一予期せぬエラーが起きても、画面が固まらずに赤文字でエラー理由を教える
+        container.style.display = 'block';
+        container.innerHTML = `<div class="loading-text" style="color:red; font-weight:bold;">通信エラーが発生しました。<br>${mainErr.message}</div>`;
       }
-      // ブラウザに記憶された電話番号を取得
-      const savedPhone = localStorage.getItem('kawabata_phone') || "";
-      fetchProducts(savedPhone);
     });
 
     async function fetchProducts(savedPhone = "") {
       const container = document.getElementById('product-container');
+      container.innerHTML = '<div class="loading-text">商品データを読み込んでいます...</div>';
+      
       try {
         let fetchUrl = GAS_API_URL + "?";
         if (lineProfile && lineProfile.userId) fetchUrl += `userId=${encodeURIComponent(lineProfile.userId)}&`;
@@ -186,7 +199,7 @@
         try {
           data = JSON.parse(text);
         } catch (e) {
-          throw new Error("スプレッドシートの権限設定が完了していません。");
+          throw new Error("スプレッドシートの権限設定が完了していません。管理者に「デプロイの更新」を依頼してください。");
         }
 
         if (data.error) throw new Error(data.error);
@@ -222,10 +235,10 @@
           document.getElementById('cust-name').value = customerMaster.name || '';
           document.getElementById('cust-phone').value = customerMaster.phone || '';
           
-          // 自動ログイン後、電話番号をストレージに記憶しておく
-          if (customerMaster.phone) {
-            localStorage.setItem('kawabata_phone', customerMaster.phone);
-          }
+          // ログイン成功時に電話番号を記憶（ブロックされても無視）
+          try {
+            if (customerMaster.phone) localStorage.setItem('kawabata_phone', customerMaster.phone);
+          } catch(e) {}
         }
 
         const discountRate = (isRegistered && customerMaster) ? customerMaster.discountRate : 1.0;
@@ -266,7 +279,7 @@
         const result = await response.json();
         
         if (result.status === "success") {
-          localStorage.setItem('kawabata_phone', regPhone);
+          try { localStorage.setItem('kawabata_phone', regPhone); } catch(e) {}
           alert("登録が完了しました！商品一覧を表示します。");
           await fetchProducts(regPhone);
         } else {
@@ -358,4 +371,111 @@
       allProducts.forEach(p => {
         const qty = cart[p.id] || 0;
         if (qty > 0) {
-          if (p.isAsk) hasAsk = t
+          if (p.isAsk) hasAsk = true; else totalAmount += p.price * qty;
+          totalVol += p.vol * qty; totalCount += qty;
+        }
+      });
+
+      document.getElementById('total-price-text').innerText = `合計金額: ${isRegistered ? totalAmount.toLocaleString() + ' 円' + (hasAsk ? ' + ASK' : '') : '---- 円'}`;
+      document.getElementById('total-vol-text').innerText = `合計容量: ${totalVol.toLocaleString()} vol`;
+      const volInCurrentBox = totalVol % 1000;
+      const boxUsageRate = totalVol === 0 ? 0 : Math.round((volInCurrentBox === 0 ? 1000 : volInCurrentBox) / 1000 * 100);
+      const remainingVol = volInCurrentBox === 0 && totalVol > 0 ? 0 : 1000 - volInCurrentBox;
+
+      document.getElementById('progress-bar').style.width = `${boxUsageRate}%`;
+      document.getElementById('box-rate-text').innerText = `${Math.floor(totalVol / 1000) + 1}箱目の使用率: ${boxUsageRate}%`;
+      document.getElementById('box-empty-text').innerText = `箱の空き: 残り ${remainingVol} vol`;
+
+      const confirmBtn = document.getElementById('confirm-btn');
+      confirmBtn.innerText = isRegistered ? `注文内容を確認する (${totalCount}点)` : '未登録のため注文できません';
+      confirmBtn.disabled = !isRegistered || totalCount === 0;
+    }
+
+    function openModal() {
+      if (!isRegistered) return;
+      calculateModalTotal(); document.getElementById('order-modal').classList.add('active');
+    }
+
+    function calculateModalTotal() {
+      const listContainer = document.getElementById('modal-item-list');
+      const summaryBox = document.getElementById('modal-summary-box');
+      listContainer.innerHTML = '';
+      let subtotalAmount = 0, totalVol = 0, totalCount = 0, hasAsk = false;
+
+      allProducts.forEach(p => {
+        const qty = cart[p.id] || 0;
+        if (qty > 0) {
+          let priceStr = p.isAsk ? 'ASK' : `¥${(p.price * qty).toLocaleString()}`;
+          if (p.isAsk) hasAsk = true; else subtotalAmount += p.price * qty;
+          totalVol += p.vol * qty; totalCount += qty;
+          const row = document.createElement('div');
+          row.className = 'order-item-row';
+          row.innerHTML = `<span>[${p.category}] ${p.name} × ${qty}</span><span>${priceStr}</span>`;
+          listContainer.appendChild(row);
+        }
+      });
+      summaryBox.innerHTML = `<div>数量: 計 ${totalCount} 点 / 容積: ${totalVol} vol (約${(totalVol / 1000).toFixed(1)}箱)</div><div class="total-price">お支払い合計: ¥${subtotalAmount.toLocaleString()} (税込)${hasAsk ? ' + ASK' : ''}</div>`;
+    }
+
+    function closeModal() { document.getElementById('order-modal').classList.remove('active'); }
+
+    async function submitOrder() {
+      const custName = document.getElementById('cust-name').value.trim();
+      const custPhone = document.getElementById('cust-phone').value.trim();
+
+      const orderItems = allProducts.filter(p => cart[p.id] > 0).map(p => ({
+        id: p.id, category: p.category, name: p.name, appliedPrice: p.price, isAsk: p.isAsk, vol: p.vol, qty: cart[p.id]
+      }));
+      if (orderItems.length === 0) return;
+
+      document.getElementById('loading-overlay').classList.add('active');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 35000);
+
+      try {
+        const payload = { action: "order", items: orderItems, customer: { name: custName, phone: custPhone, lineUserId: lineProfile ? lineProfile.userId : '' } };
+        const response = await fetch(GAS_API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload), signal: controller.signal });
+        clearTimeout(timeoutId);
+        
+        const text = await response.text();
+        let result;
+        try { result = JSON.parse(text); } catch (e) { throw new Error("サーバーとの通信に失敗しました。"); }
+
+        if (result.status === "success") {
+          let subtotalAmount = 0, totalVol = 0, hasAsk = false;
+          let msgText = `【新規ご注文】\n店舗/氏名: ${custName} 様\n`;
+          if (custPhone) msgText += `TEL: ${custPhone}\n`;
+          msgText += `-------------------\n`;
+          orderItems.forEach(item => {
+            msgText += `・${item.name} × ${item.qty} ${item.isAsk ? '(ASK)' : '(¥'+(item.appliedPrice * item.qty).toLocaleString()+')'}\n`;
+            if (item.isAsk) hasAsk = true; else subtotalAmount += item.appliedPrice * item.qty;
+            totalVol += item.vol * item.qty;
+          });
+          msgText += `-------------------\n商品計: ¥${subtotalAmount.toLocaleString()}${hasAsk ? ' + ASK' : ''}\n容量: ${totalVol.toLocaleString()} vol (約${(totalVol/1000).toFixed(1)}箱)\n\n`;
+          if (result.invoiceUrl) msgText += `📄 納品書PDF:\n${result.invoiceUrl}`;
+
+          Object.keys(cart).forEach(id => { cart[id] = 0; });
+          closeModal(); renderProducts(); updateSummary();
+
+          if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
+            try {
+              await liff.sendMessages([{ type: 'text', text: msgText }]);
+              alert('ご注文が完了しました！公式LINEに控えが送信されました。');
+              liff.closeWindow(); return;
+            } catch (e) {}
+          }
+          alert('ご注文が完了しました！\n(LINEアプリが入っている場合は、この後メッセージ画面が立ち上がります)');
+          window.location.href = `https://line.me/R/oaMessage/@877qwvyc/?${encodeURIComponent(msgText)}`;
+        } else {
+           alert("エラーが発生しました: " + (result.message || '不明なエラー'));
+        }
+      } catch (e) {
+        if (e.name === 'AbortError') alert('通信がタイムアウトしました。電波の良い場所で再度お試しください。');
+        else alert('注文処理中にエラーが発生しました。通信環境を確認して再度お試しください。');
+      } finally {
+        document.getElementById('loading-overlay').classList.remove('active');
+      }
+    }
+  </script>
+</body>
+</html>
