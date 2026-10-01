@@ -34,6 +34,7 @@
     .product-card { background: var(--card-bg); border-radius: 8px; padding: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: space-between; gap: 6px; position: relative; }
     .product-card.disabled { opacity: 0.6; }
     .soldout-tag { position: absolute; top: 15px; left: 15px; background: rgba(217, 83, 79, 0.95); color: #fff; font-size: 0.75rem; font-weight: bold; padding: 4px 8px; border-radius: 4px; z-index: 2; }
+    .repeat-badge { background: #ff9800; color: #fff; font-size: 0.65rem; font-weight: bold; padding: 2px 5px; border-radius: 4px; display: inline-block; margin-left: 4px; vertical-align: middle; }
     .product-img { width: 100%; height: 120px; object-fit: cover; border-radius: 6px; background-color: #eee; cursor: pointer; }
     .product-title { font-size: 0.85rem; font-weight: bold; line-height: 1.2; }
     .product-meta { font-size: 0.75rem; color: #777; }
@@ -56,7 +57,25 @@
     .form-group label { display: block; font-size: 0.8rem; font-weight: bold; margin-bottom: 3px; }
     .form-input { width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; font-size: 0.85rem; }
     .order-item-row { display: flex; justify-content: space-between; font-size: 0.85rem; padding: 5px 0; border-bottom: 1px dashed #eee; }
-    .modal-summary { background: #f8f9fa; padding: 10px; border-radius: 6px; font-size: 0.85rem; margin-top: 8px; text-align: center; }
+    
+    /* レコメンドセクション */
+    .recommend-section { background: #fffdf5; border: 1px solid #ffe082; border-radius: 8px; padding: 10px; margin-top: 12px; }
+    .recommend-title { font-size: 0.85rem; font-weight: bold; color: #b78103; margin-bottom: 8px; display: flex; align-items: center; gap: 4px; }
+    .recommend-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #ffe082; font-size: 0.82rem; }
+    .recommend-item:last-child { border-bottom: none; }
+    .recommend-item-info { flex: 1; padding-right: 8px; }
+    .recommend-item-price { color: var(--primary-color); font-weight: bold; margin-left: 4px; }
+    .recommend-add-btn { background: var(--primary-color); color: #fff; border: none; padding: 5px 10px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; cursor: pointer; }
+    
+    /* 受取不可日セレクター */
+    .ng-dates-container { background: #fdfdfd; border: 1px solid #d5dbdb; border-radius: 8px; padding: 10px; margin-top: 12px; }
+    .ng-dates-title { font-size: 0.85rem; font-weight: bold; color: #2c3e50; margin-bottom: 3px; display: flex; align-items: center; gap: 4px; }
+    .ng-dates-sub { font-size: 0.72rem; color: #7f8c8d; margin-bottom: 8px; line-height: 1.3; }
+    .date-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .date-chip { padding: 5px 8px; border-radius: 6px; border: 1px solid #d0d7de; background: #fff; font-size: 0.75rem; cursor: pointer; user-select: none; transition: all 0.15s ease; color: #333; }
+    .date-chip.selected { background: #e74c3c; color: #fff; border-color: #c0392b; font-weight: bold; }
+
+    .modal-summary { background: #f8f9fa; padding: 10px; border-radius: 6px; font-size: 0.85rem; margin-top: 12px; text-align: center; }
     .modal-summary .total-price { font-size: 1.1rem; font-weight: bold; color: var(--primary-color); margin-top: 4px; }
     .modal-actions { display: flex; gap: 8px; margin-top: 10px; }
     .modal-btn { flex: 1; padding: 12px; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
@@ -129,7 +148,21 @@
           <div class="form-group"><label>店舗名 / お名前</label><input type="text" id="cust-name" class="form-input" readonly style="background:#f0f0f0;"></div>
           <div class="form-group"><label>電話番号</label><input type="tel" id="cust-phone" class="form-input" readonly style="background:#f0f0f0;"></div>
         </div>
+        
+        <!-- カート商品リスト -->
         <div id="modal-item-list"></div>
+
+        <!-- 前回の注文おすすめエリア（在庫連動レコメンド） -->
+        <div id="modal-recommend-container" style="display:none;"></div>
+
+        <!-- 受取不可日セレクター（2週間先まで） -->
+        <div class="ng-dates-container">
+          <div class="ng-dates-title">📅 受取不可日（受取が難しい日）</div>
+          <div class="ng-dates-sub">※当店都合で発送いたします。受け取れない日がある場合はタップで選択してください（複数可）。</div>
+          <div class="date-chips" id="ng-date-chips"></div>
+        </div>
+
+        <!-- 合計サマリー -->
         <div class="modal-summary" id="modal-summary-box"></div>
       </div>
       <div class="modal-actions">
@@ -146,8 +179,14 @@
   <script>
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwEEEt2vWPC4BXlnj08pxvW6ARGKX4FVz41anHlh9wWaXmdduhz4Bb7YQsskkGHMwRz-A/exec";
     const LIFF_ID = "2011653892-RjIQ6YBe";
+    
+    // カテゴリの固定並び順
+    const ORDERED_CATEGORIES = ["魚", "シャコガイ", "貝", "サンゴ", "イソギンチャク", "擬岩", "その他"];
+
     let allProducts = [], categories = [], currentCategory = '', cart = {};
     let lineProfile = null, isRegistered = false, customerMaster = null;
+    let userHistory = { purchaseCounts: {}, lastOrderItems: [] };
+    let selectedNgDates = new Set(); // 選択された受取不可日
 
     window.addEventListener('DOMContentLoaded', async () => {
       const container = document.getElementById('product-container');
@@ -165,7 +204,7 @@
           console.warn("LIFF init skipped:", liffErr);
         }
 
-        // スマホの記憶領域へのアクセス（フリーズの最大の原因。ブロックされても無視する）
+        // スマホの記憶領域へのアクセス（ブロックされても無視）
         let savedPhone = "";
         try {
           savedPhone = localStorage.getItem('kawabata_phone') || "";
@@ -176,7 +215,6 @@
         await fetchProducts(savedPhone);
 
       } catch (mainErr) {
-        // 万が一予期せぬエラーが起きても、画面が固まらずに赤文字でエラー理由を教える
         container.style.display = 'block';
         container.innerHTML = `<div class="loading-text" style="color:red; font-weight:bold;">通信エラーが発生しました。<br>${mainErr.message}</div>`;
       }
@@ -206,6 +244,7 @@
 
         isRegistered = !!data.isRegistered;
         customerMaster = data.customer;
+        userHistory = data.userHistory || { purchaseCounts: {}, lastOrderItems: [] };
         
         const alertBox = document.getElementById('unregistered-alert');
         const mainUI = document.getElementById('main-ui');
@@ -229,13 +268,12 @@
           footerBar.style.display = 'block';
           container.style.display = 'grid';
 
-          const discountPct = Math.round((customerMaster.discountRate || 1) * 100);
-          badge.innerText = `🏢 ${customerMaster.name} 様 (掛率: ${discountPct}%)`;
+          // 掛け率の表示は削除し、店舗名/お名前のみ表示
+          badge.innerText = `🏢 ${customerMaster.name} 様`;
           badge.style.display = 'inline-block';
           document.getElementById('cust-name').value = customerMaster.name || '';
           document.getElementById('cust-phone').value = customerMaster.phone || '';
           
-          // ログイン成功時に電話番号を記憶（ブロックされても無視）
           try {
             if (customerMaster.phone) localStorage.setItem('kawabata_phone', customerMaster.phone);
           } catch(e) {}
@@ -248,11 +286,23 @@
         });
 
         allProducts.forEach(p => { if (cart[p.id] === undefined) cart[p.id] = 0; });
-        categories = [...new Set(allProducts.map(p => p.category))];
-        if (categories.length > 0 && !categories.includes(currentCategory)) currentCategory = categories[0];
+
+        // 指定順序（ORDERED_CATEGORIES）でカテゴリを並び替え
+        const availableCats = new Set(allProducts.map(p => p.category));
+        categories = ORDERED_CATEGORIES.filter(cat => availableCats.has(cat));
+        // もしORDERED_CATEGORIES以外のカテゴリがあれば末尾に追加
+        allProducts.forEach(p => {
+          if (!categories.includes(p.category)) categories.push(p.category);
+        });
+
+        if (categories.length > 0 && !categories.includes(currentCategory)) {
+          currentCategory = categories[0];
+        }
 
         if (isRegistered) {
-          renderTabs(); renderProducts(); updateSummary();
+          renderTabs();
+          renderProducts();
+          updateSummary();
         }
       } catch (err) {
         container.style.display = 'block';
@@ -321,10 +371,15 @@
       let filtered = allProducts.filter(p => p.category === currentCategory);
       if (filtered.length === 0) return container.innerHTML = '<div class="loading-text">該当する商品は現在ありません。</div>';
 
+      // ソート: 1.在庫あり優先 2.過去の購入回数/数量が多い順 3.通常順
       filtered.sort((a, b) => {
         if (a.stock > 0 && b.stock <= 0) return -1;
         if (a.stock <= 0 && b.stock > 0) return 1;
-        return 0; 
+        
+        const countA = (userHistory.purchaseCounts && userHistory.purchaseCounts[a.name]) || 0;
+        const countB = (userHistory.purchaseCounts && userHistory.purchaseCounts[b.name]) || 0;
+        if (countA !== countB) return countB - countA;
+        return 0;
       });
 
       filtered.forEach(p => {
@@ -337,10 +392,13 @@
         const imgSrc = p.img ? formatImgUrl(p.img) : dummyImg;
         let priceDisplay = !isRegistered ? '<span class="price-ask">非公開 (要登録)</span>' : p.isAsk ? '<span class="price-ask">ASK</span>' : `<span class="product-price">¥${p.price.toLocaleString()}</span>`;
 
+        const repeatCount = (userHistory.purchaseCounts && userHistory.purchaseCounts[p.name]) || 0;
+        const repeatBadge = repeatCount > 0 ? `<span class="repeat-badge">★よく買う</span>` : '';
+
         card.innerHTML = `
           ${isSoldOut ? '<div class="soldout-tag">売り切れ</div>' : ''}
           <img src="${imgSrc}" class="product-img" alt="${p.name}" loading="lazy" onerror="this.src='${dummyImg}';" onclick="openImageModal('${imgSrc}')">
-          <div class="product-title">${p.name} ${p.isNew ? '<span style="color:red; font-size:0.75rem;">[NEW]</span>' : ''}</div>
+          <div class="product-title">${p.name} ${p.isNew ? '<span style="color:red; font-size:0.75rem;">[NEW]</span>' : ''} ${repeatBadge}</div>
           <div class="product-meta">サイズ:${p.size || '規格なし'} / ${p.vol}vol / 在庫:${p.stock}</div>
           <div class="product-price-box">${priceDisplay}</div>
           <div class="qty-control">
@@ -353,8 +411,14 @@
       });
     }
 
-    function openImageModal(src) { document.getElementById('zoomed-img').src = src; document.getElementById('img-zoom-modal').classList.add('active'); }
-    function closeImageModal() { document.getElementById('img-zoom-modal').classList.remove('active'); }
+    function openImageModal(src) {
+      document.getElementById('zoomed-img').src = src;
+      document.getElementById('img-zoom-modal').classList.add('active');
+    }
+    
+    function closeImageModal() {
+      document.getElementById('img-zoom-modal').classList.remove('active');
+    }
 
     function changeQty(id, delta) {
       if (!isRegistered) return;
@@ -363,7 +427,9 @@
       let newQty = (cart[id] || 0) + delta;
       if (newQty < 0) newQty = 0;
       if (newQty > product.stock) return alert(`在庫上限は ${product.stock} 個です。`);
-      cart[id] = newQty; renderProducts(); updateSummary();
+      cart[id] = newQty;
+      renderProducts();
+      updateSummary();
     }
 
     function updateSummary() {
@@ -372,7 +438,8 @@
         const qty = cart[p.id] || 0;
         if (qty > 0) {
           if (p.isAsk) hasAsk = true; else totalAmount += p.price * qty;
-          totalVol += p.vol * qty; totalCount += qty;
+          totalVol += p.vol * qty;
+          totalCount += qty;
         }
       });
 
@@ -393,12 +460,47 @@
 
     function openModal() {
       if (!isRegistered) return;
-      calculateModalTotal(); document.getElementById('order-modal').classList.add('active');
+      renderNgDateChips();
+      calculateModalTotal();
+      document.getElementById('order-modal').classList.add('active');
+    }
+
+    function renderNgDateChips() {
+      const container = document.getElementById('ng-date-chips');
+      if (!container) return;
+      container.innerHTML = '';
+      const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+      const today = new Date();
+
+      // 翌日から14日間（2週間先）の日付チップを生成
+      for (let i = 1; i <= 14; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() + i);
+        const m = d.getMonth() + 1;
+        const dt = d.getDate();
+        const dayStr = weekdays[d.getDay()];
+        const dateKey = `${m}/${dt}(${dayStr})`;
+        
+        const chip = document.createElement('div');
+        const isSel = selectedNgDates.has(dateKey);
+        chip.className = `date-chip ${isSel ? 'selected' : ''}`;
+        chip.innerText = (isSel ? '✕ ' : '') + dateKey;
+        chip.onclick = () => {
+          if (selectedNgDates.has(dateKey)) {
+            selectedNgDates.delete(dateKey);
+          } else {
+            selectedNgDates.add(dateKey);
+          }
+          renderNgDateChips();
+        };
+        container.appendChild(chip);
+      }
     }
 
     function calculateModalTotal() {
       const listContainer = document.getElementById('modal-item-list');
       const summaryBox = document.getElementById('modal-summary-box');
+      const recContainer = document.getElementById('modal-recommend-container');
       listContainer.innerHTML = '';
       let subtotalAmount = 0, totalVol = 0, totalCount = 0, hasAsk = false;
 
@@ -407,24 +509,73 @@
         if (qty > 0) {
           let priceStr = p.isAsk ? 'ASK' : `¥${(p.price * qty).toLocaleString()}`;
           if (p.isAsk) hasAsk = true; else subtotalAmount += p.price * qty;
-          totalVol += p.vol * qty; totalCount += qty;
+          totalVol += p.vol * qty;
+          totalCount += qty;
           const row = document.createElement('div');
           row.className = 'order-item-row';
           row.innerHTML = `<span>[${p.category}] ${p.name} × ${qty}</span><span>${priceStr}</span>`;
           listContainer.appendChild(row);
         }
       });
-      summaryBox.innerHTML = `<div>数量: 計 ${totalCount} 点 / 容積: ${totalVol} vol (約${(totalVol / 1000).toFixed(1)}箱)</div><div class="total-price">お支払い合計: ¥${subtotalAmount.toLocaleString()} (税込)${hasAsk ? ' + ASK' : ''}</div>`;
+
+      // 前回の注文からのおすすめ商品（カートに入っておらず、かつ在庫あり）
+      const recCandidates = (userHistory.lastOrderItems || []).map(name => {
+        return allProducts.find(p => p.name === name);
+      }).filter(p => p && p.stock > 0 && (!cart[p.id] || cart[p.id] === 0));
+
+      if (recCandidates.length > 0) {
+        recContainer.style.display = 'block';
+        recContainer.innerHTML = `
+          <div class="recommend-section">
+            <div class="recommend-title">📦 前回の注文ではこちらも注文していました（在庫あり）</div>
+            ${recCandidates.map(p => `
+              <div class="recommend-item">
+                <div class="recommend-item-info">
+                  <strong>${p.name}</strong> (${p.size || '規格なし'} / ${p.vol}vol)
+                  <span class="recommend-item-price">${p.isAsk ? 'ASK' : '¥' + p.price.toLocaleString()}</span>
+                  <div style="font-size:0.7rem; color:#888;">在庫: ${p.stock}個</div>
+                </div>
+                <button class="recommend-add-btn" onclick="addRecommendToCart('${p.id}')">＋ 1個追加</button>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else {
+        recContainer.style.display = 'none';
+        recContainer.innerHTML = '';
+      }
+
+      summaryBox.innerHTML = `
+        <div>数量: 計 ${totalCount} 点 / 容積: ${totalVol} vol (約${(totalVol / 1000).toFixed(1)}箱)</div>
+        <div class="total-price">お支払い合計: ¥${subtotalAmount.toLocaleString()} (税込)${hasAsk ? ' + ASK' : ''}</div>
+      `;
     }
 
-    function closeModal() { document.getElementById('order-modal').classList.remove('active'); }
+    function addRecommendToCart(productId) {
+      const p = allProducts.find(item => String(item.id) === String(productId));
+      if (!p || p.stock <= 0) return;
+      cart[productId] = 1;
+      calculateModalTotal();
+      updateSummary();
+      renderProducts();
+    }
+
+    function closeModal() {
+      document.getElementById('order-modal').classList.remove('active');
+    }
 
     async function submitOrder() {
       const custName = document.getElementById('cust-name').value.trim();
       const custPhone = document.getElementById('cust-phone').value.trim();
 
       const orderItems = allProducts.filter(p => cart[p.id] > 0).map(p => ({
-        id: p.id, category: p.category, name: p.name, appliedPrice: p.price, isAsk: p.isAsk, vol: p.vol, qty: cart[p.id]
+        id: p.id,
+        category: p.category,
+        name: p.name,
+        appliedPrice: p.price,
+        isAsk: p.isAsk,
+        vol: p.vol,
+        qty: cart[p.id]
       }));
       if (orderItems.length === 0) return;
 
@@ -432,19 +583,38 @@
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 35000);
 
+      const ngDatesList = Array.from(selectedNgDates);
+
       try {
-        const payload = { action: "order", items: orderItems, customer: { name: custName, phone: custPhone, lineUserId: lineProfile ? lineProfile.userId : '' } };
-        const response = await fetch(GAS_API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload), signal: controller.signal });
+        const payload = {
+          action: "order",
+          items: orderItems,
+          customer: { name: custName, phone: custPhone, lineUserId: lineProfile ? lineProfile.userId : '' },
+          ngDates: ngDatesList
+        };
+        const response = await fetch(GAS_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
         clearTimeout(timeoutId);
         
         const text = await response.text();
         let result;
-        try { result = JSON.parse(text); } catch (e) { throw new Error("サーバーとの通信に失敗しました。"); }
+        try {
+          result = JSON.parse(text);
+        } catch (e) {
+          throw new Error("サーバーとの通信に失敗しました。");
+        }
 
         if (result.status === "success") {
           let subtotalAmount = 0, totalVol = 0, hasAsk = false;
           let msgText = `【新規ご注文】\n店舗/氏名: ${custName} 様\n`;
           if (custPhone) msgText += `TEL: ${custPhone}\n`;
+          if (ngDatesList.length > 0) {
+            msgText += `受取不可日: ${ngDatesList.join(', ')}\n`;
+          }
           msgText += `-------------------\n`;
           orderItems.forEach(item => {
             msgText += `・${item.name} × ${item.qty} ${item.isAsk ? '(ASK)' : '(¥'+(item.appliedPrice * item.qty).toLocaleString()+')'}\n`;
@@ -454,14 +624,20 @@
           msgText += `-------------------\n商品計: ¥${subtotalAmount.toLocaleString()}${hasAsk ? ' + ASK' : ''}\n容量: ${totalVol.toLocaleString()} vol (約${(totalVol/1000).toFixed(1)}箱)\n\n`;
           if (result.invoiceUrl) msgText += `📄 納品書PDF:\n${result.invoiceUrl}`;
 
+          // カートと受取不可日のリセット
           Object.keys(cart).forEach(id => { cart[id] = 0; });
-          closeModal(); renderProducts(); updateSummary();
+          selectedNgDates.clear();
+
+          closeModal();
+          renderProducts();
+          updateSummary();
 
           if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
             try {
               await liff.sendMessages([{ type: 'text', text: msgText }]);
               alert('ご注文が完了しました！公式LINEに控えが送信されました。');
-              liff.closeWindow(); return;
+              liff.closeWindow();
+              return;
             } catch (e) {}
           }
           alert('ご注文が完了しました！\n(LINEアプリが入っている場合は、この後メッセージ画面が立ち上がります)');
