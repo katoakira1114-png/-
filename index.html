@@ -117,19 +117,19 @@
           </div>
           
           <div class="form-group">
-            <label>LINE ユーザーID（自動取得）</label>
-            <input type="text" id="reg-uid" class="form-input" readonly placeholder="LINE連携待機中..." style="background:#f0f0f0; color:#333; font-size:0.8rem; font-weight:bold;">
-            <div id="uid-status-box" style="margin-top:5px;">
+            <label>LINE ユーザーID（自動取得）<span style="color:red;"> *必須</span></label>
+            <input type="text" id="reg-uid" class="form-input" readonly placeholder="LINE連携待機中..." style="background:#f0f0f0; color:#111; font-size:0.82rem; font-weight:bold;">
+            <div id="uid-status-box" style="margin-top:6px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:4px;">
               <span id="uid-hint" style="font-size:0.75rem; color:#888;">⏳ LINEアカウント情報を取得中...</span>
-              <button id="liff-login-btn" type="button" style="display:none; margin-left:6px; padding:3px 8px; background:#06c755; color:#fff; border:none; border-radius:4px; font-size:0.75rem; font-weight:bold; cursor:pointer;" onclick="execLiffLogin()">LINEログインしてID取得</button>
+              <button id="liff-login-btn" type="button" style="display:none; padding:5px 12px; background:#06c755; color:#fff; border:none; border-radius:4px; font-size:0.75rem; font-weight:bold; cursor:pointer;" onclick="execLiffLogin()">LINEログインしてIDを取得</button>
             </div>
           </div>
           <div class="form-group">
-            <label>店舗名 / お名前（必須）</label>
+            <label>店舗名 / お名前（必須）<span style="color:red;"> *</span></label>
             <input type="text" id="reg-name" class="form-input" placeholder="例: ○○アクアリウム">
           </div>
           <div class="form-group">
-            <label>電話番号（必須）</label>
+            <label>電話番号（必須）<span style="color:red;"> *</span></label>
             <input type="tel" id="reg-phone" class="form-input" placeholder="例: 090-1234-5678">
           </div>
           <div class="form-group">
@@ -137,7 +137,7 @@
             <input type="text" id="reg-address" class="form-input" placeholder="例: 東京都〇〇区... / 店舗住所">
           </div>
           
-          <button class="confirm-btn" style="margin-top:12px; background:var(--success-color);" onclick="sendRegistrationRequest()">📩 公式LINEへ登録申請を送る</button>
+          <button class="confirm-btn" id="reg-submit-btn" style="margin-top:14px; background:var(--success-color);" onclick="sendRegistrationRequest()">📩 公式LINEへ登録申請を送る</button>
         </div>
 
         <div class="register-body" id="reg-done-body" style="display:none; text-align:center; padding:25px 15px;">
@@ -219,10 +219,27 @@
     let userHistory = { purchaseCounts: {}, lastOrderItems: [] };
     let selectedNgDates = new Set(); // 選択された受取不可日
 
+    // ユーザーIDを複数の取得元から安全に抽出する関数
+    function extractUserId() {
+      if (lineProfile && lineProfile.userId) return lineProfile.userId;
+      if (typeof liff !== 'undefined') {
+        try {
+          const ctx = liff.getContext();
+          if (ctx && ctx.userId) return ctx.userId;
+        } catch (e) {}
+        try {
+          const idToken = liff.getDecodedIDToken();
+          if (idToken && idToken.sub) return idToken.sub;
+        } catch (e) {}
+      }
+      const val = document.getElementById('reg-uid') ? document.getElementById('reg-uid').value.trim() : "";
+      return (val && !val.includes("待機") && !val.includes("ログイン")) ? val : "";
+    }
+
     window.addEventListener('DOMContentLoaded', async () => {
       const container = document.getElementById('product-container');
       try {
-        // 1. LIFF初期化とLINEプロフィール取得（タイムアウトを10秒に緩和）
+        // 1. LIFF初期化とLINEプロフィール取得
         await initLiff();
 
         // 2. スマホの記憶領域へのアクセス（ブロックされても無視）
@@ -255,21 +272,25 @@
         ]);
 
         if (liff.isLoggedIn()) {
-          lineProfile = await liff.getProfile();
+          try {
+            lineProfile = await liff.getProfile();
+          } catch (pErr) {
+            console.warn("getProfile failed, using fallback:", pErr);
+          }
           applyProfileToUI();
         } else {
           // 未ログイン状態
           if (liff.isInClient && liff.isInClient()) {
-            // LINEアプリ内の場合は自動ログイン
+            // LINEアプリ内の場合は自動ログイン実行
             liff.login();
           } else {
             // 外部ブラウザ（Safari/Chrome等）の場合はログインボタンを表示
             if (hint) {
-              hint.innerText = "※LINE未ログインです。ボタンを押してLINE認証してください";
+              hint.innerText = "⚠️ LINE未ログインです。ボタンを押してLINE認証してください";
               hint.style.color = "#d9534f";
             }
             if (loginBtn) loginBtn.style.display = "inline-block";
-            if (uidInput) uidInput.placeholder = "下のボタンからLINEログインしてください";
+            if (uidInput) uidInput.placeholder = "下のボタンを押してLINEログインしてください";
           }
         }
       } catch (liffErr) {
@@ -294,21 +315,24 @@
       const loginBtn = document.getElementById('liff-login-btn');
       const badge = document.getElementById('user-badge');
 
-      if (lineProfile && lineProfile.userId) {
-        if (uidInput) uidInput.value = lineProfile.userId;
+      const uid = extractUserId();
+      const displayName = lineProfile ? lineProfile.displayName : "";
+
+      if (uid) {
+        if (uidInput) uidInput.value = uid;
         if (hint) {
-          hint.innerText = `✓ LINE ID取得完了 (${lineProfile.displayName})`;
+          hint.innerText = `✓ LINE ID取得完了 (${displayName || uid.substring(0, 8) + '...'})`;
           hint.style.color = "#27ae60";
           hint.style.fontWeight = "bold";
         }
         if (loginBtn) loginBtn.style.display = "none";
         
         const regNameInput = document.getElementById('reg-name');
-        if (regNameInput && !regNameInput.value) {
-          regNameInput.value = lineProfile.displayName || '';
+        if (regNameInput && !regNameInput.value && displayName) {
+          regNameInput.value = displayName;
         }
         if (badge && !isRegistered) {
-          badge.innerText = `👤 LINE: ${lineProfile.displayName}`;
+          badge.innerText = `👤 LINE: ${displayName || '取得済'}`;
           badge.style.display = 'inline-block';
         }
       }
@@ -319,8 +343,9 @@
       container.innerHTML = '<div class="loading-text">商品データを読み込んでいます...</div>';
       
       try {
+        const uid = extractUserId();
         let fetchUrl = GAS_API_URL + "?";
-        if (lineProfile && lineProfile.userId) fetchUrl += `userId=${encodeURIComponent(lineProfile.userId)}&`;
+        if (uid) fetchUrl += `userId=${encodeURIComponent(uid)}&`;
         if (savedPhone) fetchUrl += `phone=${encodeURIComponent(savedPhone)}&`;
         
         const res = await fetch(fetchUrl);
@@ -353,7 +378,7 @@
           container.style.display = 'none';
           
           applyProfileToUI();
-          if (!lineProfile) {
+          if (!extractUserId()) {
             badge.innerText = `👤 未登録`;
             badge.style.display = 'inline-block';
           }
@@ -406,7 +431,6 @@
     }
 
     async function sendRegistrationRequest() {
-      const regUid = document.getElementById('reg-uid').value.trim();
       const regName = document.getElementById('reg-name').value.trim();
       const regPhone = document.getElementById('reg-phone').value.trim();
       const regAddress = document.getElementById('reg-address').value.trim();
@@ -422,9 +446,34 @@
         return;
       }
 
-      const userId = regUid || (lineProfile ? lineProfile.userId : "");
+      // LINEユーザーIDの厳格取得チェック
+      let userId = extractUserId();
 
-      // 公式LINEへ送信する申請メッセージ文面
+      // 未取得の場合、再度プロファイル取得を試みる
+      if (!userId && typeof liff !== 'undefined') {
+        if (liff.isLoggedIn()) {
+          try {
+            lineProfile = await liff.getProfile();
+            userId = extractUserId();
+          } catch(e) {}
+        } else {
+          // 未ログインならLINE認証へ案内
+          if (confirm("LINEユーザーIDを取得するためにLINE認証が必要です。\n認証画面へ進みますか？")) {
+            execLiffLogin();
+          }
+          return;
+        }
+      }
+
+      // それでも取得できない場合は送信をブロックして明示的に案内
+      if (!userId) {
+        alert("LINEユーザーIDが取得できていません。\n「LINEログインしてIDを取得」ボタンを押して認証を完了してください。");
+        const loginBtn = document.getElementById('liff-login-btn');
+        if (loginBtn) loginBtn.style.display = "inline-block";
+        return;
+      }
+
+      // 公式LINEへ送信する申請メッセージ文面（ユーザーIDを確実に含める）
       let msgText = `【会員登録・取引申請】\n`;
       msgText += `仕入れサイトのアカウント登録を申請します。\n\n`;
       msgText += `■ 店舗名 / お名前: ${regName}\n`;
@@ -432,9 +481,7 @@
       if (regAddress) {
         msgText += `■ 住所: ${regAddress}\n`;
       }
-      if (userId) {
-        msgText += `■ LINEユーザーID: ${userId}\n`;
-      }
+      msgText += `■ LINEユーザーID: ${userId}\n`;
       msgText += `\n※確認および顧客登録（承認）をお願いいたします。`;
 
       document.getElementById('loading-overlay').classList.add('active');
@@ -718,12 +765,13 @@
       const timeoutId = setTimeout(() => controller.abort(), 35000);
 
       const ngDatesList = Array.from(selectedNgDates);
+      const uid = extractUserId();
 
       try {
         const payload = {
           action: "order",
           items: orderItems,
-          customer: { name: custName, phone: custPhone, lineUserId: lineProfile ? lineProfile.userId : '' },
+          customer: { name: custName, phone: custPhone, lineUserId: uid },
           ngDates: ngDatesList
         };
         const response = await fetch(GAS_API_URL, {
