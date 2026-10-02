@@ -2,6 +2,9 @@ var SPREADSHEET_ID = "1l5uJihoagHbMAwiCulpt9Zy9PIV6RRDneUYJ6QbiBbU";
 var LINE_CHANNEL_ACCESS_TOKEN = "4z5y4BBsTTTEZgfmcaUF7cbc1T1k6qePWr/xKn3Yuk0E1pi4wxY3uPtSar9xW3F8FxIDpqTpma7lfn3HXhQ19LyTaDkNU6s779LkSLtPCUCZNb3nKg/tDSJXLNuADTfjDGoD8SQMw/CYDBdUAgkq3gdB04t89/1O/w1cDnyilFU=";
 var PDF_FOLDER_NAME = "川畑水産_納品書PDF";
 var EDIT_FOLDER_NAME = "川畑水産_納品書(編集用)";
+var BACKUP_FOLDER_NAME = "川畑水産_スプレッドシート自動バックアップ";
+// 管理者（店主）のLINEユーザーID（スクリプトプロパティ「ADMIN_LINE_USER_ID」があればそれを優先、または下記に指定）
+var ADMIN_LINE_USER_ID = PropertiesService.getScriptProperties().getProperty("ADMIN_LINE_USER_ID") || "";
 
 // サイトに表示する正規カテゴリ定義（表示名・対応シート名候補）
 var CATEGORY_DEFS = [
@@ -604,6 +607,9 @@ function doPost(e) {
       // 既に顧客マスタに登録済みであれば即座に「承認済み」へ更新
       syncApplicationStatus(ssReg);
 
+      // 【自動LINE通知】新規の顧客登録申請を管理者(店主)宛てに通知
+      sendApplicationLineNotification(customerReg);
+
       return ContentService.createTextOutput(JSON.stringify({
         status: "success",
         message: "申請を受け付けました。管理者の承認をお待ちください。"
@@ -675,6 +681,19 @@ function doPost(e) {
       notes: notes
     });
     updateMonthlySales(masterSS, now, subtotalAmount, shippingFee);
+
+    // 【自動LINE通知】管理者(店主)宛およびお客様宛にプッシュ通知を送信
+    sendOrderLineNotifications({
+      orderId: orderId,
+      date: now,
+      customer: customer,
+      items: items,
+      pdfUrl: pdfUrl,
+      subtotal: subtotalAmount,
+      shippingFee: shippingFee,
+      ngDates: ngDates,
+      notes: notes
+    });
 
     return ContentService.createTextOutput(JSON.stringify({
       status: "success",
@@ -943,3 +962,188 @@ function createDeliveryNoteTemplate() {
     ["=E42+E43+E44"]
   ]).setFontWeight("bold");
 }
+
+// -----------------------------------------------------------------------------
+// 【LINE通知機能】Messaging API (Push Message) による自動送信
+// -----------------------------------------------------------------------------
+function pushLineMessage(toUserId, textMessage) {
+  if (!toUserId || !LINE_CHANNEL_ACCESS_TOKEN) return false;
+  try {
+    var url = "https://api.line.me/v2/bot/message/push";
+    var payload = {
+      to: toUserId,
+      messages: [{ type: "text", text: textMessage }]
+    };
+    var options = {
+      method: "post",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + LINE_CHANNEL_ACCESS_TOKEN
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+    var res = UrlFetchApp.fetch(url, options);
+    var resCode = res.getResponseCode();
+    if (resCode !== 200) {
+      Logger.log("pushLineMessage failed: " + resCode + " " + res.getContentText());
+      return false;
+    }
+    return true;
+  } catch (e) {
+    Logger.log("pushLineMessage exception: " + e.toString());
+    return false;
+  }
+}
+
+// 注文確定時の自動LINE通知（管理者宛 ＆ お客様宛）
+function sendOrderLineNotifications(order) {
+  try {
+    var dateStr = Utilities.formatDate(order.date, "JST", "yyyy/MM/dd HH:mm");
+    var custName = (order.customer && order.customer.name) ? order.customer.name : "お客様";
+    var custPhone = (order.customer && order.customer.phone) ? order.customer.phone : "";
+    var custUid = (order.customer && order.customer.lineUserId) ? order.customer.lineUserId : "";
+
+    // 商品明細テキスト作成
+    var itemListText = "";
+    for (var i = 0; i < order.items.length; i++) {
+      var it = order.items[i];
+      var pStr = it.isAsk ? "ASK" : "¥" + Number(it.appliedPrice).toLocaleString();
+      itemListText += "・" + it.name + " × " + it.qty + " (" + pStr + ")\n";
+    }
+
+    var ngText = "";
+    if (Array.isArray(order.ngDates) && order.ngDates.length > 0) {
+      ngText = "\n🚫受取不可日: " + order.ngDates.join(", ");
+    } else if (order.ngDates) {
+      ngText = "\n🚫受取不可日: " + order.ngDates;
+    }
+
+    var notesText = order.notes ? "\n📝備考: " + order.notes : "";
+    var totalAmountTax = Math.floor(((Number(order.subtotal) || 0) + (Number(order.shippingFee) || 0)) * 1.1);
+
+    // 1. お客様宛の確認メッセージ
+    var userMsg = "【ご注文ありがとうございます】\n" +
+      custName + " 様\n\n" +
+      "下記の内容でご注文を承りました。\n\n" +
+      "📅注文日時: " + dateStr + "\n" +
+      "🔖注文番号: " + order.orderId + "\n\n" +
+      "【ご注文商品】\n" + itemListText +
+      "\n商品小計(税抜): ¥" + Number(order.subtotal || 0).toLocaleString() +
+      "\n送料: " + (order.shippingFee > 0 ? "¥" + Number(order.shippingFee).toLocaleString() : "別途確認") +
+      "\n総合計(税込見込): ¥" + totalAmountTax.toLocaleString() +
+      ngText + notesText + "\n\n" +
+      "📄納品書PDF:\n" + order.pdfUrl + "\n\n" +
+      "商品の発送準備が整い次第、改めてご連絡いたします。";
+
+    if (custUid) {
+      pushLineMessage(custUid, userMsg);
+    }
+
+    // 2. 店主（管理者）宛の即時注文通知
+    var adminTargetUid = ADMIN_LINE_USER_ID;
+    if (adminTargetUid) {
+      var adminMsg = "🔔【新着注文が入りました！】\n\n" +
+        "店舗名: " + custName + " 様\n" +
+        "TEL: " + custPhone + "\n" +
+        "注文番号: " + order.orderId + "\n" +
+        "注文日時: " + dateStr + "\n\n" +
+        "【商品内容】\n" + itemListText +
+        "\n合計見込: ¥" + totalAmountTax.toLocaleString() +
+        ngText + notesText + "\n\n" +
+        "📄納品書確認:\n" + order.pdfUrl;
+
+      pushLineMessage(adminTargetUid, adminMsg);
+    }
+
+  } catch (err) {
+    Logger.log("sendOrderLineNotifications error: " + err.toString());
+  }
+}
+
+// 顧客登録申請時の管理者通知
+function sendApplicationLineNotification(customerReg) {
+  var adminTargetUid = ADMIN_LINE_USER_ID;
+  if (!adminTargetUid) return;
+
+  try {
+    var regMsg = "👤【新規の顧客登録申請がありました】\n\n" +
+      "店舗名/氏名: " + (customerReg.name || "未入力") + "\n" +
+      "電話番号: " + (customerReg.phone || "未入力") + "\n" +
+      "LINE_UID: " + (customerReg.lineUserId || "未取得") + "\n" +
+      "住所: " + (customerReg.address || "未入力") + "\n\n" +
+      "※スプレッドシートの「顧客登録申請」シートを確認の上、顧客マスタへの反映を行ってください。";
+
+    pushLineMessage(adminTargetUid, regMsg);
+  } catch (e) {
+    Logger.log("sendApplicationLineNotification error: " + e.toString());
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 【スプレッドシート定期バックアップ機能】
+// -----------------------------------------------------------------------------
+// スプレッドシート全体のコピーを指定フォルダに保存（古いバックアップは自動クリーンアップ）
+function backupSpreadsheet() {
+  try {
+    var originalFile = DriveApp.getFileById(SPREADSHEET_ID);
+    var folders = DriveApp.getFoldersByName(BACKUP_FOLDER_NAME);
+    var backupFolder;
+    if (folders.hasNext()) {
+      backupFolder = folders.next();
+    } else {
+      backupFolder = DriveApp.createFolder(BACKUP_FOLDER_NAME);
+    }
+
+    var now = new Date();
+    var timeStamp = Utilities.formatDate(now, "JST", "yyyyMMdd_HHmmss");
+    var backupName = "【バックアップ】" + originalFile.getName() + "_" + timeStamp;
+
+    // ファイルの複製
+    var copiedFile = originalFile.makeCopy(backupName, backupFolder);
+    Logger.log("Backup completed: " + copiedFile.getName());
+
+    // 過去のバックアップファイル整理（直近10件を残して古いものを削除）
+    var files = backupFolder.getFiles();
+    var fileList = [];
+    while (files.hasNext()) {
+      var f = files.next();
+      fileList.push({ file: f, date: f.getDateCreated().getTime() });
+    }
+
+    fileList.sort(function(a, b) { return b.date - a.date; }); // 新しい順
+    var MAX_BACKUPS = 10;
+    if (fileList.length > MAX_BACKUPS) {
+      for (var i = MAX_BACKUPS; i < fileList.length; i++) {
+        fileList[i].file.setTrashed(true);
+        Logger.log("Old backup trashed: " + fileList[i].file.getName());
+      }
+    }
+
+    return "バックアップが完了しました: " + backupName;
+  } catch (err) {
+    Logger.log("backupSpreadsheet error: " + err.toString());
+    throw err;
+  }
+}
+
+// バックアップを週1回（毎週月曜午前3時）定期実行するためのトリガー自動登録関数
+function setupWeeklyBackupTrigger() {
+  // 既存の同名トリガーを削除して重複を防止
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === "backupSpreadsheet") {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+
+  // 毎週月曜日の深夜3時に実行するトリガーを新規登録
+  ScriptApp.newTrigger("backupSpreadsheet")
+    .timeBased()
+    .onWeekDay(ScriptApp.WeekDay.MONDAY)
+    .atHour(3)
+    .create();
+
+  Logger.log("毎週月曜午前3時のバックアップトリガーを設定しました。");
+}
+
