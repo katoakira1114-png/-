@@ -118,8 +118,11 @@
           
           <div class="form-group">
             <label>LINE ユーザーID（自動取得）</label>
-            <input type="text" id="reg-uid" class="form-input" readonly style="background:#f0f0f0; color:#555; font-size:0.75rem;">
-            <div id="uid-hint" style="font-size:0.7rem; color:#888; margin-top:2px;">※LINEアプリ内からアクセスすると自動設定されます</div>
+            <input type="text" id="reg-uid" class="form-input" readonly placeholder="LINE連携待機中..." style="background:#f0f0f0; color:#333; font-size:0.8rem; font-weight:bold;">
+            <div id="uid-status-box" style="margin-top:5px;">
+              <span id="uid-hint" style="font-size:0.75rem; color:#888;">⏳ LINEアカウント情報を取得中...</span>
+              <button id="liff-login-btn" type="button" style="display:none; margin-left:6px; padding:3px 8px; background:#06c755; color:#fff; border:none; border-radius:4px; font-size:0.75rem; font-weight:bold; cursor:pointer;" onclick="execLiffLogin()">LINEログインしてID取得</button>
+            </div>
           </div>
           <div class="form-group">
             <label>店舗名 / お名前（必須）</label>
@@ -219,20 +222,10 @@
     window.addEventListener('DOMContentLoaded', async () => {
       const container = document.getElementById('product-container');
       try {
-        // LIFFの初期化（エラーが起きても絶対にクラッシュさせない）
-        try {
-          await Promise.race([
-            liff.init({ liffId: LIFF_ID }),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('LIFF init timeout')), 2500))
-          ]);
-          if (liff.isLoggedIn()) {
-            lineProfile = await liff.getProfile();
-          }
-        } catch (liffErr) {
-          console.warn("LIFF init skipped:", liffErr);
-        }
+        // 1. LIFF初期化とLINEプロフィール取得（タイムアウトを10秒に緩和）
+        await initLiff();
 
-        // スマホの記憶領域へのアクセス（ブロックされても無視）
+        // 2. スマホの記憶領域へのアクセス（ブロックされても無視）
         let savedPhone = "";
         try {
           savedPhone = localStorage.getItem('kawabata_phone') || "";
@@ -240,6 +233,7 @@
           console.warn("localStorage access denied:", storageErr);
         }
 
+        // 3. 商品データ & 顧客認証の照会
         await fetchProducts(savedPhone);
 
       } catch (mainErr) {
@@ -247,6 +241,78 @@
         container.innerHTML = `<div class="loading-text" style="color:red; font-weight:bold;">通信エラーが発生しました。<br>${mainErr.message}</div>`;
       }
     });
+
+    async function initLiff() {
+      const hint = document.getElementById('uid-hint');
+      const loginBtn = document.getElementById('liff-login-btn');
+      const uidInput = document.getElementById('reg-uid');
+
+      try {
+        // LIFF SDKの初期化（タイムアウト10秒）
+        await Promise.race([
+          liff.init({ liffId: LIFF_ID }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('LINE連携の初期化がタイムアウトしました')), 10000))
+        ]);
+
+        if (liff.isLoggedIn()) {
+          lineProfile = await liff.getProfile();
+          applyProfileToUI();
+        } else {
+          // 未ログイン状態
+          if (liff.isInClient && liff.isInClient()) {
+            // LINEアプリ内の場合は自動ログイン
+            liff.login();
+          } else {
+            // 外部ブラウザ（Safari/Chrome等）の場合はログインボタンを表示
+            if (hint) {
+              hint.innerText = "※LINE未ログインです。ボタンを押してLINE認証してください";
+              hint.style.color = "#d9534f";
+            }
+            if (loginBtn) loginBtn.style.display = "inline-block";
+            if (uidInput) uidInput.placeholder = "下のボタンからLINEログインしてください";
+          }
+        }
+      } catch (liffErr) {
+        console.warn("LIFF init error:", liffErr);
+        if (hint) {
+          hint.innerText = "※LINE連携待機中: " + (liffErr.message || "再読み込みしてください");
+          hint.style.color = "#d9534f";
+        }
+        if (loginBtn) loginBtn.style.display = "inline-block";
+      }
+    }
+
+    function execLiffLogin() {
+      if (typeof liff !== 'undefined') {
+        liff.login({ redirectUri: window.location.href });
+      }
+    }
+
+    function applyProfileToUI() {
+      const uidInput = document.getElementById('reg-uid');
+      const hint = document.getElementById('uid-hint');
+      const loginBtn = document.getElementById('liff-login-btn');
+      const badge = document.getElementById('user-badge');
+
+      if (lineProfile && lineProfile.userId) {
+        if (uidInput) uidInput.value = lineProfile.userId;
+        if (hint) {
+          hint.innerText = `✓ LINE ID取得完了 (${lineProfile.displayName})`;
+          hint.style.color = "#27ae60";
+          hint.style.fontWeight = "bold";
+        }
+        if (loginBtn) loginBtn.style.display = "none";
+        
+        const regNameInput = document.getElementById('reg-name');
+        if (regNameInput && !regNameInput.value) {
+          regNameInput.value = lineProfile.displayName || '';
+        }
+        if (badge && !isRegistered) {
+          badge.innerText = `👤 LINE: ${lineProfile.displayName}`;
+          badge.style.display = 'inline-block';
+        }
+      }
+    }
 
     async function fetchProducts(savedPhone = "") {
       const container = document.getElementById('product-container');
@@ -286,16 +352,8 @@
           footerBar.style.display = 'none';
           container.style.display = 'none';
           
-          if (lineProfile) {
-            badge.innerText = `👤 LINE: ${lineProfile.displayName}`;
-            badge.style.display = 'inline-block';
-            document.getElementById('reg-uid').value = lineProfile.userId || '';
-            if (!document.getElementById('reg-name').value) {
-              document.getElementById('reg-name').value = lineProfile.displayName || '';
-            }
-            const hint = document.getElementById('uid-hint');
-            if (hint) hint.innerText = "✓ LINEユーザーIDを取得しました";
-          } else {
+          applyProfileToUI();
+          if (!lineProfile) {
             badge.innerText = `👤 未登録`;
             badge.style.display = 'inline-block';
           }
