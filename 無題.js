@@ -61,7 +61,7 @@ function doGet(e) {
     // 「擬岩」シートの存在チェック & 自動生成
     ensureGiganiSheet(ss);
 
-    // 顧客マスタから顧客情報を特定
+    // 顧客マスタから顧客情報を特定（LINE UIDまたは電話番号で照合）
     var cSheet = ss.getSheetByName("顧客マスタ");
     if (cSheet) {
       var cData = cSheet.getDataRange().getValues();
@@ -96,7 +96,17 @@ function doGet(e) {
       }
     }
 
-    // 商品データの読み込み（CATEGORY_DEFSに含まれるシートのみ対象）
+    // 厳格なアクセス制御：未登録ユーザーには商品情報を一切返さない
+    if (!customerInfo) {
+      return ContentService.createTextOutput(JSON.stringify({
+        isRegistered: false,
+        customer: null,
+        products: [],
+        userHistory: { purchaseCounts: {}, lastOrderItems: [] }
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 登録済み顧客のみ商品データを読み込み（CATEGORY_DEFSに含まれるシートのみ対象）
     var products = [];
     var nowTime = new Date().getTime();
 
@@ -166,49 +176,47 @@ function doGet(e) {
       lastOrderItems: []
     };
 
-    if (customerInfo) {
-      var detailSheet = ss.getSheetByName("注文明細");
-      if (detailSheet) {
-        var detailData = detailSheet.getDataRange().getValues();
-        if (detailData.length > 1) {
-          var custPhoneClean = (customerInfo.phone || "").replace(/[^0-9]/g, "");
-          var custNameClean = (customerInfo.name || "").trim();
+    var detailSheet = ss.getSheetByName("注文明細");
+    if (detailSheet) {
+      var detailData = detailSheet.getDataRange().getValues();
+      if (detailData.length > 1) {
+        var custPhoneClean = (customerInfo.phone || "").replace(/[^0-9]/g, "");
+        var custNameClean = (customerInfo.name || "").trim();
 
-          var lastOrderId = "";
-          var lastOrderItemsMap = {};
+        var lastOrderId = "";
+        var lastOrderItemsMap = {};
 
-          // 最新行から過去に遡って集計
-          for (var dr = detailData.length - 1; dr >= 1; dr--) {
-            var rowCustName = String(detailData[dr][2] || "").trim();
-            var rowPhone = String(detailData[dr][3] || "").replace(/[^0-9]/g, "");
-            var isMatch = (custPhoneClean !== "" && rowPhone !== "" && custPhoneClean === rowPhone) ||
-                          (custNameClean !== "" && rowCustName === custNameClean);
+        // 最新行から過去に遡って集計
+        for (var dr = detailData.length - 1; dr >= 1; dr--) {
+          var rowCustName = String(detailData[dr][2] || "").trim();
+          var rowPhone = String(detailData[dr][3] || "").replace(/[^0-9]/g, "");
+          var isMatch = (custPhoneClean !== "" && rowPhone !== "" && custPhoneClean === rowPhone) ||
+                        (custNameClean !== "" && rowCustName === custNameClean);
 
-            if (isMatch) {
-              var orderIdVal = String(detailData[dr][1] || "").trim();
-              var prodName = String(detailData[dr][5] || "").trim();
-              var qty = Number(detailData[dr][6]) || 1;
+          if (isMatch) {
+            var orderIdVal = String(detailData[dr][1] || "").trim();
+            var prodName = String(detailData[dr][5] || "").trim();
+            var qty = Number(detailData[dr][6]) || 1;
 
-              if (prodName) {
-                userHistory.purchaseCounts[prodName] = (userHistory.purchaseCounts[prodName] || 0) + qty;
+            if (prodName) {
+              userHistory.purchaseCounts[prodName] = (userHistory.purchaseCounts[prodName] || 0) + qty;
 
-                // 最新の注文IDに含まれる商品名を記録
-                if (!lastOrderId && orderIdVal) {
-                  lastOrderId = orderIdVal;
-                }
-                if (lastOrderId && orderIdVal === lastOrderId) {
-                  lastOrderItemsMap[prodName] = true;
-                }
+              // 最新の注文IDに含まれる商品名を記録
+              if (!lastOrderId && orderIdVal) {
+                lastOrderId = orderIdVal;
+              }
+              if (lastOrderId && orderIdVal === lastOrderId) {
+                lastOrderItemsMap[prodName] = true;
               }
             }
           }
-          userHistory.lastOrderItems = Object.keys(lastOrderItemsMap);
         }
+        userHistory.lastOrderItems = Object.keys(lastOrderItemsMap);
       }
     }
 
     return ContentService.createTextOutput(JSON.stringify({
-      isRegistered: customerInfo !== null,
+      isRegistered: true,
       customer: customerInfo,
       products: products,
       userHistory: userHistory
@@ -240,43 +248,34 @@ function doPost(e) {
     var contents = JSON.parse(e.postData.contents);
     var action = contents.action || "order";
 
-    // 初回アカウントの自動登録処理
-    if (action === "register") {
-      var customerReg = contents.customer;
+    // 顧客登録の申請処理（スプレッドシートへの申請ログバックアップ記録）
+    if (action === "apply" || action === "register") {
+      var customerReg = contents.customer || {};
       var ssReg = SpreadsheetApp.openById(SPREADSHEET_ID);
-      var cSheet = ssReg.getSheetByName("顧客マスタ");
+      var appSheet = ssReg.getSheetByName("顧客登録申請");
 
-      if (!cSheet) {
-        cSheet = ssReg.insertSheet("顧客マスタ");
-        cSheet.getRange(1, 1, 1, 5).setValues([["LINE_UID", "店舗名/氏名", "掛率", "電話番号", "住所"]])
+      if (!appSheet) {
+        appSheet = ssReg.insertSheet("顧客登録申請");
+        var appHeaders = ["申請日時", "LINE_UID", "店舗名/氏名", "電話番号", "住所", "ステータス"];
+        appSheet.getRange(1, 1, 1, appHeaders.length).setValues([appHeaders])
           .setBackground("#005bac").setFontColor("#ffffff").setFontWeight("bold");
-        cSheet.setFrozenRows(1);
+        appSheet.setFrozenRows(1);
       }
 
-      var cData = cSheet.getDataRange().getValues();
-      var exists = false;
-      var reqRaw = String(customerReg.phone).replace(/[^0-9]/g, "");
+      var nowAppStr = Utilities.formatDate(new Date(), "JST", "yyyy/MM/dd HH:mm:ss");
+      appSheet.appendRow([
+        nowAppStr,
+        customerReg.lineUserId || "",
+        customerReg.name || "",
+        customerReg.phone || "",
+        customerReg.address || "",
+        "承認待ち"
+      ]);
 
-      for (var i = 1; i < cData.length; i++) {
-        var dbUid = String(cData[i][0]).trim();
-        var dbPhone = String(cData[i][3]).replace(/[^0-9]/g, "");
-        var matchUid = (dbUid !== "" && customerReg.lineUserId !== "" && dbUid === customerReg.lineUserId);
-        var matchPhone = (dbPhone !== "" && reqRaw !== "" && dbPhone === reqRaw);
-
-        if (matchUid || matchPhone) {
-          exists = true;
-          if (matchPhone && dbUid === "" && customerReg.lineUserId !== "") {
-            cSheet.getRange(i + 1, 1).setValue(customerReg.lineUserId);
-          }
-          break;
-        }
-      }
-
-      if (!exists) {
-        cSheet.appendRow([customerReg.lineUserId, customerReg.name, 1.0, customerReg.phone, ""]);
-      }
-
-      return ContentService.createTextOutput(JSON.stringify({ status: "success" })).setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "申請を受け付けました。管理者の承認をお待ちください。"
+      })).setMimeType(ContentService.MimeType.JSON);
     }
 
     // --- ここから注文処理 ---

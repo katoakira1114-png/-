@@ -17,9 +17,9 @@
     .user-badge { font-size: 0.8rem; color: #008000; margin-top: 3px; font-weight: bold; background: #eef9ee; padding: 2px 8px; border-radius: 10px; display: inline-block; }
     
     .register-box { background: #fff; margin: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); overflow: hidden; }
-    .register-header { background: var(--danger-color); color: #fff; text-align: center; padding: 12px; font-weight: bold; font-size: 1rem; }
+    .register-header { background: var(--primary-color); color: #fff; text-align: center; padding: 12px; font-weight: bold; font-size: 1rem; }
     .register-body { padding: 15px; }
-    .register-desc { font-size: 0.85rem; color: #555; margin-bottom: 15px; line-height: 1.4; }
+    .register-desc { font-size: 0.85rem; color: #555; margin-bottom: 15px; line-height: 1.5; }
     
     .tabs { display: flex; background-color: var(--card-bg); border-bottom: 1px solid var(--border-color); overflow-x: auto; }
     .tab-btn { flex: 1; padding: 10px 12px; text-align: center; background: none; border: none; font-size: 0.9rem; font-weight: bold; color: #666; cursor: pointer; white-space: nowrap; }
@@ -104,11 +104,23 @@
       <div><span class="user-badge" id="user-badge" style="display:none;"></span></div>
     </header>
 
+    <!-- 未登録ユーザー向けの会員登録・利用申請画面 -->
     <div id="unregistered-alert" style="display: none;">
       <div class="register-box">
-        <div class="register-header">初回アカウント登録</div>
-        <div class="register-body">
-          <div class="register-desc">仕入れ取引をご利用いただくには、初回のみアカウント登録が必要です。<br>以下の情報を入力して「登録」ボタンを押してください。<br><span style="color:var(--primary-color);font-size:0.75rem;">※次回以降は自動でログインされます。</span></div>
+        <div class="register-header">会員登録・取引申請</div>
+        <div class="register-body" id="reg-form-body">
+          <div class="register-desc">
+            当サイトは会員制（承認制）の卸売・販売サイトです。<br>
+            商品の閲覧およびご注文には、事前の会員登録が必要です。<br>
+            以下の情報をご確認・ご入力の上、<strong>「公式LINEへ登録申請を送る」</strong>を押してください。<br>
+            <span style="color:var(--primary-color); font-weight:bold;">※当店にて登録・承認完了後、商品をご覧いただけるようになります。</span>
+          </div>
+          
+          <div class="form-group">
+            <label>LINE ユーザーID（自動取得）</label>
+            <input type="text" id="reg-uid" class="form-input" readonly style="background:#f0f0f0; color:#555; font-size:0.75rem;">
+            <div id="uid-hint" style="font-size:0.7rem; color:#888; margin-top:2px;">※LINEアプリ内からアクセスすると自動設定されます</div>
+          </div>
           <div class="form-group">
             <label>店舗名 / お名前（必須）</label>
             <input type="text" id="reg-name" class="form-input" placeholder="例: ○○アクアリウム">
@@ -117,7 +129,23 @@
             <label>電話番号（必須）</label>
             <input type="tel" id="reg-phone" class="form-input" placeholder="例: 090-1234-5678">
           </div>
-          <button class="confirm-btn" style="margin-top:10px; background:var(--success-color);" onclick="submitRegistration()">登録して注文を始める</button>
+          <div class="form-group">
+            <label>住所（任意）</label>
+            <input type="text" id="reg-address" class="form-input" placeholder="例: 東京都〇〇区... / 店舗住所">
+          </div>
+          
+          <button class="confirm-btn" style="margin-top:12px; background:var(--success-color);" onclick="sendRegistrationRequest()">📩 公式LINEへ登録申請を送る</button>
+        </div>
+
+        <div class="register-body" id="reg-done-body" style="display:none; text-align:center; padding:25px 15px;">
+          <div style="font-size:2.5rem; margin-bottom:10px;">⏳</div>
+          <div style="font-weight:bold; font-size:1.05rem; color:#333; margin-bottom:8px;">登録申請を送信しました</div>
+          <div style="font-size:0.85rem; color:#666; line-height:1.5; margin-bottom:15px;">
+            管理者が内容を確認し、顧客マスタへの登録（掛率等の設定）を行います。<br>
+            登録完了後、再度このページを開いていただくと商品一覧をご覧いただけます。<br>
+            今しばらくお待ちください。
+          </div>
+          <button class="confirm-btn" style="background:var(--primary-color);" onclick="location.reload()">再読み込み（登録状況の確認）</button>
         </div>
       </div>
     </div>
@@ -252,6 +280,7 @@
         const badge = document.getElementById('user-badge');
 
         if (!isRegistered) {
+          // 未登録時は商品一覧・注文UIを完全に非表示
           alertBox.style.display = 'block';
           mainUI.style.display = 'none';
           footerBar.style.display = 'none';
@@ -260,24 +289,34 @@
           if (lineProfile) {
             badge.innerText = `👤 LINE: ${lineProfile.displayName}`;
             badge.style.display = 'inline-block';
-            document.getElementById('reg-name').value = lineProfile.displayName;
+            document.getElementById('reg-uid').value = lineProfile.userId || '';
+            if (!document.getElementById('reg-name').value) {
+              document.getElementById('reg-name').value = lineProfile.displayName || '';
+            }
+            const hint = document.getElementById('uid-hint');
+            if (hint) hint.innerText = "✓ LINEユーザーIDを取得しました";
+          } else {
+            badge.innerText = `👤 未登録`;
+            badge.style.display = 'inline-block';
           }
-        } else {
-          alertBox.style.display = 'none';
-          mainUI.style.display = 'block';
-          footerBar.style.display = 'block';
-          container.style.display = 'grid';
-
-          // 掛け率の表示は削除し、店舗名/お名前のみ表示
-          badge.innerText = `🏢 ${customerMaster.name} 様`;
-          badge.style.display = 'inline-block';
-          document.getElementById('cust-name').value = customerMaster.name || '';
-          document.getElementById('cust-phone').value = customerMaster.phone || '';
-          
-          try {
-            if (customerMaster.phone) localStorage.setItem('kawabata_phone', customerMaster.phone);
-          } catch(e) {}
+          return;
         }
+
+        // 登録承認済みの場合のみ表示
+        alertBox.style.display = 'none';
+        mainUI.style.display = 'block';
+        footerBar.style.display = 'block';
+        container.style.display = 'grid';
+
+        // 掛け率の表示は削除し、店舗名/お名前のみ表示
+        badge.innerText = `🏢 ${customerMaster.name} 様`;
+        badge.style.display = 'inline-block';
+        document.getElementById('cust-name').value = customerMaster.name || '';
+        document.getElementById('cust-phone').value = customerMaster.phone || '';
+        
+        try {
+          if (customerMaster.phone) localStorage.setItem('kawabata_phone', customerMaster.phone);
+        } catch(e) {}
 
         const discountRate = (isRegistered && customerMaster) ? customerMaster.discountRate : 1.0;
         allProducts = (data.products || []).map(p => {
@@ -290,7 +329,6 @@
         // 指定順序（ORDERED_CATEGORIES）でカテゴリを並び替え
         const availableCats = new Set(allProducts.map(p => p.category));
         categories = ORDERED_CATEGORIES.filter(cat => availableCats.has(cat));
-        // もしORDERED_CATEGORIES以外のカテゴリがあれば末尾に追加
         allProducts.forEach(p => {
           if (!categories.includes(p.category)) categories.push(p.category);
         });
@@ -299,44 +337,82 @@
           currentCategory = categories[0];
         }
 
-        if (isRegistered) {
-          renderTabs();
-          renderProducts();
-          updateSummary();
-        }
+        renderTabs();
+        renderProducts();
+        updateSummary();
+
       } catch (err) {
         container.style.display = 'block';
         container.innerHTML = `<div class="loading-text" style="color:red; font-weight:bold;">${err.message}</div>`;
       }
     }
 
-    async function submitRegistration() {
+    async function sendRegistrationRequest() {
+      const regUid = document.getElementById('reg-uid').value.trim();
       const regName = document.getElementById('reg-name').value.trim();
       const regPhone = document.getElementById('reg-phone').value.trim();
+      const regAddress = document.getElementById('reg-address').value.trim();
       
-      if (!regName || !regPhone) {
-        alert("店舗名とお電話番号を入力してください。");
+      if (!regName) {
+        alert("店舗名 / お名前を入力してください。");
+        document.getElementById('reg-name').focus();
+        return;
+      }
+      if (!regPhone) {
+        alert("お電話番号を入力してください。");
+        document.getElementById('reg-phone').focus();
         return;
       }
 
+      const userId = regUid || (lineProfile ? lineProfile.userId : "");
+
+      // 公式LINEへ送信する申請メッセージ文面
+      let msgText = `【会員登録・取引申請】\n`;
+      msgText += `仕入れサイトのアカウント登録を申請します。\n\n`;
+      msgText += `■ 店舗名 / お名前: ${regName}\n`;
+      msgText += `■ 電話番号: ${regPhone}\n`;
+      if (regAddress) {
+        msgText += `■ 住所: ${regAddress}\n`;
+      }
+      if (userId) {
+        msgText += `■ LINEユーザーID: ${userId}\n`;
+      }
+      msgText += `\n※確認および顧客登録（承認）をお願いいたします。`;
+
       document.getElementById('loading-overlay').classList.add('active');
+
       try {
-        const payload = {
-          action: "register",
-          customer: { name: regName, phone: regPhone, lineUserId: lineProfile ? lineProfile.userId : '' }
-        };
-        const response = await fetch(GAS_API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) });
-        const result = await response.json();
-        
-        if (result.status === "success") {
-          try { localStorage.setItem('kawabata_phone', regPhone); } catch(e) {}
-          alert("登録が完了しました！商品一覧を表示します。");
-          await fetchProducts(regPhone);
-        } else {
-          alert("エラーが発生しました: " + result.message);
+        // スプレッドシートの「顧客登録申請」シートに申請ログを自動記録
+        fetch(GAS_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: "apply",
+            customer: { name: regName, phone: regPhone, address: regAddress, lineUserId: userId }
+          })
+        }).catch(e => console.warn("Apply log failed:", e));
+
+        // LINEアプリ内（LIFFクライアント）からの場合
+        if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
+          try {
+            await liff.sendMessages([{ type: 'text', text: msgText }]);
+            alert('公式LINEに登録申請メッセージを送信しました！\n管理者の登録完了まで今しばらくお待ちください。');
+            document.getElementById('reg-form-body').style.display = 'none';
+            document.getElementById('reg-done-body').style.display = 'block';
+            return;
+          } catch (liffSendErr) {
+            console.warn("liff.sendMessages failed, fallback to url:", liffSendErr);
+          }
         }
-      } catch (e) {
-        alert('通信エラーが発生しました。電波の良い場所で再度お試しください。');
+
+        // 外部ブラウザ等の場合は公式LINEトーク画面を開く
+        document.getElementById('reg-form-body').style.display = 'none';
+        document.getElementById('reg-done-body').style.display = 'block';
+        alert('公式LINEを開きます。表示されたメッセージをそのまま送信してください。');
+        window.location.href = `https://line.me/R/oaMessage/@877qwvyc/?${encodeURIComponent(msgText)}`;
+
+      } catch (err) {
+        alert('申請処理中にエラーが発生しました。通信環境をご確認ください。');
       } finally {
         document.getElementById('loading-overlay').classList.remove('active');
       }
