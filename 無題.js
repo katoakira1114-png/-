@@ -33,6 +33,55 @@ function getSheetForCategory(ss, catLabel) {
   return ss.getSheetByName(catLabel);
 }
 
+// 顧客マスタに「カテゴリ許可」「商品許可」列が存在しない場合は自動追加し、入力規則を設定
+function ensureCustomerMasterColumns(ss) {
+  var cSheet = ss.getSheetByName("顧客マスタ");
+  if (!cSheet) return;
+
+  var lastCol = cSheet.getLastColumn();
+  if (lastCol < 1) return;
+  var headers = cSheet.getRange(1, 1, 1, lastCol).getValues()[0];
+
+  var colCat = -1;
+  var colProd = -1;
+
+  for (var i = 0; i < headers.length; i++) {
+    var h = String(headers[i]).trim();
+    if (h.indexOf("カテゴリ許可") !== -1) colCat = i;
+    if (h.indexOf("商品許可") !== -1 || h.indexOf("許可商品") !== -1) colProd = i;
+  }
+
+  var currentLastCol = lastCol;
+
+  if (colCat === -1) {
+    currentLastCol++;
+    cSheet.getRange(1, currentLastCol).setValue("カテゴリ許可")
+      .setBackground("#005bac").setFontColor("#ffffff").setFontWeight("bold");
+    cSheet.setColumnWidth(currentLastCol, 180);
+    try {
+      var ruleCat = SpreadsheetApp.newDataValidation()
+        .requireValueInList(["魚", "シャコガイ", "貝", "サンゴ", "イソギンチャク", "擬岩", "その他"], true)
+        .setAllowInvalid(true)
+        .build();
+      cSheet.getRange(2, currentLastCol, Math.max(cSheet.getMaxRows() - 1, 1), 1).setDataValidation(ruleCat);
+    } catch(e) {}
+  }
+
+  if (colProd === -1) {
+    currentLastCol++;
+    cSheet.getRange(1, currentLastCol).setValue("商品許可")
+      .setBackground("#005bac").setFontColor("#ffffff").setFontWeight("bold");
+    cSheet.setColumnWidth(currentLastCol, 140);
+    try {
+      var ruleProd = SpreadsheetApp.newDataValidation()
+        .requireValueInList(["A", "B", "C", "AB", "AC", "BC", "ABC"], true)
+        .setAllowInvalid(true)
+        .build();
+      cSheet.getRange(2, currentLastCol, Math.max(cSheet.getMaxRows() - 1, 1), 1).setDataValidation(ruleProd);
+    } catch(e) {}
+  }
+}
+
 // 「擬岩」シートが存在しない場合は自動作成し、初期テストデータを投入
 function ensureGiganiSheet(ss) {
   var sheet = ss.getSheetByName("擬岩");
@@ -45,9 +94,26 @@ function ensureGiganiSheet(ss) {
       .setFontWeight("bold");
     sheet.setFrozenRows(1);
     
-    // テスト用データ: 「擬岩」「Mサイズ」「3000円」「500vol」「50個」
-    var testData = ["擬岩", "Mサイズ", 3000, 500, 50, "", "擬岩_1", ""];
-    sheet.getRange(2, 1, 1, testData.length).setValues([testData]);
+    // 1. 通常商品（全顧客OK）: ID="擬岩_1"
+    // 2. A許可限定商品: ID="A_001"
+    var testData = [
+      ["擬岩", "Mサイズ", 3000, 500, 50, "", "擬岩_1", ""],
+      ["【限定】特選擬岩", "Lサイズ", 5000, 800, 20, "", "A_001", ""]
+    ];
+    sheet.getRange(2, 1, testData.length, headers.length).setValues(testData);
+  } else {
+    // 既存シートに A_001 がなければ自動追記
+    var data = sheet.getDataRange().getValues();
+    var hasA = false;
+    for (var r = 1; r < data.length; r++) {
+      if (String(data[r][6] || "").indexOf("A_") === 0 || String(data[r][0] || "").indexOf("【限定】") !== -1) {
+        hasA = true;
+        break;
+      }
+    }
+    if (!hasA) {
+      sheet.appendRow(["【限定】特選擬岩", "Lサイズ", 5000, 800, 20, "", "A_001", ""]);
+    }
   }
 }
 
@@ -58,7 +124,8 @@ function doGet(e) {
     var reqPhone = (e && e.parameter && e.parameter.phone) ? String(e.parameter.phone).trim() : "";
     var customerInfo = null;
 
-    // 「擬岩」シートの存在チェック & 自動生成
+    // 「顧客マスタ」の列拡張（カテゴリ許可・商品許可）&「擬岩」シート確認
+    ensureCustomerMasterColumns(ss);
     ensureGiganiSheet(ss);
 
     // 顧客マスタから顧客情報を特定（LINE UIDまたは電話番号で照合）
@@ -67,6 +134,16 @@ function doGet(e) {
       var cData = cSheet.getDataRange().getValues();
       var reqRawPhone = reqPhone.replace(/[^0-9]/g, "");
       if (reqRawPhone.length === 10 && !reqRawPhone.startsWith("0")) reqRawPhone = "0" + reqRawPhone;
+
+      // ヘッダー列インデックスの特定
+      var colCatPerm = -1;
+      var colProdPerm = -1;
+      var cHeaders = cData[0];
+      for (var ch = 0; ch < cHeaders.length; ch++) {
+        var chTitle = String(cHeaders[ch]).trim();
+        if (chTitle.indexOf("カテゴリ許可") !== -1) colCatPerm = ch;
+        if (chTitle.indexOf("商品許可") !== -1 || chTitle.indexOf("許可商品") !== -1) colProdPerm = ch;
+      }
 
       for (var i = 1; i < cData.length; i++) {
         var dbUserId = String(cData[i][0] || "").trim();
@@ -79,11 +156,39 @@ function doGet(e) {
         if (matchUid || matchPhone) {
           var rateVal = parseFloat(String(cData[i][2] || "1").trim());
           if (isNaN(rateVal) || rateVal <= 0) rateVal = 1.0;
+
+          // 1. カテゴリ許可のパース（空欄または「全」は全カテゴリ許可）
+          var catPermStr = (colCatPerm !== -1) ? String(cData[i][colCatPerm] || "").trim() : "";
+          var allowedCategories = [];
+          if (!catPermStr || catPermStr === "全て" || catPermStr === "全カテゴリ") {
+            allowedCategories = ["魚", "シャコガイ", "貝", "サンゴ", "イソギンチャク", "擬岩", "その他"];
+          } else {
+            var catParts = catPermStr.split(/[,、\s\n]+/);
+            for (var cp = 0; cp < catParts.length; cp++) {
+              var cName = catParts[cp].trim();
+              if (cName === "シャコ貝") cName = "シャコガイ";
+              if (cName) allowedCategories.push(cName);
+            }
+            if (allowedCategories.length === 0) {
+              allowedCategories = ["魚", "シャコガイ", "貝", "サンゴ", "イソギンチャク", "擬岩", "その他"];
+            }
+          }
+
+          // 2. 商品グループ許可（A, B, C）のパース
+          var prodPermStr = (colProdPerm !== -1) ? String(cData[i][colProdPerm] || "").toUpperCase() : "";
+          var allowedGroups = {
+            A: prodPermStr.indexOf("A") !== -1,
+            B: prodPermStr.indexOf("B") !== -1,
+            C: prodPermStr.indexOf("C") !== -1
+          };
+
           customerInfo = {
             lineUserId: dbUserId,
             name: String(cData[i][1] || "お客様").trim(),
             discountRate: rateVal,
-            phone: String(cData[i][3] || "").trim()
+            phone: String(cData[i][3] || "").trim(),
+            allowedCategories: allowedCategories,
+            allowedProductGroups: allowedGroups
           };
 
           // 電話番号一致でLINE ID未登録だった場合は自動補完
@@ -106,12 +211,18 @@ function doGet(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 登録済み顧客のみ商品データを読み込み（CATEGORY_DEFSに含まれるシートのみ対象）
+    // 登録済み顧客のみ商品データを読み込み（カテゴリ許可 & 商品グループ許可で厳格にフィルタリング）
     var products = [];
     var nowTime = new Date().getTime();
 
     for (var catIdx = 0; catIdx < CATEGORY_DEFS.length; catIdx++) {
       var catDef = CATEGORY_DEFS[catIdx];
+
+      // 【カテゴリ認可チェック】顧客に許可されていないカテゴリはスキップ
+      if (customerInfo.allowedCategories.indexOf(catDef.label) === -1) {
+        continue;
+      }
+
       var sheet = getSheetForCategory(ss, catDef.label);
       if (!sheet) continue;
 
@@ -144,13 +255,24 @@ function doGet(e) {
         var pName = String(row[colName] || "").trim();
         if (!pName) continue;
 
+        var pId = (colId !== -1 && row[colId]) ? String(row[colId]).trim() : sheetName + "_" + r;
+
+        // 【商品グループ認可チェック】商品IDの先頭文字が A, B, C の場合は対応グループ許可が必要
+        var firstChar = pId.charAt(0).toUpperCase();
+        if (firstChar === "A" || firstChar === "B" || firstChar === "C") {
+          // 該当グループの許可を持っていない顧客には表示しない
+          if (!customerInfo.allowedProductGroups[firstChar]) {
+            continue;
+          }
+        }
+        // 頭にアルファベット(A, B, C)が付いていない商品は全顧客に表示OK
+
         var numStock = Number(row[colStock]) || 0;
         if (numStock <= 0 && colSoldOut !== -1 && row[colSoldOut]) {
           var soldOutTime = new Date(row[colSoldOut]).getTime();
           if (nowTime - soldOutTime > 2 * 60 * 60 * 1000) continue;
         }
 
-        var pId = (colId !== -1 && row[colId]) ? String(row[colId]).trim() : sheetName + "_" + r;
         var priceVal = row[colPrice];
         var isAsk = String(priceVal).trim().toLowerCase() === "ask" || priceVal === "";
         var numPrice = isAsk ? 0 : (Number(priceVal) || 0);
