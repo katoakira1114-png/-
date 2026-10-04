@@ -4,8 +4,17 @@
 
 // スクリプトプロパティから取得（未設定時の初期フォールバック値）
 var SPREADSHEET_ID = PropertiesService.getScriptProperties().getProperty("REQUEST_SPREADSHEET_ID") || "";
-var LINE_CHANNEL_ACCESS_TOKEN = PropertiesService.getScriptProperties().getProperty("LINE_CHANNEL_ACCESS_TOKEN") || "4z5y4BBsTTTEZgfmcaUF7cbc1T1k6qePWr/xKn3Yuk0E1pi4wxY3uPtSar9xW3F8FxIDpqTpma7lfn3HXhQ19LyTaDkNU6s779LkSLtPCUCZNb3nKg/tDSJXLNuADTfjDGoD8SQMw/CYDBdUAgkq3gdB04t89/1O/w1cDnyilFU=";
-var ADMIN_LINE_USER_ID = PropertiesService.getScriptProperties().getProperty("ADMIN_LINE_USER_ID") || "";
+var FALLBACK_LINE_TOKEN = "4z5y4BBsTTTEZgfmcaUF7cbc1T1k6qePWr/xKn3Yuk0E1pi4wxY3uPtSar9xW3F8FxIDpqTpma7lfn3HXhQ19LyTaDkNU6s779LkSLtPCUCZNb3nKg/tDSJXLNuADTfjDGoD8SQMw/CYDBdUAgkq3gdB04t89/1O/w1cDnyilFU=";
+
+function getLineChannelAccessToken() {
+  var token = PropertiesService.getScriptProperties().getProperty("LINE_CHANNEL_ACCESS_TOKEN");
+  return (token && token.trim() !== "") ? token.trim() : FALLBACK_LINE_TOKEN;
+}
+
+function getAdminLineUserId() {
+  var uid = PropertiesService.getScriptProperties().getProperty("ADMIN_LINE_USER_ID");
+  return (uid && uid.trim() !== "") ? uid.trim() : "";
+}
 
 var SHEET_NAME = "採集リクエスト一覧";
 
@@ -275,7 +284,24 @@ function doPost(e) {
  * LINE Messaging API (Push Message) 送信
  */
 function pushLineMessage(toUserId, textMessage) {
-  if (!toUserId || !LINE_CHANNEL_ACCESS_TOKEN) return false;
+  var token = getLineChannelAccessToken();
+  if (!token) {
+    console.error("【LINE送信エラー】LINE_CHANNEL_ACCESS_TOKEN が未設定です。スクリプトプロパティをご確認ください。");
+    return { success: false, error: "ACCESS_TOKEN_NOT_SET" };
+  }
+
+  if (!toUserId || String(toUserId).trim() === "") {
+    console.error("【LINE送信エラー】送信先ユーザーID (toUserId) が空です。");
+    return { success: false, error: "TO_USER_ID_EMPTY" };
+  }
+
+  toUserId = String(toUserId).trim();
+
+  // ユーザーIDの形式バリデーション（LINE UIDは通常 'U' または 'C', 'R' から始まる33文字前後の文字列）
+  if (!/^[UCR][0-9a-f]{32}$/i.test(toUserId)) {
+    console.warn("【LINE送信警告】送信先ID '" + toUserId + "' はLINEの個別UID（Uから始まる33文字の文字列）ではない可能性があります。公式LINEアカウントの@IDや表示名ではプッシュ送信できません。");
+  }
+
   try {
     var url = "https://api.line.me/v2/bot/message/push";
     var payload = {
@@ -286,16 +312,26 @@ function pushLineMessage(toUserId, textMessage) {
       method: "post",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer " + LINE_CHANNEL_ACCESS_TOKEN
+        "Authorization": "Bearer " + token
       },
       payload: JSON.stringify(payload),
       muteHttpExceptions: true
     };
+
     var res = UrlFetchApp.fetch(url, options);
-    return res.getResponseCode() === 200;
+    var resCode = res.getResponseCode();
+    var resBody = res.getContentText();
+
+    if (resCode !== 200) {
+      console.error("【LINE送信失敗】HTTP " + resCode + " to: " + toUserId + " Response: " + resBody);
+      return { success: false, statusCode: resCode, response: resBody };
+    }
+
+    console.log("【LINE送信成功】to: " + toUserId + " (HTTP " + resCode + ")");
+    return { success: true, statusCode: resCode };
   } catch (e) {
-    Logger.log("pushLineMessage exception: " + e.toString());
-    return false;
+    console.error("【LINE送信例外】to: " + toUserId + " Exception: " + e.toString());
+    return { success: false, error: e.toString() };
   }
 }
 
@@ -308,7 +344,8 @@ function sendRequestLineNotifications(info) {
   var itemsSummary = info.itemsSummaryText || "";
 
   // 1. 管理者（店主）宛通知
-  var adminUid = ADMIN_LINE_USER_ID;
+  var adminUid = getAdminLineUserId();
+  var adminResult = null;
   if (adminUid) {
     var adminText = "🎣【新規 生体リクエスト・採集要望受付】\n" +
       "-------------------\n" +
@@ -326,10 +363,13 @@ function sendRequestLineNotifications(info) {
       "💡飼育環境・備考:\n" + (d.notes ? d.notes : "なし") + "\n\n" +
       "※スプレッドシートの「採集リクエスト一覧」をご確認ください。";
 
-    pushLineMessage(adminUid, adminText);
+    adminResult = pushLineMessage(adminUid, adminText);
+  } else {
+    console.warn("【管理者LINE通知スキップ】ADMIN_LINE_USER_ID が未設定のため、店主へのLINE通知は送信されませんでした。GASの「プロジェクトの設定」＞「スクリプト プロパティ」で ADMIN_LINE_USER_ID に店主様のLINE個別UIDを設定してください。");
   }
 
   // 2. お客様宛の確認通知（LINE UIDが取得できている場合）
+  var userResult = null;
   if (d.lineUserId) {
     var userText = "【採集リクエストを承りました】\n" +
       (d.name || "お客様") + " 様\n\n" +
@@ -342,6 +382,8 @@ function sendRequestLineNotifications(info) {
       "当店の採集員が海況・天候を確認し、採集後の状態確認・トリートメント完了次第、改めてご連絡いたします。\n" +
       "※自然環境下での採集のため、海況によりお時間をいただく場合がございます。";
 
-    pushLineMessage(d.lineUserId, userText);
+    userResult = pushLineMessage(d.lineUserId, userText);
   }
+
+  return { admin: adminResult, user: userResult };
 }

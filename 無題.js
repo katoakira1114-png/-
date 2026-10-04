@@ -1,10 +1,20 @@
 var SPREADSHEET_ID = "1l5uJihoagHbMAwiCulpt9Zy9PIV6RRDneUYJ6QbiBbU";
-var LINE_CHANNEL_ACCESS_TOKEN = "4z5y4BBsTTTEZgfmcaUF7cbc1T1k6qePWr/xKn3Yuk0E1pi4wxY3uPtSar9xW3F8FxIDpqTpma7lfn3HXhQ19LyTaDkNU6s779LkSLtPCUCZNb3nKg/tDSJXLNuADTfjDGoD8SQMw/CYDBdUAgkq3gdB04t89/1O/w1cDnyilFU=";
 var PDF_FOLDER_NAME = "川畑水産_納品書PDF";
 var EDIT_FOLDER_NAME = "川畑水産_納品書(編集用)";
 var BACKUP_FOLDER_NAME = "川畑水産_スプレッドシート自動バックアップ";
-// 管理者（店主）のLINEユーザーID（スクリプトプロパティ「ADMIN_LINE_USER_ID」があればそれを優先、または下記に指定）
-var ADMIN_LINE_USER_ID = PropertiesService.getScriptProperties().getProperty("ADMIN_LINE_USER_ID") || "";
+
+// LINEアクセストークンの解決（スクリプトプロパティ優先、フォールバック定数）
+var FALLBACK_LINE_TOKEN = "4z5y4BBsTTTEZgfmcaUF7cbc1T1k6qePWr/xKn3Yuk0E1pi4wxY3uPtSar9xW3F8FxIDpqTpma7lfn3HXhQ19LyTaDkNU6s779LkSLtPCUCZNb3nKg/tDSJXLNuADTfjDGoD8SQMw/CYDBdUAgkq3gdB04t89/1O/w1cDnyilFU=";
+function getLineChannelAccessToken() {
+  var token = PropertiesService.getScriptProperties().getProperty("LINE_CHANNEL_ACCESS_TOKEN");
+  return (token && token.trim() !== "") ? token.trim() : FALLBACK_LINE_TOKEN;
+}
+
+// 管理者（店主）のLINEユーザーIDの解決（スクリプトプロパティ最優先、ハードコードIDがあれば補完）
+function getAdminLineUserId() {
+  var uid = PropertiesService.getScriptProperties().getProperty("ADMIN_LINE_USER_ID");
+  return (uid && uid.trim() !== "") ? uid.trim() : "";
+}
 
 // サイトに表示する正規カテゴリ定義（表示名・対応シート名候補）
 var CATEGORY_DEFS = [
@@ -1034,7 +1044,24 @@ function createDeliveryNoteTemplate() {
 // 【LINE通知機能】Messaging API (Push Message) による自動送信
 // -----------------------------------------------------------------------------
 function pushLineMessage(toUserId, textMessage) {
-  if (!toUserId || !LINE_CHANNEL_ACCESS_TOKEN) return false;
+  var token = getLineChannelAccessToken();
+  if (!token) {
+    console.error("【LINE送信エラー】LINE_CHANNEL_ACCESS_TOKEN が未設定です。スクリプトプロパティをご確認ください。");
+    return { success: false, error: "ACCESS_TOKEN_NOT_SET" };
+  }
+
+  if (!toUserId || String(toUserId).trim() === "") {
+    console.error("【LINE送信エラー】送信先ユーザーID (toUserId) が空です。");
+    return { success: false, error: "TO_USER_ID_EMPTY" };
+  }
+
+  toUserId = String(toUserId).trim();
+
+  // ユーザーIDの形式バリデーション（LINE UIDは通常 'U' または 'C', 'R' から始まる33文字前後の文字列）
+  if (!/^[UCR][0-9a-f]{32}$/i.test(toUserId)) {
+    console.warn("【LINE送信警告】送信先ID '" + toUserId + "' はLINEの個別UID（Uから始まる33文字の文字列）ではない可能性があります。公式LINEアカウントの@IDや表示名ではプッシュ送信できません。");
+  }
+
   try {
     var url = "https://api.line.me/v2/bot/message/push";
     var payload = {
@@ -1045,21 +1072,26 @@ function pushLineMessage(toUserId, textMessage) {
       method: "post",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": "Bearer " + LINE_CHANNEL_ACCESS_TOKEN
+        "Authorization": "Bearer " + token
       },
       payload: JSON.stringify(payload),
       muteHttpExceptions: true
     };
+
     var res = UrlFetchApp.fetch(url, options);
     var resCode = res.getResponseCode();
+    var resBody = res.getContentText();
+
     if (resCode !== 200) {
-      Logger.log("pushLineMessage failed: " + resCode + " " + res.getContentText());
-      return false;
+      console.error("【LINE送信失敗】HTTP " + resCode + " to: " + toUserId + " Response: " + resBody);
+      return { success: false, statusCode: resCode, response: resBody };
     }
-    return true;
+
+    console.log("【LINE送信成功】to: " + toUserId + " (HTTP " + resCode + ")");
+    return { success: true, statusCode: resCode };
   } catch (e) {
-    Logger.log("pushLineMessage exception: " + e.toString());
-    return false;
+    console.error("【LINE送信例外】to: " + toUserId + " Exception: " + e.toString());
+    return { success: false, error: e.toString() };
   }
 }
 
@@ -1108,7 +1140,7 @@ function sendOrderLineNotifications(order) {
     }
 
     // 2. 店主（管理者）宛の即時注文通知
-    var adminTargetUid = ADMIN_LINE_USER_ID;
+    var adminTargetUid = getAdminLineUserId();
     if (adminTargetUid) {
       var adminMsg = "🔔【新着注文が入りました！】\n\n" +
         "店舗名: " + custName + " 様\n" +
@@ -1121,17 +1153,22 @@ function sendOrderLineNotifications(order) {
         "📄納品書確認:\n" + order.pdfUrl;
 
       pushLineMessage(adminTargetUid, adminMsg);
+    } else {
+      console.warn("【注文通知スキップ】ADMIN_LINE_USER_ID が未設定のため、店主へのLINE注文通知はスキップされました。");
     }
 
   } catch (err) {
-    Logger.log("sendOrderLineNotifications error: " + err.toString());
+    console.error("sendOrderLineNotifications error: " + err.toString());
   }
 }
 
 // 顧客登録申請時の管理者通知
 function sendApplicationLineNotification(customerReg) {
-  var adminTargetUid = ADMIN_LINE_USER_ID;
-  if (!adminTargetUid) return;
+  var adminTargetUid = getAdminLineUserId();
+  if (!adminTargetUid) {
+    console.warn("【申請通知スキップ】ADMIN_LINE_USER_ID が未設定のため、店主へのLINE申請通知はスキップされました。");
+    return;
+  }
 
   try {
     var regMsg = "👤【新規の顧客登録申請がありました】\n\n" +
@@ -1298,7 +1335,8 @@ function handleSpecimenRequest(data) {
     sheet.appendRow(rowValues);
 
     // 管理者(店主)宛LINE通知
-    var adminTargetUid = ADMIN_LINE_USER_ID;
+    var adminTargetUid = getAdminLineUserId();
+    var adminLineResult = null;
     if (adminTargetUid) {
       var adminMsg = "🎣【新規 生体リクエスト・採集要望受付】\n" +
         "-------------------\n" +
@@ -1316,10 +1354,13 @@ function handleSpecimenRequest(data) {
         "💡飼育環境・備考:\n" + (data.notes ? data.notes : "なし") + "\n\n" +
         "※スプレッドシートの「採集リクエスト一覧」をご確認ください。";
 
-      pushLineMessage(adminTargetUid, adminMsg);
+      adminLineResult = pushLineMessage(adminTargetUid, adminMsg);
+    } else {
+      console.warn("【管理者LINE通知スキップ】スクリプトプロパティ ADMIN_LINE_USER_ID が未設定のため、店主へのLINE通知は送信されませんでした。LINE通知を受け取るには、GASのプロジェクト設定で ADMIN_LINE_USER_ID に店主様の個別UID(Uから始まる文字列)を設定してください。");
     }
 
     // お客様宛LINE通知（UID取得時）
+    var customerLineResult = null;
     if (data.lineUserId) {
       var userMsg = "【採集リクエストを承りました】\n" +
         (data.name || "お客様") + " 様\n\n" +
@@ -1332,13 +1373,15 @@ function handleSpecimenRequest(data) {
         "当店の採集員が海況・天候を確認し、採集後の状態確認・トリートメント完了次第、改めてご連絡いたします。\n" +
         "※自然環境下での採集のため、海況によりお時間をいただく場合がございます。";
 
-      pushLineMessage(data.lineUserId, userMsg);
+      customerLineResult = pushLineMessage(data.lineUserId, userMsg);
     }
 
     return ContentService.createTextOutput(JSON.stringify({
       status: "success",
       requestId: reqId,
-      message: "採集リクエストを受け付けました。"
+      message: "採集リクエストを受け付けました。",
+      adminNotified: adminLineResult ? adminLineResult.success : false,
+      adminNotifyDetail: adminLineResult || { skipped: !adminTargetUid, reason: "ADMIN_LINE_USER_ID_NOT_CONFIGURED" }
     })).setMimeType(ContentService.MimeType.JSON);
 
   } catch (err) {
