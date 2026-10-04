@@ -1393,4 +1393,38 @@ function handleSpecimenRequest(data) {
   }
 }
 
+// -----------------------------------------------------------------------------
+// 【LINE通知 動作確認・診断用テスト関数】
+// -----------------------------------------------------------------------------
+// GASエディタ上でこの関数を選択して「実行」ボタンを押すと、
+// プロパティの設定状況とLINE送信の成否が実行ログに一目で出力されます。
+function testSendLineNotification() {
+  console.log("=== LINE通知設定 診断開始 ===");
+
+  var token = getLineChannelAccessToken();
+  var adminUid = getAdminLineUserId();
+
+  console.log("1. アクセストークン確認: " + (token ? ("設定あり (先頭: " + token.substring(0, 15) + "...)") : "❌ 未設定"));
+  console.log("2. 管理者LINE UID確認: " + (adminUid ? ("設定あり (" + adminUid + ")") : "❌ 未設定 (ADMIN_LINE_USER_ID を設定してください)"));
+
+  if (!token) {
+    console.error("【診断結果】アクセストークンが取得できませんでした。スクリプトプロパティの LINE_CHANNEL_ACCESS_TOKEN をご確認ください。");
+    return "ERROR: LINE_CHANNEL_ACCESS_TOKEN is missing";
+  }
+
+  if (!adminUid) {
+    console.warn("【診断結果】管理者LINE UIDが設定されていません。GASの「プロジェクトの設定」＞「スクリプト プロパティ」に ADMIN_LINE_USER_ID （Uから始まる文字列）を設定してください。");
+    return "WARNING: ADMIN_LINE_USER_ID is missing";
+  }
+
+  console.log("3. テストメッセージ送信試行中...");
+  var testMsg = "🔔【川畑水産 テスト通知】\nLINE Messaging APIの疎通確認テストです。\n正常に通知が届いています！\n日時: " + Utilities.formatDate(new Date(), "JST", "yyyy/MM/dd HH:mm:ss");
+
+  var result = pushLineMessage(adminUid, testMsg);
+  console.log("4. 送信結果: " + JSON.stringify(result));
+  console.log("=== LINE通知設定 診断終了 ===");
+
+  return result;
+}
+
 
