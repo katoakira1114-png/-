@@ -27,7 +27,6 @@ function getTargetSpreadsheet() {
       Logger.log("openById failed, fallback to active spreadsheet: " + e.toString());
     }
   }
-  // コンテナバインド（スプレッドシートの拡張機能から作成した場合）
   try {
     return SpreadsheetApp.getActiveSpreadsheet();
   } catch (e) {
@@ -49,11 +48,10 @@ function ensureRequestSheet(ss) {
     "メールアドレス",
     "LINE_UID",
     "お届け先都道府県",
-    "希望カテゴリ",
-    "希望種・生体名",
-    "数量・サイズ感",
+    "希望生体一覧(明細)",
+    "品目数",
     "希望納期",
-    "目安予算",
+    "合計目安予算",
     "注意事項同意",
     "備考・飼育環境",
     "対応ステータス",
@@ -77,17 +75,15 @@ function ensureRequestSheet(ss) {
     sheet.setColumnWidth(5, 180); // メール
     sheet.setColumnWidth(6, 140); // LINE_UID
     sheet.setColumnWidth(7, 120); // 都道府県
-    sheet.setColumnWidth(8, 130); // カテゴリ
-    sheet.setColumnWidth(9, 200); // 生体名
-    sheet.setColumnWidth(10, 140); // 数量サイズ
-    sheet.setColumnWidth(11, 130); // 納期
-    sheet.setColumnWidth(12, 110); // 予算
-    sheet.setColumnWidth(13, 90);  // 同意
-    sheet.setColumnWidth(14, 250); // 備考
-    sheet.setColumnWidth(15, 110); // ステータス
-    sheet.setColumnWidth(16, 200); // メモ
+    sheet.setColumnWidth(8, 300); // 希望生体一覧(明細)
+    sheet.setColumnWidth(9, 80);  // 品目数
+    sheet.setColumnWidth(10, 130); // 納期
+    sheet.setColumnWidth(11, 120); // 予算
+    sheet.setColumnWidth(12, 90);  // 同意
+    sheet.setColumnWidth(13, 250); // 備考
+    sheet.setColumnWidth(14, 110); // ステータス
+    sheet.setColumnWidth(15, 200); // メモ
   } else {
-    // 既存シートのヘッダーが未設定の場合
     if (sheet.getLastRow() === 0) {
       sheet.getRange(1, 1, 1, headers.length).setValues([headers])
         .setBackground("#005bac")
@@ -102,9 +98,74 @@ function ensureRequestSheet(ss) {
 }
 
 /**
- * GETリクエストハンドラ（疎通確認用）
+ * GETリクエストハンドラ（疎通確認 & 顧客情報検索API）
  */
 function doGet(e) {
+  var action = (e && e.parameter && e.parameter.action) ? String(e.parameter.action).trim() : "";
+
+  // 顧客マスタ検索API（電話番号 / LINE UID / 名前）
+  if (action === "lookupCustomer" || action === "searchCustomer") {
+    var queryPhone = (e.parameter.phone || "").replace(/[^0-9]/g, "");
+    if (queryPhone.length === 10 && !queryPhone.startsWith("0")) queryPhone = "0" + queryPhone;
+    var queryUid = (e.parameter.userId || "").trim().toLowerCase();
+    var queryName = (e.parameter.name || "").trim().toLowerCase();
+
+    var ss = getTargetSpreadsheet();
+    var foundCustomer = null;
+    if (ss) {
+      var cSheet = ss.getSheetByName("顧客マスタ");
+      if (cSheet) {
+        var cData = cSheet.getDataRange().getValues();
+        if (cData.length > 1) {
+          var h = cData[0];
+          var lUid = -1, lName = -1, lParamPhone = -1, lAddr = -1;
+          for (var i = 0; i < h.length; i++) {
+            var title = String(h[i]).trim();
+            if (title.indexOf("LINE") !== -1 || title.indexOf("UID") !== -1) lUid = i;
+            else if (title.indexOf("店舗") !== -1 || title.indexOf("氏名") !== -1) lName = i;
+            else if (title.indexOf("電話") !== -1 || title.indexOf("TEL") !== -1) lParamPhone = i;
+            else if (title.indexOf("住所") !== -1) lAddr = i;
+          }
+          if (lUid === -1) lUid = 1;
+          if (lName === -1) lName = 2;
+          if (lParamPhone === -1) lParamPhone = 3;
+
+          for (var r = 1; r < cData.length; r++) {
+            var rowUid = String(cData[r][lUid] || "").trim().toLowerCase();
+            var rowPhone = String(cData[r][lParamPhone] || "").replace(/[^0-9]/g, "");
+            if (rowPhone.length === 10 && !rowPhone.startsWith("0")) rowPhone = "0" + rowPhone;
+            var rowName = String(cData[r][lName] || "").trim().toLowerCase();
+
+            var isMatched = false;
+            if (queryPhone && rowPhone && queryPhone === rowPhone) isMatched = true;
+            else if (queryUid && rowUid && queryUid === rowUid) isMatched = true;
+            else if (queryName && rowName && queryName === rowName) isMatched = true;
+
+            if (isMatched) {
+              var fullAddress = (lAddr !== -1) ? String(cData[r][lAddr] || "").trim() : "";
+              var prefMatch = fullAddress.match(/(東京都|北海道|(?:京都|大阪)府|.{2,3}県)/);
+              var extractedPref = prefMatch ? prefMatch[0] : "";
+
+              foundCustomer = {
+                found: true,
+                name: String(cData[r][lName] || "").trim(),
+                phone: String(cData[r][lParamPhone] || "").trim(),
+                address: fullAddress,
+                prefecture: extractedPref,
+                lineUserId: String(cData[r][lUid] || "").trim()
+              };
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    return ContentService.createTextOutput(JSON.stringify(
+      foundCustomer || { found: false }
+    )).setMimeType(ContentService.MimeType.JSON);
+  }
+
   return ContentService.createTextOutput(JSON.stringify({
     status: "ok",
     service: "生体リクエスト・採集要望受付API",
@@ -141,6 +202,28 @@ function doPost(e) {
     var dateStr = Utilities.formatDate(now, "JST", "yyyy/MM/dd HH:mm:ss");
     var reqId = "REQ-" + Utilities.formatDate(now, "JST", "yyyyMMdd-HHmmss");
 
+    var items = data.items || [];
+    if (items.length === 0 && data.species) {
+      items = [{
+        category: data.category || "その他",
+        species: data.species || "",
+        quantity: data.quantitySize || "1",
+        size: "",
+        budget: data.budget || ""
+      }];
+    }
+
+    var itemsSummaryLines = [];
+    var totalBudgetSummary = data.totalBudget || "";
+    for (var itIdx = 0; itIdx < items.length; itIdx++) {
+      var itm = items[itIdx];
+      var itmLine = "・[" + (itm.category || "その他") + "] " + (itm.species || "未指定") + " × " + (itm.quantity || "1");
+      if (itm.size) itmLine += " (" + itm.size + ")";
+      if (itm.budget) itmLine += " [予算: " + itm.budget + "]";
+      itemsSummaryLines.push(itmLine);
+    }
+    var itemsSummaryText = itemsSummaryLines.join("\n");
+
     var rowValues = [
       dateStr,
       reqId,
@@ -149,15 +232,14 @@ function doPost(e) {
       String(data.email || "").trim(),
       String(data.lineUserId || "").trim(),
       String(data.prefecture || "").trim(),
-      String(data.category || "").trim(),
-      String(data.species || "").trim(),
-      String(data.quantitySize || "").trim(),
+      itemsSummaryText,
+      items.length,
       String(data.deadline || "").trim(),
-      String(data.budget || "").trim(),
+      String(totalBudgetSummary || "").trim(),
       data.agreedToTerms ? "同意済" : "未同意",
       String(data.notes || "").trim(),
-      "新規受付", // 初期対応ステータス
-      "" // 管理者メモ
+      "新規受付",
+      ""
     ];
 
     sheet.appendRow(rowValues);
@@ -166,7 +248,10 @@ function doPost(e) {
     sendRequestLineNotifications({
       reqId: reqId,
       dateStr: dateStr,
-      data: data
+      data: data,
+      items: items,
+      itemsSummaryText: itemsSummaryText,
+      totalBudget: totalBudgetSummary
     });
 
     return ContentService.createTextOutput(JSON.stringify({
@@ -219,6 +304,8 @@ function pushLineMessage(toUserId, textMessage) {
  */
 function sendRequestLineNotifications(info) {
   var d = info.data;
+  var items = info.items || [];
+  var itemsSummary = info.itemsSummaryText || "";
 
   // 1. 管理者（店主）宛通知
   var adminUid = ADMIN_LINE_USER_ID;
@@ -231,12 +318,11 @@ function sendRequestLineNotifications(info) {
       "TEL: " + (d.phone || "未入力") + "\n" +
       "お届け先: " + (d.prefecture || "未入力") + "\n" +
       "-------------------\n" +
-      "🐟希望カテゴリ: " + (d.category || "未選択") + "\n" +
-      "📝希望生体名: " + (d.species || "未入力") + "\n" +
-      "📦数量/サイズ: " + (d.quantitySize || "未入力") + "\n" +
-      "⏳希望納期: " + (d.deadline || "指定なし") + "\n" +
-      "💰目安予算: " + (d.budget || "指定なし") + "\n" +
+      "【ご希望生体一覧 (" + items.length + "品目)】\n" +
+      itemsSummary + "\n" +
       "-------------------\n" +
+      "⏳希望納期: " + (d.deadline || "指定なし") + "\n" +
+      (info.totalBudget ? "💰目安予算: " + info.totalBudget + "\n" : "") +
       "💡飼育環境・備考:\n" + (d.notes ? d.notes : "なし") + "\n\n" +
       "※スプレッドシートの「採集リクエスト一覧」をご確認ください。";
 
@@ -249,12 +335,12 @@ function sendRequestLineNotifications(info) {
       (d.name || "お客様") + " 様\n\n" +
       "川畑水産への採集リクエストありがとうございます。\n" +
       "下記の内容で受け付けいたしました。\n\n" +
-      "🔖受付番号: " + info.reqId + "\n" +
-      "🐟希望生体: " + (d.species || "") + " (" + (d.category || "") + ")\n" +
-      "📦数量・サイズ: " + (d.quantitySize || "") + "\n" +
-      "⏳希望納期: " + (d.deadline || "") + "\n\n" +
-      "当店の採集員が天候や海況を確認の上、採集可否や目処が立ち次第、改めてご連絡いたします。\n" +
-      "※天候や海の状況によってはお時間をいただく場合がございます。";
+      "🔖受付番号: " + info.reqId + "\n\n" +
+      "【ご希望生体 (" + items.length + "品目)】\n" +
+      itemsSummary + "\n\n" +
+      "⏳希望納期: " + (d.deadline || "時期不問") + "\n\n" +
+      "当店の採集員が海況・天候を確認し、採集後の状態確認・トリートメント完了次第、改めてご連絡いたします。\n" +
+      "※自然環境下での採集のため、海況によりお時間をいただく場合がございます。";
 
     pushLineMessage(d.lineUserId, userText);
   }

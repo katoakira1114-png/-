@@ -293,6 +293,7 @@ function doGet(e) {
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     var reqUserId = (e && e.parameter && e.parameter.userId) ? String(e.parameter.userId).trim() : "";
     var reqPhone = (e && e.parameter && e.parameter.phone) ? String(e.parameter.phone).trim() : "";
+    var action = (e && e.parameter && e.parameter.action) ? String(e.parameter.action).trim() : "";
     var customerInfo = null;
 
     // 「顧客マスタ」の列拡張（チェックボックス化）&「擬岩」シート統一
@@ -301,6 +302,67 @@ function doGet(e) {
 
     // 顧客登録申請とマスタの自動承認ステータス同期
     syncApplicationStatus(ss);
+
+    // 【顧客情報参照API】採集リクエストフォームや注文フォームからの自動補完用
+    if (action === "lookupCustomer" || action === "searchCustomer") {
+      var queryPhone = (e.parameter.phone || "").replace(/[^0-9]/g, "");
+      if (queryPhone.length === 10 && !queryPhone.startsWith("0")) queryPhone = "0" + queryPhone;
+      var queryUid = (e.parameter.userId || "").trim().toLowerCase();
+      var queryName = (e.parameter.name || "").trim().toLowerCase();
+
+      var foundCustomer = null;
+      var cSheetLookup = ss.getSheetByName("顧客マスタ");
+      if (cSheetLookup) {
+        var cDataLookup = cSheetLookup.getDataRange().getValues();
+        if (cDataLookup.length > 1) {
+          var hLookup = cDataLookup[0];
+          var lUid = -1, lName = -1, lParamPhone = -1, lAddr = -1;
+          for (var lh = 0; lh < hLookup.length; lh++) {
+            var lTitle = String(hLookup[lh]).trim();
+            if (lTitle.indexOf("LINE") !== -1 || lTitle.indexOf("UID") !== -1) lUid = lh;
+            else if (lTitle.indexOf("店舗") !== -1 || lTitle.indexOf("氏名") !== -1) lName = lh;
+            else if (lTitle.indexOf("電話") !== -1 || lTitle.indexOf("TEL") !== -1) lParamPhone = lh;
+            else if (lTitle.indexOf("住所") !== -1) lAddr = lh;
+          }
+          if (lUid === -1) lUid = 1;
+          if (lName === -1) lName = 2;
+          if (lParamPhone === -1) lParamPhone = 3;
+
+          for (var lr = 1; lr < cDataLookup.length; lr++) {
+            var rowUid = String(cDataLookup[lr][lUid] || "").trim().toLowerCase();
+            var rowPhone = String(cDataLookup[lr][lParamPhone] || "").replace(/[^0-9]/g, "");
+            if (rowPhone.length === 10 && !rowPhone.startsWith("0")) rowPhone = "0" + rowPhone;
+            var rowName = String(cDataLookup[lr][lName] || "").trim().toLowerCase();
+
+            var isMatched = false;
+            if (queryPhone && rowPhone && queryPhone === rowPhone) isMatched = true;
+            else if (queryUid && rowUid && queryUid === rowUid) isMatched = true;
+            else if (queryName && rowName && queryName === rowName) isMatched = true;
+
+            if (isMatched) {
+              var fullAddress = (lAddr !== -1) ? String(cDataLookup[lr][lAddr] || "").trim() : "";
+              // 都道府県の抽出
+              var prefMatch = fullAddress.match(/(東京都|北海道|(?:京都|大阪)府|.{2,3}県)/);
+              var extractedPref = prefMatch ? prefMatch[0] : "";
+
+              foundCustomer = {
+                found: true,
+                name: String(cDataLookup[lr][lName] || "").trim(),
+                phone: String(cDataLookup[lr][lParamPhone] || "").trim(),
+                address: fullAddress,
+                prefecture: extractedPref,
+                lineUserId: String(cDataLookup[lr][lUid] || "").trim()
+              };
+              break;
+            }
+          }
+        }
+      }
+
+      return ContentService.createTextOutput(JSON.stringify(
+        foundCustomer || { found: false }
+      )).setMimeType(ContentService.MimeType.JSON);
+    }
 
     // 顧客マスタから顧客情報を特定（動的ヘッダー判定で列順の変更に対応）
     var cSheet = ss.getSheetByName("顧客マスタ");
@@ -1174,8 +1236,8 @@ function handleSpecimenRequest(data) {
     var sheet = ssTarget.getSheetByName(sheetName);
     var headers = [
       "受付日時", "リクエストID", "お名前 / 店舗名", "電話番号", "メールアドレス",
-      "LINE_UID", "お届け先都道府県", "希望カテゴリ", "希望種・生体名",
-      "数量・サイズ感", "希望納期", "目安予算", "注意事項同意", "備考・飼育環境", "対応ステータス", "管理者メモ"
+      "LINE_UID", "お届け先都道府県", "希望生体一覧(明細)", "品目数", "希望納期",
+      "合計目安予算", "注意事項同意", "備考・飼育環境", "対応ステータス", "管理者メモ"
     ];
 
     if (!sheet) {
@@ -1183,11 +1245,37 @@ function handleSpecimenRequest(data) {
       sheet.getRange(1, 1, 1, headers.length).setValues([headers])
         .setBackground("#005bac").setFontColor("#ffffff").setFontWeight("bold").setHorizontalAlignment("center");
       sheet.setFrozenRows(1);
+      sheet.setColumnWidth(8, 300); // 希望生体一覧(明細)
+      sheet.setColumnWidth(13, 250); // 備考
     }
 
     var now = new Date();
     var dateStr = Utilities.formatDate(now, "JST", "yyyy/MM/dd HH:mm:ss");
     var reqId = "REQ-" + Utilities.formatDate(now, "JST", "yyyyMMdd-HHmmss");
+
+    // 複数生体アイテムの整形
+    var items = data.items || [];
+    if (items.length === 0 && data.species) {
+      // 単一指定時の後方互換
+      items = [{
+        category: data.category || "その他",
+        species: data.species || "",
+        quantity: data.quantitySize || "1",
+        size: "",
+        budget: data.budget || ""
+      }];
+    }
+
+    var itemsSummaryLines = [];
+    var totalBudgetSummary = data.totalBudget || "";
+    for (var itIdx = 0; itIdx < items.length; itIdx++) {
+      var itm = items[itIdx];
+      var itmLine = "・[" + (itm.category || "その他") + "] " + (itm.species || "未指定") + " × " + (itm.quantity || "1");
+      if (itm.size) itmLine += " (" + itm.size + ")";
+      if (itm.budget) itmLine += " [予算: " + itm.budget + "]";
+      itemsSummaryLines.push(itmLine);
+    }
+    var itemsSummaryText = itemsSummaryLines.join("\n");
 
     var rowValues = [
       dateStr,
@@ -1197,11 +1285,10 @@ function handleSpecimenRequest(data) {
       String(data.email || "").trim(),
       String(data.lineUserId || "").trim(),
       String(data.prefecture || "").trim(),
-      String(data.category || "").trim(),
-      String(data.species || "").trim(),
-      String(data.quantitySize || "").trim(),
+      itemsSummaryText,
+      items.length,
       String(data.deadline || "").trim(),
-      String(data.budget || "").trim(),
+      String(totalBudgetSummary || "").trim(),
       data.agreedToTerms ? "同意済" : "未同意",
       String(data.notes || "").trim(),
       "新規受付",
@@ -1221,12 +1308,11 @@ function handleSpecimenRequest(data) {
         "TEL: " + (data.phone || "未入力") + "\n" +
         "お届け先: " + (data.prefecture || "未入力") + "\n" +
         "-------------------\n" +
-        "🐟希望カテゴリ: " + (data.category || "未選択") + "\n" +
-        "📝希望生体名: " + (data.species || "未入力") + "\n" +
-        "📦数量/サイズ: " + (data.quantitySize || "未入力") + "\n" +
-        "⏳希望納期: " + (data.deadline || "指定なし") + "\n" +
-        "💰目安予算: " + (data.budget || "指定なし") + "\n" +
+        "【ご希望生体一覧 (" + items.length + "品目)】\n" +
+        itemsSummaryText + "\n" +
         "-------------------\n" +
+        "⏳希望納期: " + (data.deadline || "指定なし") + "\n" +
+        (totalBudgetSummary ? "💰目安予算: " + totalBudgetSummary + "\n" : "") +
         "💡飼育環境・備考:\n" + (data.notes ? data.notes : "なし") + "\n\n" +
         "※スプレッドシートの「採集リクエスト一覧」をご確認ください。";
 
@@ -1239,12 +1325,12 @@ function handleSpecimenRequest(data) {
         (data.name || "お客様") + " 様\n\n" +
         "川畑水産への採集リクエストありがとうございます。\n" +
         "下記の内容で受け付けいたしました。\n\n" +
-        "🔖受付番号: " + reqId + "\n" +
-        "🐟希望生体: " + (data.species || "") + " (" + (data.category || "") + ")\n" +
-        "📦数量・サイズ: " + (data.quantitySize || "") + "\n" +
-        "⏳希望納期: " + (data.deadline || "") + "\n\n" +
-        "当店の採集員が天候や海況を確認の上、採集可否や目処が立ち次第、改めてご連絡いたします。\n" +
-        "※天候や海の状況によってはお時間をいただく場合がございます。";
+        "🔖受付番号: " + reqId + "\n\n" +
+        "【ご希望生体 (" + items.length + "品目)】\n" +
+        itemsSummaryText + "\n\n" +
+        "⏳希望納期: " + (data.deadline || "時期不問") + "\n\n" +
+        "当店の採集員が海況・天候を確認し、採集後の状態確認・トリートメント完了次第、改めてご連絡いたします。\n" +
+        "※自然環境下での採集のため、海況によりお時間をいただく場合がございます。";
 
       pushLineMessage(data.lineUserId, userMsg);
     }

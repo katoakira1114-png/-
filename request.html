@@ -71,7 +71,7 @@
       margin-bottom: 14px;
       display: flex;
       align-items: center;
-      gap: 6px;
+      justify-content: space-between;
     }
 
     .form-group { margin-bottom: 14px; }
@@ -82,7 +82,7 @@
 
     .form-input, .form-select, .form-textarea {
       width: 100%;
-      padding: 10px 12px;
+      padding: 9px 11px;
       border: 1px solid var(--border-color);
       border-radius: 6px;
       font-size: 0.9rem;
@@ -96,27 +96,69 @@
     }
     .form-textarea { resize: vertical; min-height: 80px; }
 
-    /* カテゴリチップ選択 */
-    .chips-group { display: flex; flex-wrap: wrap; gap: 8px; }
-    .chip-radio { display: none; }
-    .chip-label {
-      padding: 7px 14px;
-      background: #f1f4f8;
-      border: 1px solid #d0d7de;
-      border-radius: 20px;
-      font-size: 0.85rem;
+    /* 生体入力アイテムブロック */
+    .specimen-item-block {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 14px 12px;
+      margin-bottom: 12px;
+      position: relative;
+      transition: border-color 0.15s ease;
+    }
+    .specimen-item-block:hover { border-color: #cbd5e1; }
+    .item-block-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      border-bottom: 1px dashed #cbd5e1;
+      padding-bottom: 6px;
+    }
+    .item-block-num { font-size: 0.85rem; font-weight: bold; color: var(--primary-color); }
+    .item-delete-btn {
+      background: #fee2e2;
+      color: #dc2626;
+      border: 1px solid #fca5a5;
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 0.75rem;
       font-weight: bold;
-      color: #444;
       cursor: pointer;
-      user-select: none;
-      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
     }
-    .chip-radio:checked + .chip-label {
-      background: var(--primary-color);
-      color: #fff;
-      border-color: var(--primary-color);
-      box-shadow: 0 2px 5px rgba(0, 91, 172, 0.25);
+    .item-delete-btn:hover { background: #fecaca; }
+
+    .add-specimen-btn {
+      width: 100%;
+      background: #f0f7ff;
+      border: 2px dashed #005bac;
+      color: var(--primary-color);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.92rem;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 4px;
+      transition: background 0.15s ease;
     }
+    .add-specimen-btn:hover { background: #e0f0fe; }
+
+    /* 顧客情報検索ステータス */
+    .lookup-status {
+      font-size: 0.75rem;
+      margin-top: 4px;
+      font-weight: bold;
+      display: none;
+    }
+    .lookup-status.success { color: #16a34a; display: block; }
+    .lookup-status.searching { color: #64748b; display: block; }
 
     /* 注意事項ボックス */
     .terms-box {
@@ -200,7 +242,7 @@
   <!-- 通信中ローディング -->
   <div class="loading-overlay" id="loading-overlay">
     <div class="spinner"></div>
-    <div style="font-weight:bold; color:#333; font-size:1rem;">リクエスト送信中...</div>
+    <div style="font-weight:bold; color:#333; font-size:1rem;" id="loading-message">リクエスト送信中...</div>
     <div style="font-size: 0.78rem; color:#888; margin-top: 4px;">画面を閉じずにお待ちください</div>
   </div>
 
@@ -222,8 +264,8 @@
       <div class="concept-badge">🌿 川畑水産（観賞魚）の取り組み</div>
       <h1 class="concept-title">「命のロス」を防ぎ、最高のコンディションでお届けする受注採集</h1>
       <p class="concept-desc">
-        過剰ストックによる生体への負担やロスを最小限に抑え、海から揚がったばかりの元気で新鮮な生体をお手元に届けるため、当店では個別リクエストによる<strong>「受注採集・トリートメント」</strong>を承っております。<br>
-        「この魚やサンゴを探してほしい」「お店・ご自宅の水槽に合わせたサイズを採ってほしい」など、お気軽にお寄せください。
+        過剰ストックによる生体への負担やロスを最小限に抑え、海から揚がったばかりの元気で新鮮な生体をお手元に届けるため、当店では個別リクエストによる<strong>「受注採集・状態確認」</strong>を承っております。<br>
+        「この魚やサンゴを探してほしい」「お店・ご自宅の水槽に合わせたサイズを採ってほしい」など、複数種類のご要望もまとめてお気軽にお寄せください。
       </p>
     </div>
 
@@ -234,7 +276,7 @@
       <div class="thanks-desc" id="thanks-details">
         <strong>受付番号:</strong> <span id="res-req-id" style="color:var(--primary-color); font-weight:bold;">-</span><br><br>
         採集リクエストを正常に送信いたしました。<br>
-        当店の採集員が天候・海況および潮回りを確認の上、採集の可否や見込みが立ち次第、LINEまたはお電話・メールにてご案内申し上げます。<br>
+        当店の採集員が天候・海況を確認の上、採集の可否および状態確認が完了次第、LINEまたはお電話・メールにてご案内申し上げます。<br>
         ※LINE公式アカウントにも受付控えを送信いたしましたのでご確認ください。
       </div>
       <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
@@ -245,74 +287,19 @@
 
     <!-- 入力フォーム -->
     <form id="request-form" onsubmit="submitRequest(event)">
-      <!-- 1. 希望生体について -->
+      <!-- 1. お客様情報（顧客マスタ自動補完） -->
       <div class="form-card">
-        <div class="section-title">🐟 1. ご希望の生体について</div>
+        <div class="section-title">
+          <span>👤 1. お客様・お届け先情報</span>
+          <span style="font-size:0.75rem; font-weight:normal; color:#666;">※既存顧客は自動補完</span>
+        </div>
 
-        <!-- 希望カテゴリ -->
         <div class="form-group">
-          <label>希望カテゴリ<span class="required-tag">*必須</span></label>
-          <div class="chips-group">
-            <input type="radio" name="category" value="海水魚" id="cat-fish" class="chip-radio" checked>
-            <label for="cat-fish" class="chip-label">海水魚</label>
-
-            <input type="radio" name="category" value="ソフトコーラル" id="cat-soft" class="chip-radio">
-            <label for="cat-soft" class="chip-label">ソフトコーラル</label>
-
-            <input type="radio" name="category" value="ハードコーラル" id="cat-hard" class="chip-radio">
-            <label for="cat-hard" class="chip-label">ハードコーラル</label>
-
-            <input type="radio" name="category" value="クリーナー・無脊椎" id="cat-invert" class="chip-radio">
-            <label for="cat-invert" class="chip-label">クリーナー・無脊椎</label>
-
-            <input type="radio" name="category" value="その他" id="cat-other" class="chip-radio">
-            <label for="cat-other" class="chip-label">その他</label>
-          </div>
+          <label for="req-phone">電話番号<span class="required-tag">*必須</span></label>
+          <input type="tel" id="req-phone" class="form-input" required placeholder="例: 090-1234-5678" onblur="handlePhoneLookup()">
+          <div id="phone-lookup-status" class="lookup-status"></div>
+          <div class="form-help">電話番号を入力すると、登録済みのお客様情報が自動入力されます。</div>
         </div>
-
-        <!-- 希望種・生体名 -->
-        <div class="form-group">
-          <label for="req-species">希望種・生体名<span class="required-tag">*必須</span></label>
-          <input type="text" id="req-species" class="form-input" required placeholder="例: ハタタテハゼ、ツツウミヅタ、シライトイソギンチャク 等（複数可）">
-          <div class="form-help">複数種ある場合は読点（、）や改行でご記入ください。</div>
-        </div>
-
-        <!-- 数量・サイズ感 -->
-        <div class="form-group">
-          <label for="req-quantity-size">数量・サイズ感<span class="required-tag">*必須</span></label>
-          <input type="text" id="req-quantity-size" class="form-input" required placeholder="例: 2匹（5〜7cm前後）、Mサイズ（握り拳大）など">
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-          <!-- 希望納期 -->
-          <div class="form-group">
-            <label for="req-deadline">希望納期<span class="optional-tag">任意</span></label>
-            <select id="req-deadline" class="form-select">
-              <option value="良い個体が採れ次第（時期不問）">良い個体が採れ次第</option>
-              <option value="今月中">今月中</option>
-              <option value="1〜2ヶ月以内">1〜2ヶ月以内</option>
-              <option value="急ぎ（2週間以内希望）">急ぎ（2週間以内希望）</option>
-              <option value="その他（備考に記載）">その他（備考に記載）</option>
-            </select>
-          </div>
-
-          <!-- 目安予算 -->
-          <div class="form-group">
-            <label for="req-budget">目安予算<span class="optional-tag">任意</span></label>
-            <input type="text" id="req-budget" class="form-input" placeholder="例: 1匹3,000円以内、総額2万円 等">
-          </div>
-        </div>
-
-        <!-- 備考・飼育環境 -->
-        <div class="form-group" style="margin-bottom:0;">
-          <label for="req-notes">備考・飼育環境<span class="optional-tag">任意</span></label>
-          <textarea id="req-notes" class="form-textarea" placeholder="水槽スペック（例: 60cmオーバーフロー・水流強め）、混泳生体、色味・模様のこだわりなどがあればご記入ください。"></textarea>
-        </div>
-      </div>
-
-      <!-- 2. お客様情報 -->
-      <div class="form-card">
-        <div class="section-title">👤 2. お客様・お届け先情報</div>
 
         <div class="form-group">
           <label for="req-name">お名前 / 店舗名<span class="required-tag">*必須</span></label>
@@ -320,10 +307,6 @@
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-          <div class="form-group">
-            <label for="req-phone">電話番号<span class="required-tag">*必須</span></label>
-            <input type="tel" id="req-phone" class="form-input" required placeholder="例: 090-1234-5678">
-          </div>
           <div class="form-group">
             <label for="req-prefecture">お届け先都道府県<span class="required-tag">*必須</span></label>
             <select id="req-prefecture" class="form-select" required>
@@ -338,25 +321,71 @@
               <option value="福岡県">福岡県</option><option value="佐賀県">佐賀県</option><option value="長崎県">長崎県</option><option value="熊本県">熊本県</option><option value="大分県">大分県</option><option value="宮崎県">宮崎県</option><option value="鹿児島県">鹿児島県</option><option value="沖縄県">沖縄県</option>
             </select>
           </div>
-        </div>
 
-        <div class="form-group" style="margin-bottom:0;">
-          <label for="req-email">メールアドレス<span class="optional-tag">任意</span></label>
-          <input type="email" id="req-email" class="form-input" placeholder="例: sample@example.com">
+          <div class="form-group">
+            <label for="req-email">メールアドレス<span class="optional-tag">任意</span></label>
+            <input type="email" id="req-email" class="form-input" placeholder="例: sample@example.com">
+          </div>
         </div>
       </div>
 
-      <!-- 3. 注意事項同意 -->
+      <!-- 2. ご希望の生体（複数追加可能） -->
+      <div class="form-card">
+        <div class="section-title">
+          <span>🐟 2. ご希望の生体（複数リクエスト可能）</span>
+        </div>
+
+        <div id="specimen-list-container">
+          <!-- 動的に生体入力ブロックが挿入されます -->
+        </div>
+
+        <button type="button" class="add-specimen-btn" onclick="addSpecimenItem()">
+          <span>＋ 生体を追加する</span>
+        </button>
+      </div>
+
+      <!-- 3. 共通条件・水槽環境 -->
+      <div class="form-card">
+        <div class="section-title">📦 3. 希望納期・ご予算・水槽環境</div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <!-- 希望納期 -->
+          <div class="form-group">
+            <label for="req-deadline">希望納期目安<span class="optional-tag">任意</span></label>
+            <select id="req-deadline" class="form-select">
+              <option value="良い個体が採れ次第（時期不問）">良い個体が採れ次第（時期不問）</option>
+              <option value="今月中">今月中</option>
+              <option value="1〜2ヶ月以内">1〜2ヶ月以内</option>
+              <option value="急ぎ（2週間以内希望）">急ぎ（2週間以内希望）</option>
+              <option value="その他（備考に記載）">その他（備考に記載）</option>
+            </select>
+          </div>
+
+          <!-- 合計目安予算 -->
+          <div class="form-group">
+            <label for="req-total-budget">全体の目安予算<span class="optional-tag">任意</span></label>
+            <input type="text" id="req-total-budget" class="form-input" placeholder="例: 全体で2万円以内、各予算など">
+          </div>
+        </div>
+
+        <!-- 備考・飼育環境 -->
+        <div class="form-group" style="margin-bottom:0;">
+          <label for="req-notes">備考・飼育環境<span class="optional-tag">任意</span></label>
+          <textarea id="req-notes" class="form-textarea" placeholder="水槽スペック（例: 90cmオーバーフロー、ミドリイシ中心）、混泳生体、色味・産地のこだわりなどがあればご記入ください。"></textarea>
+        </div>
+      </div>
+
+      <!-- 4. 注意事項同意（「餌付け」文言削除・状態管理優先表現） -->
       <div class="terms-box">
         <div class="terms-title">⚠️ 生体採集・受注に関する注意事項</div>
         <ul class="terms-list">
-          <li>天然採集のため、<strong>天候・海況・台風などの影響</strong>により採集予定が前後したり、採集できない場合がございます。</li>
-          <li>採集後、万全の状態で発送するために<strong>数日間のトリートメント（餌付け・状態観察）期間</strong>を設けております。</li>
+          <li>自然環境下での天然採集のため、<strong>海況・天候（風・波・濁り等）</strong>に大きく左右され、採集時期が前後する場合や採集できない場合がございます。</li>
+          <li>採集後は生体の命を最優先とし、<strong>状態確認・トリートメント（水慣らし・検疫観察）</strong>を十分に行ってから発送いたします。</li>
           <li>良い個体が採れ次第、金額・発送日程等の確認連絡を差し上げます。無理な購入強制などは一切ございませんのでご安心ください。</li>
         </ul>
         <label class="terms-agree-label">
           <input type="checkbox" id="terms-agree" class="terms-checkbox" required>
-          <span>上記の注意事項・日程変動について確認・同意しました</span>
+          <span>自然環境下での採集のため海況・天候に左右されること、および採集後の状態確認・トリートメントを最優先とするため発送時期が前後する場合があることを了承します</span>
         </label>
       </div>
 
@@ -368,14 +397,14 @@
   </div>
 
   <script>
-    // 採集リクエスト専用GAS Web App URL（GAS新規デプロイ後に設定）
-    // ※未デプロイ時や初期状態では既存販売用GASエンドポイントを初期値とし、適宜差し替え可能
-    const REQUEST_GAS_API_URL = "https://script.google.com/macros/s/AKfycbwEEEt2vWPC4BXlnj08pxvW6ARGKX4FVz41anHlh9wWaXmdduhz4Bb7YQsskkGHMwRz-A/exec";
+    // 採集リクエスト受付・顧客検索APIのURL
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwEEEt2vWPC4BXlnj08pxvW6ARGKX4FVz41anHlh9wWaXmdduhz4Bb7YQsskkGHMwRz-A/exec";
     const LIFF_ID = "2011653892-RjIQ6YBe";
 
     let lineProfile = null;
+    let specimenCount = 0;
 
-    // ユーザーID抽出関数（index.htmlと同一ロジック）
+    // ユーザーID抽出関数
     function extractUserId() {
       if (lineProfile && lineProfile.userId) return lineProfile.userId;
       if (typeof liff !== 'undefined') {
@@ -391,13 +420,132 @@
       return "";
     }
 
+    // 生体入力ブロックの動的追加
+    function addSpecimenItem(defaultValues = {}) {
+      specimenCount++;
+      const currentIdx = specimenCount;
+      const container = document.getElementById('specimen-list-container');
+
+      const block = document.createElement('div');
+      block.className = 'specimen-item-block';
+      block.id = `specimen-item-${currentIdx}`;
+
+      block.innerHTML = `
+        <div class="item-block-header">
+          <div class="item-block-num">#${currentIdx} 生体リクエスト</div>
+          <button type="button" class="item-delete-btn" onclick="removeSpecimenItem(${currentIdx})">
+            🗑️ 削除
+          </button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+          <div>
+            <label style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:3px;">カテゴリ<span class="required-tag">*</span></label>
+            <select class="form-select item-category" style="padding:7px;" required>
+              <option value="海水魚" ${defaultValues.category === '海水魚' ? 'selected' : ''}>海水魚</option>
+              <option value="ソフトコーラル" ${defaultValues.category === 'ソフトコーラル' ? 'selected' : ''}>ソフトコーラル</option>
+              <option value="ハードコーラル" ${defaultValues.category === 'ハードコーラル' ? 'selected' : ''}>ハードコーラル</option>
+              <option value="クリーナー・無脊椎" ${defaultValues.category === 'クリーナー・無脊椎' ? 'selected' : ''}>クリーナー・無脊椎</option>
+              <option value="その他" ${defaultValues.category === 'その他' ? 'selected' : ''}>その他</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:3px;">希望種・生体名<span class="required-tag">*</span></label>
+            <input type="text" class="form-input item-species" style="padding:7px;" required placeholder="例: ハタタテハゼ、ツツウミヅタ" value="${defaultValues.species || ''}">
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+          <div>
+            <label style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:3px;">数量<span class="required-tag">*</span></label>
+            <input type="text" class="form-input item-quantity" style="padding:7px;" required placeholder="例: 1匹、2個" value="${defaultValues.quantity || '1匹'}">
+          </div>
+          <div>
+            <label style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:3px;">希望サイズ感</label>
+            <input type="text" class="form-input item-size" style="padding:7px;" placeholder="例: 5〜7cm前後、S" value="${defaultValues.size || ''}">
+          </div>
+          <div>
+            <label style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:3px;">1個あたりの目安予算</label>
+            <input type="text" class="form-input item-budget" style="padding:7px;" placeholder="例: 3,000円以内" value="${defaultValues.budget || ''}">
+          </div>
+        </div>
+      `;
+
+      container.appendChild(block);
+      updateItemNumbers();
+    }
+
+    // 生体入力ブロックの削除
+    function removeSpecimenItem(index) {
+      const container = document.getElementById('specimen-list-container');
+      const blocks = container.getElementsByClassName('specimen-item-block');
+      if (blocks.length <= 1) {
+        alert('少なくとも1つの生体を入力してください。');
+        return;
+      }
+      const target = document.getElementById(`specimen-item-${index}`);
+      if (target) {
+        container.removeChild(target);
+        updateItemNumbers();
+      }
+    }
+
+    // 項目番号の振り直し
+    function updateItemNumbers() {
+      const container = document.getElementById('specimen-list-container');
+      const blocks = container.getElementsByClassName('specimen-item-block');
+      for (let i = 0; i < blocks.length; i++) {
+        const numEl = blocks[i].querySelector('.item-block-num');
+        if (numEl) numEl.innerText = `#${i + 1} 生体リクエスト`;
+      }
+    }
+
+    // 顧客マスタ検索と自動補完（電話番号トリガー）
+    async function handlePhoneLookup() {
+      const phoneInput = document.getElementById('req-phone');
+      const statusEl = document.getElementById('phone-lookup-status');
+      const rawPhone = phoneInput.value.trim().replace(/[^0-9]/g, '');
+
+      if (rawPhone.length < 10) return;
+
+      statusEl.className = 'lookup-status searching';
+      statusEl.innerText = '🔍 顧客情報を照会中...';
+
+      try {
+        const url = `${GAS_API_URL}?action=lookupCustomer&phone=${encodeURIComponent(rawPhone)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data && data.found) {
+          if (data.name && !document.getElementById('req-name').value) {
+            document.getElementById('req-name').value = data.name;
+          }
+          if (data.prefecture && !document.getElementById('req-prefecture').value) {
+            document.getElementById('req-prefecture').value = data.prefecture;
+          }
+          statusEl.className = 'lookup-status success';
+          statusEl.innerText = `✨ 登録済み顧客情報（${data.name} 様）を自動反映しました`;
+        } else {
+          statusEl.style.display = 'none';
+        }
+      } catch (err) {
+        statusEl.style.display = 'none';
+      }
+    }
+
     // 初期化処理
     window.addEventListener('DOMContentLoaded', async () => {
-      // 既存の保存情報があれば自動補完
+      // 最初の生体入力ブロックを1つ生成
+      addSpecimenItem();
+
+      // ローカルストレージからの既存入力補助
       try {
         const savedPhone = localStorage.getItem('kawabata_phone') || "";
         const savedName = localStorage.getItem('kawabata_cust_name') || "";
-        if (savedPhone) document.getElementById('req-phone').value = savedPhone;
+        if (savedPhone) {
+          document.getElementById('req-phone').value = savedPhone;
+          handlePhoneLookup();
+        }
         if (savedName) document.getElementById('req-name').value = savedName;
       } catch (e) {}
 
@@ -422,7 +570,7 @@
       }
     });
 
-    // リクエスト送信処理
+    // フォーム送信処理
     async function submitRequest(event) {
       event.preventDefault();
 
@@ -432,22 +580,43 @@
         return;
       }
 
-      const selectedCatEl = document.querySelector('input[name="category"]:checked');
-      const category = selectedCatEl ? selectedCatEl.value : "その他";
-      const species = document.getElementById('req-species').value.trim();
-      const quantitySize = document.getElementById('req-quantity-size').value.trim();
-      const deadline = document.getElementById('req-deadline').value;
-      const budget = document.getElementById('req-budget').value.trim();
-      const notes = document.getElementById('req-notes').value.trim();
+      // 各生体ブロックの取得
+      const container = document.getElementById('specimen-list-container');
+      const blocks = container.getElementsByClassName('specimen-item-block');
+      const items = [];
+
+      for (let i = 0; i < blocks.length; i++) {
+        const cat = blocks[i].querySelector('.item-category').value;
+        const species = blocks[i].querySelector('.item-species').value.trim();
+        const quantity = blocks[i].querySelector('.item-quantity').value.trim();
+        const size = blocks[i].querySelector('.item-size').value.trim();
+        const budget = blocks[i].querySelector('.item-budget').value.trim();
+
+        if (!species || !quantity) {
+          alert(`生体 #${i + 1} の生体名と数量を入力してください。`);
+          return;
+        }
+
+        items.push({
+          category: cat,
+          species: species,
+          quantity: quantity,
+          size: size,
+          budget: budget
+        });
+      }
 
       const name = document.getElementById('req-name').value.trim();
       const phone = document.getElementById('req-phone').value.trim();
       const prefecture = document.getElementById('req-prefecture').value;
       const email = document.getElementById('req-email').value.trim();
+      const deadline = document.getElementById('req-deadline').value;
+      const totalBudget = document.getElementById('req-total-budget').value.trim();
+      const notes = document.getElementById('req-notes').value.trim();
       const uid = extractUserId();
 
-      if (!species || !quantitySize || !name || !phone || !prefecture) {
-        alert('必須項目をすべて入力してください。');
+      if (!name || !phone || !prefecture) {
+        alert('お名前、電話番号、お届け先都道府県をすべて入力してください。');
         return;
       }
 
@@ -459,11 +628,9 @@
 
       const payload = {
         action: "request",
-        category: category,
-        species: species,
-        quantitySize: quantitySize,
+        items: items,
         deadline: deadline,
-        budget: budget,
+        totalBudget: totalBudget,
         notes: notes,
         name: name,
         phone: phone,
@@ -482,7 +649,7 @@
       const timeoutId = setTimeout(() => controller.abort(), 35000);
 
       try {
-        const response = await fetch(REQUEST_GAS_API_URL, {
+        const response = await fetch(GAS_API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload),
@@ -505,8 +672,9 @@
           document.getElementById('thanks-card').style.display = 'block';
           window.scrollTo({ top: 0, behavior: 'smooth' });
 
-          // LINEアプリ内であればトーク送信も試行
-          const lineNotifyText = `【生体リクエスト送信控え】\n受付番号: ${result.requestId || ''}\n希望生体: ${species} (${category})\n数量/サイズ: ${quantitySize}\n納期: ${deadline}`;
+          // LINEアプリ内であればトーク送信控えも試行
+          let itemSummaryLine = items.map((it, idx) => `・${it.species} (${it.category}) × ${it.quantity}`).join('\n');
+          const lineNotifyText = `【生体リクエスト送信控え】\n受付番号: ${result.requestId || ''}\n\n【希望生体】\n${itemSummaryLine}\n\n納期目安: ${deadline}`;
           if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
             try {
               await liff.sendMessages([{ type: 'text', text: lineNotifyText }]);
@@ -530,6 +698,9 @@
     // フォームリセット
     function resetForm() {
       document.getElementById('request-form').reset();
+      document.getElementById('specimen-list-container').innerHTML = '';
+      specimenCount = 0;
+      addSpecimenItem();
       document.getElementById('request-form').style.display = 'block';
       document.getElementById('thanks-card').style.display = 'none';
       window.scrollTo({ top: 0, behavior: 'smooth' });
