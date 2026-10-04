@@ -6,7 +6,8 @@ var BACKUP_FOLDER_NAME = "川畑水産_スプレッドシート自動バック�
 // LINEアクセストークンの解決（スクリプトプロパティ優先、フォールバック定数）
 var FALLBACK_LINE_TOKEN = "4z5y4BBsTTTEZgfmcaUF7cbc1T1k6qePWr/xKn3Yuk0E1pi4wxY3uPtSar9xW3F8FxIDpqTpma7lfn3HXhQ19LyTaDkNU6s779LkSLtPCUCZNb3nKg/tDSJXLNuADTfjDGoD8SQMw/CYDBdUAgkq3gdB04t89/1O/w1cDnyilFU=";
 function getLineChannelAccessToken() {
-  var token = PropertiesService.getScriptProperties().getProperty("LINE_CHANNEL_ACCESS_TOKEN");
+  var token = PropertiesService.getScriptProperties().getProperty("LINE_CHANNEL_ACCESS_TOKEN") ||
+              PropertiesService.getScriptProperties().getProperty("LINE_ACCESS_TOKEN");
   return (token && token.trim() !== "") ? token.trim() : FALLBACK_LINE_TOKEN;
 }
 

@@ -666,20 +666,51 @@
         }
 
         if (result.status === "success") {
-          // 成功画面への切り替え
+          // 成功画面への切り替え（フォールバック表示用）
           document.getElementById('request-form').style.display = 'none';
           document.getElementById('res-req-id').innerText = result.requestId || "受付完了";
           document.getElementById('thanks-card').style.display = 'block';
           window.scrollTo({ top: 0, behavior: 'smooth' });
 
-          // LINEアプリ内であればトーク送信控えも試行
-          let itemSummaryLine = items.map((it, idx) => `・${it.species} (${it.category}) × ${it.quantity}`).join('\n');
-          const lineNotifyText = `【生体リクエスト送信控え】\n受付番号: ${result.requestId || ''}\n\n【希望生体】\n${itemSummaryLine}\n\n納期目安: ${deadline}`;
+          // 注文フォーム(index.html)と同一のLINE送信メッセージ生成
+          const reqId = result.requestId || 'REQ-受付完了';
+          const specimenDetailText = items.map((it, idx) => {
+            let line = `[${idx + 1}] ${it.species} (${it.category}) × ${it.quantity}`;
+            if (it.size) line += ` / サイズ: ${it.size}`;
+            if (it.budget) line += ` / 予算目安: ${it.budget}`;
+            return line;
+          }).join('\n');
+
+          const msgText = `🌊【生体リクエスト・採集要望】\n` +
+            `受付番号: ${reqId}\n` +
+            `お名前: ${name} 様\n` +
+            `お電話: ${phone}\n` +
+            `お届け先: ${prefecture}\n` +
+            (email ? `メール: ${email}\n` : '') +
+            `-------------------\n` +
+            `【ご希望の生体】\n` +
+            `${specimenDetailText}\n` +
+            `-------------------\n` +
+            `納期目安: ${deadline}\n` +
+            (totalBudget ? `目安総予算: ${totalBudget}\n` : '') +
+            (notes ? `飼育環境・備考:\n${notes}\n` : '') +
+            `-------------------\n` +
+            `※上記内容で採集リクエストを送信しました。`;
+
+          // 注文フォーム(index.html)と完全に同一のLINE送信フロー（LIFF内送信用 / 外部ブラウザ用URLスキーム）
           if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
             try {
-              await liff.sendMessages([{ type: 'text', text: lineNotifyText }]);
-            } catch (e) {}
+              await liff.sendMessages([{ type: 'text', text: msgText }]);
+              alert('リクエストが完了しました！公式LINEに控えが送信されました。');
+              liff.closeWindow();
+              return;
+            } catch (e) {
+              console.warn("liff.sendMessages error:", e);
+            }
           }
+
+          alert('リクエストが完了しました！\n(LINEアプリが入っている場合は、この後メッセージ画面が立ち上がります)');
+          window.location.href = `https://line.me/R/oaMessage/@877qwvyc/?${encodeURIComponent(msgText)}`;
         } else {
           alert('エラーが発生しました: ' + (result.message || '送信に失敗しました'));
         }
