@@ -616,6 +616,11 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
+    // 生体リクエスト・採集要望の処理
+    if (action === "request") {
+      return handleSpecimenRequest(contents);
+    }
+
     // --- ここから注文処理 ---
     var items = contents.items || [];
     var customer = contents.customer || {};
@@ -1146,4 +1151,117 @@ function setupWeeklyBackupTrigger() {
 
   Logger.log("毎週月曜午前3時のバックアップトリガーを設定しました。");
 }
+
+// -----------------------------------------------------------------------------
+// 【生体リクエスト・採集要望受付処理】
+// -----------------------------------------------------------------------------
+function handleSpecimenRequest(data) {
+  try {
+    var ssTarget;
+    // 独立したリクエスト専用スプレッドシートIDがあればそちらを使用、なければメインスプレッドシート
+    var reqSsId = PropertiesService.getScriptProperties().getProperty("REQUEST_SPREADSHEET_ID");
+    if (reqSsId && reqSsId !== "") {
+      try {
+        ssTarget = SpreadsheetApp.openById(reqSsId);
+      } catch (e) {
+        ssTarget = SpreadsheetApp.openById(SPREADSHEET_ID);
+      }
+    } else {
+      ssTarget = SpreadsheetApp.openById(SPREADSHEET_ID);
+    }
+
+    var sheetName = "採集リクエスト一覧";
+    var sheet = ssTarget.getSheetByName(sheetName);
+    var headers = [
+      "受付日時", "リクエストID", "お名前 / 店舗名", "電話番号", "メールアドレス",
+      "LINE_UID", "お届け先都道府県", "希望カテゴリ", "希望種・生体名",
+      "数量・サイズ感", "希望納期", "目安予算", "注意事項同意", "備考・飼育環境", "対応ステータス", "管理者メモ"
+    ];
+
+    if (!sheet) {
+      sheet = ssTarget.insertSheet(sheetName);
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+        .setBackground("#005bac").setFontColor("#ffffff").setFontWeight("bold").setHorizontalAlignment("center");
+      sheet.setFrozenRows(1);
+    }
+
+    var now = new Date();
+    var dateStr = Utilities.formatDate(now, "JST", "yyyy/MM/dd HH:mm:ss");
+    var reqId = "REQ-" + Utilities.formatDate(now, "JST", "yyyyMMdd-HHmmss");
+
+    var rowValues = [
+      dateStr,
+      reqId,
+      String(data.name || "").trim(),
+      String(data.phone || "").trim(),
+      String(data.email || "").trim(),
+      String(data.lineUserId || "").trim(),
+      String(data.prefecture || "").trim(),
+      String(data.category || "").trim(),
+      String(data.species || "").trim(),
+      String(data.quantitySize || "").trim(),
+      String(data.deadline || "").trim(),
+      String(data.budget || "").trim(),
+      data.agreedToTerms ? "同意済" : "未同意",
+      String(data.notes || "").trim(),
+      "新規受付",
+      ""
+    ];
+
+    sheet.appendRow(rowValues);
+
+    // 管理者(店主)宛LINE通知
+    var adminTargetUid = ADMIN_LINE_USER_ID;
+    if (adminTargetUid) {
+      var adminMsg = "🎣【新規 生体リクエスト・採集要望受付】\n" +
+        "-------------------\n" +
+        "受付番号: " + reqId + "\n" +
+        "日時: " + dateStr + "\n" +
+        "お名前: " + (data.name || "未入力") + " 様\n" +
+        "TEL: " + (data.phone || "未入力") + "\n" +
+        "お届け先: " + (data.prefecture || "未入力") + "\n" +
+        "-------------------\n" +
+        "🐟希望カテゴリ: " + (data.category || "未選択") + "\n" +
+        "📝希望生体名: " + (data.species || "未入力") + "\n" +
+        "📦数量/サイズ: " + (data.quantitySize || "未入力") + "\n" +
+        "⏳希望納期: " + (data.deadline || "指定なし") + "\n" +
+        "💰目安予算: " + (data.budget || "指定なし") + "\n" +
+        "-------------------\n" +
+        "💡飼育環境・備考:\n" + (data.notes ? data.notes : "なし") + "\n\n" +
+        "※スプレッドシートの「採集リクエスト一覧」をご確認ください。";
+
+      pushLineMessage(adminTargetUid, adminMsg);
+    }
+
+    // お客様宛LINE通知（UID取得時）
+    if (data.lineUserId) {
+      var userMsg = "【採集リクエストを承りました】\n" +
+        (data.name || "お客様") + " 様\n\n" +
+        "川畑水産への採集リクエストありがとうございます。\n" +
+        "下記の内容で受け付けいたしました。\n\n" +
+        "🔖受付番号: " + reqId + "\n" +
+        "🐟希望生体: " + (data.species || "") + " (" + (data.category || "") + ")\n" +
+        "📦数量・サイズ: " + (data.quantitySize || "") + "\n" +
+        "⏳希望納期: " + (data.deadline || "") + "\n\n" +
+        "当店の採集員が天候や海況を確認の上、採集可否や目処が立ち次第、改めてご連絡いたします。\n" +
+        "※天候や海の状況によってはお時間をいただく場合がございます。";
+
+      pushLineMessage(data.lineUserId, userMsg);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "success",
+      requestId: reqId,
+      message: "採集リクエストを受け付けました。"
+    })).setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    Logger.log("handleSpecimenRequest error: " + err.toString());
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: err.message || err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
 
