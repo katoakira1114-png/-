@@ -128,6 +128,15 @@
               <span id="uid-hint" style="font-size:0.75rem; color:#888;">⏳ LINEアカウント情報を取得中...</span>
               <button id="liff-login-btn" type="button" style="display:none; padding:5px 12px; background:#06c755; color:#fff; border:none; border-radius:4px; font-size:0.75rem; font-weight:bold; cursor:pointer;" onclick="execLiffLogin()">LINEログインしてIDを取得</button>
             </div>
+            <!-- 診断・デバッグ用詳細ボックス（エラー時に自動展開） -->
+            <div id="liff-debug-panel" style="display:none; margin-top:8px; padding:8px 10px; background:#fff3cd; border:1px solid #ffeeba; border-radius:6px; font-size:0.72rem; color:#856404; line-height:1.4; word-break:break-all;">
+              <div style="font-weight:bold; margin-bottom:4px; display:flex; justify-content:space-between;">
+                <span>🛠️ 連携診断ログ</span>
+                <span id="debug-copy-btn" style="cursor:pointer; text-decoration:underline;" onclick="copyDebugLog()">ログコピー</span>
+              </div>
+              <div id="debug-liff-msg" style="margin-bottom:4px;">LIFF状態: 待機中</div>
+              <div id="debug-gas-msg">GAS照会: 待機中</div>
+            </div>
           </div>
           <div class="form-group">
             <label>店舗名 / お名前（必須）<span style="color:red;"> *</span></label>
@@ -268,10 +277,38 @@
       }
     });
 
+    // 診断ログ更新ヘルパー
+    function updateDebugLog(type, message) {
+      const panel = document.getElementById('liff-debug-panel');
+      const liffMsg = document.getElementById('debug-liff-msg');
+      const gasMsg = document.getElementById('debug-gas-msg');
+      if (panel) panel.style.display = 'block';
+
+      if (type === 'liff' && liffMsg) {
+        liffMsg.innerHTML = `<strong>LIFF:</strong> ${message}`;
+      } else if (type === 'gas' && gasMsg) {
+        gasMsg.innerHTML = `<strong>GAS照会:</strong> ${message}`;
+      }
+    }
+
+    function copyDebugLog() {
+      const liffMsg = document.getElementById('debug-liff-msg')?.innerText || '';
+      const gasMsg = document.getElementById('debug-gas-msg')?.innerText || '';
+      const text = `【診断ログ】\n${liffMsg}\n${gasMsg}\nURL: ${window.location.href}\nUserAgent: ${navigator.userAgent}`;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => alert('診断ログをクリップボードにコピーしました'));
+      } else {
+        alert(text);
+      }
+    }
+
     async function initLiff() {
       const hint = document.getElementById('uid-hint');
       const loginBtn = document.getElementById('liff-login-btn');
       const uidInput = document.getElementById('reg-uid');
+
+      console.log(`[LIFF] 初期化開始: LIFF_ID="${LIFF_ID}", URL="${window.location.href}"`);
+      updateDebugLog('liff', `初期化中... (LIFF_ID: ${LIFF_ID})`);
 
       try {
         // LIFF SDKの初期化（タイムアウト10秒）
@@ -280,20 +317,28 @@
           new Promise((_, reject) => setTimeout(() => reject(new Error('LINE連携の初期化がタイムアウトしました')), 10000))
         ]);
 
-        if (liff.isLoggedIn()) {
+        const inClient = typeof liff.isInClient === 'function' ? liff.isInClient() : false;
+        const loggedIn = typeof liff.isLoggedIn === 'function' ? liff.isLoggedIn() : false;
+        console.log(`[LIFF] 初期化成功: isInClient=${inClient}, isLoggedIn=${loggedIn}`);
+        updateDebugLog('liff', `✅ 初期化成功 (LINE内: ${inClient}, ログイン: ${loggedIn})`);
+
+        if (loggedIn) {
           try {
             lineProfile = await liff.getProfile();
+            console.log("[LIFF] プロフィール取得成功:", lineProfile);
           } catch (pErr) {
-            console.warn("getProfile failed, using fallback:", pErr);
+            console.warn("[LIFF] getProfile failed, fallback:", pErr);
           }
           applyProfileToUI();
         } else {
           // 未ログイン状態
-          if (liff.isInClient && liff.isInClient()) {
+          if (inClient) {
             // LINEアプリ内の場合は自動ログイン実行
+            console.log("[LIFF] LINEアプリ内未ログイン -> 自動ログイン実行");
             liff.login();
           } else {
             // 外部ブラウザ（Safari/Chrome等）の場合はログインボタンを表示
+            console.log("[LIFF] 外部ブラウザ未ログイン -> ログインボタン表示");
             if (hint) {
               hint.innerText = "⚠️ LINE未ログインです。ボタンを押してLINE認証してください";
               hint.style.color = "#d9534f";
@@ -303,9 +348,16 @@
           }
         }
       } catch (liffErr) {
-        console.warn("LIFF init error:", liffErr);
+        console.error("【LIFF初期化エラー詳細】", liffErr);
+        const errCode = liffErr.code ? ` (code: ${liffErr.code})` : "";
+        const errMsg = liffErr.message || String(liffErr);
+        console.error(`LIFF Init Failed: ${errMsg}${errCode}`);
+
+        // 画面の診断ログボックスにエラー詳細を表示
+        updateDebugLog('liff', `❌ 初期化失敗: ${errMsg}${errCode}<br><small style="color:#d9534f;">※LINE DevelopersコンソールでLIFF ID「${LIFF_ID}」が有効かご確認ください</small>`);
+
         if (hint) {
-          hint.innerText = "※LINE連携待機中: " + (liffErr.message || "再読み込みしてください");
+          hint.innerText = "⚠️ LINE連携失敗: " + errMsg;
           hint.style.color = "#d9534f";
         }
         if (loginBtn) loginBtn.style.display = "inline-block";
@@ -357,6 +409,10 @@
         if (uid) fetchUrl += `userId=${encodeURIComponent(uid)}&`;
         if (savedPhone) fetchUrl += `phone=${encodeURIComponent(savedPhone)}&`;
         
+        console.log(`[GAS API] 送信パラメータ: userId="${uid || '(未取得)'}", phone="${savedPhone || '(未取得)'}"`);
+        console.log(`[GAS API] リクエストURL: ${fetchUrl}`);
+        updateDebugLog('gas', `照会中... (送信UID: ${uid ? uid.substring(0, 10) + '...' : '❌未取得(LIFFエラー)'})`);
+
         const res = await fetch(fetchUrl);
         if (!res.ok) throw new Error(`HTTPエラー ${res.status}`);
         
@@ -368,18 +424,24 @@
           throw new Error("スプレッドシートの権限設定が完了していません。管理者に「デプロイの更新」を依頼してください。");
         }
 
+        console.log("[GAS API] 受信レスポンスJSON:", data);
+
         if (data.error) throw new Error(data.error);
 
         isRegistered = !!data.isRegistered;
         customerMaster = data.customer;
         userHistory = data.userHistory || { purchaseCounts: {}, lastOrderItems: [] };
         
+        updateDebugLog('gas', `応答受信: 登録状態=${isRegistered ? '✅ 承認済み(' + (customerMaster ? customerMaster.name : '') + ' 様)' : '⚠️ 未登録/認証未通過'}`);
+
         const alertBox = document.getElementById('unregistered-alert');
         const mainUI = document.getElementById('main-ui');
         const footerBar = document.getElementById('footer-bar');
         const badge = document.getElementById('user-badge');
 
         if (!isRegistered) {
+          console.warn("[GAS API] 未登録判定の理由:", !uid ? "LIFF初期化エラーによりLINE UIDがGASへ未送信のため" : "送信されたUIDが顧客マスタに未登録または承認待ちのため");
+          
           // 未登録時は商品一覧・注文UIを完全に非表示
           alertBox.style.display = 'block';
           mainUI.style.display = 'none';
