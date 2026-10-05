@@ -213,8 +213,12 @@
   </div>
 
   <script>
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwEEEt2vWPC4BXlnj08pxvW6ARGKX4FVz41anHlh9wWaXmdduhz4Bb7YQsskkGHMwRz-A/exec";
-    const LIFF_ID = "2011653892-RjIQ6YBe";
+    // ==========================================
+    // 外部連携設定・環境定数
+    // ==========================================
+    const GAS_API_URL = "__GAS_API_URL__"; // GAS URL受領時にワンライナー等で置換
+    const LIFF_ID = "2011871129-P4lflaGc";
+    const OFFICIAL_LINE_ID = "@721pyqfn";
     
     // カテゴリの固定並び順
     const ORDERED_CATEGORIES = ["魚", "シャコガイ", "貝", "サンゴ", "イソギンチャク", "擬岩", "その他"];
@@ -519,7 +523,7 @@
         document.getElementById('reg-form-body').style.display = 'none';
         document.getElementById('reg-done-body').style.display = 'block';
         alert('公式LINEを開きます。表示されたメッセージをそのまま送信してください。');
-        window.location.href = `https://line.me/R/oaMessage/@877qwvyc/?${encodeURIComponent(msgText)}`;
+        window.location.href = `https://line.me/R/oaMessage/${OFFICIAL_LINE_ID}/?${encodeURIComponent(msgText)}`;
 
       } catch (err) {
         alert('申請処理中にエラーが発生しました。通信環境をご確認ください。');
@@ -828,7 +832,7 @@
             } catch (e) {}
           }
           alert('ご注文が完了しました！\n(LINEアプリが入っている場合は、この後メッセージ画面が立ち上がります)');
-          window.location.href = `https://line.me/R/oaMessage/@877qwvyc/?${encodeURIComponent(msgText)}`;
+          window.location.href = `https://line.me/R/oaMessage/${OFFICIAL_LINE_ID}/?${encodeURIComponent(msgText)}`;
         } else {
            alert("エラーが発生しました: " + (result.message || '不明なエラー'));
         }
