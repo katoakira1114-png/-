@@ -1176,16 +1176,31 @@ function doPost(e) {
         targetSheet.setFrozenRows(1);
       }
 
-      // 画像のDrive保存（指定がある場合）
-      var imageUrl = String(contents.imageUrl || "").trim();
-      if (contents.imageBase64) {
+      // 画像のDrive保存（指定がある場合・複数枚対応）
+      var imageUrls = [];
+      if (contents.images && Array.isArray(contents.images) && contents.images.length > 0) {
+        for (var mi = 0; mi < contents.images.length; mi++) {
+          var imgObj = contents.images[mi];
+          if (imgObj && imgObj.base64) {
+            try {
+              var s = saveImageToDrive(imgObj.base64, imgObj.fileName || (prodName + "_" + (mi + 1) + ".jpg"));
+              imageUrls.push(s.url);
+            } catch (err) {
+              console.error("Image upload error: " + err);
+            }
+          }
+        }
+      } else if (contents.imageBase64) {
         try {
           var saved = saveImageToDrive(contents.imageBase64, contents.imageFileName || (prodName + ".jpg"));
-          imageUrl = saved.url;
+          imageUrls.push(saved.url);
         } catch (imgErr) {
           console.error("Image upload failed: " + imgErr);
         }
+      } else if (contents.imageUrl) {
+        imageUrls.push(String(contents.imageUrl).trim());
       }
+      var imageUrl = imageUrls.join(",");
 
       // 商品IDの自動生成（頭にABCをつけるかどうかの指定に対応）
       var nowTime = new Date();
@@ -1215,14 +1230,30 @@ function doPost(e) {
         status: "success",
         message: "商品「" + prodName + "」を登録しました",
         productId: autoId,
-        imageUrl: imageUrl
+        imageUrl: imageUrl,
+        imageUrls: imageUrls
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 【画像アップロードAPI】既存商品への画像添付・Drive保存
+    // 【画像アップロードAPI】既存商品への画像添付・Drive保存（複数枚対応）
     if (action === "uploadImage") {
-      if (!contents.imageBase64) throw new Error("画像データがありません。");
-      var saved = saveImageToDrive(contents.imageBase64, contents.imageFileName || "fish.jpg");
+      var savedUrls = [];
+      if (contents.images && Array.isArray(contents.images) && contents.images.length > 0) {
+        for (var ui = 0; ui < contents.images.length; ui++) {
+          var uObj = contents.images[ui];
+          if (uObj && uObj.base64) {
+            var s = saveImageToDrive(uObj.base64, uObj.fileName || ("fish_" + (ui + 1) + ".jpg"));
+            savedUrls.push(s.url);
+          }
+        }
+      } else if (contents.imageBase64) {
+        var s = saveImageToDrive(contents.imageBase64, contents.imageFileName || "fish.jpg");
+        savedUrls.push(s.url);
+      } else {
+        throw new Error("画像データがありません。");
+      }
+
+      var finalUrl = savedUrls.join(",");
 
       // 商品IDとカテゴリが指定されていればシートにも即時反映
       if (contents.id && contents.category) {
@@ -1240,7 +1271,15 @@ function doPost(e) {
             if (colId !== -1 && colImg !== -1) {
               for (var r = 1; r < upData.length; r++) {
                 if (String(upData[r][colId]).trim() === String(contents.id).trim()) {
-                  shUp.getRange(r + 1, colImg + 1).setValue(saved.url);
+                  var curImgVal = String(upData[r][colImg] || "").trim();
+                  var newImgVal = "";
+                  if (contents.mode === "append" && curImgVal) {
+                    newImgVal = curImgVal + "," + finalUrl;
+                  } else {
+                    newImgVal = finalUrl;
+                  }
+                  shUp.getRange(r + 1, colImg + 1).setValue(newImgVal);
+                  finalUrl = newImgVal;
                   break;
                 }
               }
@@ -1254,8 +1293,9 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify({
         status: "success",
         message: "画像をGoogle Driveに保存しました",
-        url: saved.url,
-        fileId: saved.fileId
+        url: savedUrls[0] || "",
+        urls: savedUrls,
+        combinedUrl: finalUrl
       })).setMimeType(ContentService.MimeType.JSON);
     }
 

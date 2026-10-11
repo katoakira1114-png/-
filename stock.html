@@ -144,15 +144,29 @@
     /* 在庫数コントロールバー */
     .stock-control-panel {
       background: #f8fafc; border-radius: 8px; padding: 8px 10px;
-      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      display: flex; flex-direction: column; gap: 8px;
     }
-    .stock-display-wrap { display: flex; align-items: baseline; gap: 4px; }
-    .stock-label { font-size: 0.72rem; color: var(--text-muted); font-weight: bold; }
-    .stock-number {
-      font-size: 1.4rem; font-weight: 800; color: var(--text); min-width: 38px; text-align: center;
+    @media (min-width: 580px) {
+      .stock-control-panel { flex-direction: row; align-items: center; justify-content: space-between; }
     }
-    .stock-number.zero { color: var(--danger); }
-    .stepper-actions { display: flex; gap: 4px; align-items: center; }
+    .stock-display-wrap { display: flex; align-items: center; gap: 6px; }
+    .stock-label { font-size: 0.78rem; color: var(--text-muted); font-weight: bold; white-space: nowrap; }
+    .stock-direct-box { display: flex; align-items: center; gap: 4px; }
+    .stock-input-direct {
+      width: 76px; height: 36px; text-align: center; font-size: 1.15rem; font-weight: 800;
+      border: 1.5px solid var(--border); border-radius: 6px; background: #fff; outline: none;
+      color: var(--text); padding: 0 4px; box-sizing: border-box;
+    }
+    .stock-input-direct:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(0, 91, 172, 0.15); }
+    .stock-input-direct.zero { color: var(--danger); border-color: #fca5a5; background: #fff5f5; }
+    .stock-unit { font-size: 0.75rem; color: #64748b; font-weight: bold; }
+    .btn-stock-save {
+      height: 36px; padding: 0 10px; background: var(--primary); color: #fff; border: none;
+      border-radius: 6px; font-size: 0.78rem; font-weight: bold; cursor: pointer; white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+    .btn-stock-save:active { background: var(--primary-dark); transform: scale(0.96); }
+    .stepper-actions { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
     .btn-step {
       width: 36px; height: 36px; border: 1px solid var(--border); background: #fff;
       border-radius: 6px; font-size: 0.85rem; font-weight: bold; cursor: pointer;
@@ -166,6 +180,31 @@
       padding: 0 10px; height: 36px; background: #fff; border: 1px solid var(--border);
       border-radius: 6px; font-size: 0.78rem; font-weight: bold; color: #475569; cursor: pointer;
       display: flex; align-items: center; gap: 3px;
+    }
+    .img-count-badge {
+      position: absolute; top: 2px; right: 2px; background: rgba(0, 0, 0, 0.7);
+      color: #fff; font-size: 0.62rem; padding: 1px 4px; border-radius: 4px; font-weight: bold;
+    }
+    /* 複数画像プレビューリスト */
+    .multi-preview-list {
+      display: flex; gap: 8px; overflow-x: auto; padding: 6px 2px;
+      margin-top: 10px;
+    }
+    .multi-preview-item {
+      position: relative; width: 80px; height: 80px; border-radius: 8px;
+      overflow: hidden; flex-shrink: 0; border: 1.5px solid var(--border); background: #000;
+    }
+    .multi-preview-item img {
+      width: 100%; height: 100%; object-fit: cover;
+    }
+    .multi-preview-remove {
+      position: absolute; top: 2px; right: 2px; width: 20px; height: 20px;
+      border-radius: 50%; background: rgba(0, 0, 0, 0.75); color: #fff; border: none;
+      font-size: 0.7rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .multi-preview-num {
+      position: absolute; bottom: 2px; left: 2px; background: rgba(0, 0, 0, 0.6);
+      color: #fff; font-size: 0.6rem; padding: 1px 4px; border-radius: 3px; font-weight: bold;
     }
 
     /* 新規商品登録フォーム */
@@ -388,33 +427,35 @@
           </div>
         </div>
 
-        <!-- 画像ファイル添付エリア -->
+        <!-- 画像ファイル添付エリア（複数枚対応） -->
         <div class="form-group">
-          <label class="form-label">生体写真・画像添付<span class="desc">Google Driveへ自動保存</span></label>
-          <!-- 端末内のファイル・写真ライブラリから選択（captureなし） -->
-          <input type="file" id="add-image-file" accept="image/*" style="display:none;" onchange="handleImageFileSelected(event)">
-          <!-- スマホのカメラを直接起動して撮影（capture="environment"） -->
-          <input type="file" id="add-image-camera" accept="image/*" capture="environment" style="display:none;" onchange="handleImageFileSelected(event)">
+          <div style="display:flex; justify-content:space-between; align-items:baseline;">
+            <label class="form-label">生体写真・画像添付<span class="desc">複数枚OK・Driveへ自動保存</span></label>
+            <span id="add-img-count" style="font-size:0.75rem; color:var(--primary); font-weight:bold;">0枚選択中</span>
+          </div>
+          <!-- 端末内のファイル・写真ライブラリから選択（multiple属性あり） -->
+          <input type="file" id="add-image-file" accept="image/*" multiple style="display:none;" onchange="handleImageFilesSelected(event)">
+          <!-- スマホのカメラを直接起動して撮影 -->
+          <input type="file" id="add-image-camera" accept="image/*" capture="environment" style="display:none;" onchange="handleImageFilesSelected(event)">
           
           <div class="image-drop-area" id="image-drop-area">
             <div id="drop-prompt">
-              <div style="font-size:2rem; margin-bottom:4px;">🖼️</div>
-              <div style="font-weight:bold; color:var(--primary); font-size:0.95rem;">画像を選択 / カメラ撮影</div>
-              <div style="font-size:0.76rem; color:var(--text-muted); margin-top:2px;">スマホの写真フォルダ・ファイルから選択、または直接撮影</div>
+              <div style="font-size:1.8rem; margin-bottom:2px;">🖼️</div>
+              <div style="font-weight:bold; color:var(--primary); font-size:0.92rem;">画像を選択 / カメラ撮影（複数枚可）</div>
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">スマホの写真フォルダ・ファイルから選択、または直接撮影</div>
               
-              <div style="margin-top:12px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
-                <button type="button" class="btn-step" style="width:auto; padding:9px 15px; height:auto; background:#fff; border:1.5px solid var(--primary); color:var(--primary); font-weight:bold; font-size:0.85rem; border-radius:8px; display:inline-flex; align-items:center; gap:5px; cursor:pointer;" onclick="document.getElementById('add-image-file').click()">
-                  📁 ファイル・写真から選択
+              <div style="margin-top:10px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+                <button type="button" class="btn-step" style="width:auto; padding:8px 14px; height:auto; background:#fff; border:1.5px solid var(--primary); color:var(--primary); font-weight:bold; font-size:0.82rem; border-radius:8px; display:inline-flex; align-items:center; gap:5px; cursor:pointer;" onclick="document.getElementById('add-image-file').click()">
+                  📁 写真・ファイルから選択
                 </button>
-                <button type="button" class="btn-step" style="width:auto; padding:9px 15px; height:auto; background:var(--primary); border:none; color:#fff; font-weight:bold; font-size:0.85rem; border-radius:8px; display:inline-flex; align-items:center; gap:5px; cursor:pointer;" onclick="document.getElementById('add-image-camera').click()">
+                <button type="button" class="btn-step" style="width:auto; padding:8px 14px; height:auto; background:var(--primary); border:none; color:#fff; font-weight:bold; font-size:0.82rem; border-radius:8px; display:inline-flex; align-items:center; gap:5px; cursor:pointer;" onclick="document.getElementById('add-image-camera').click()">
                   📷 その場でカメラ撮影
                 </button>
               </div>
             </div>
-            <div class="image-preview-box" id="add-preview-box">
-              <img id="add-preview-img" src="" alt="プレビュー">
-            </div>
-            <button type="button" class="btn-remove-img" id="btn-remove-img" onclick="event.stopPropagation(); removeSelectedImage()">✕ 削除</button>
+
+            <!-- 複数画像サムネイル一覧 -->
+            <div class="multi-preview-list" id="add-multi-preview-list" style="display:none;"></div>
           </div>
         </div>
 
@@ -469,24 +510,45 @@
         </div>
       </div>
 
-      <!-- 写真の差し替え・Drive保存 -->
+      <!-- 写真の差し替え・複数追加・Drive保存 -->
       <div class="form-group">
-        <label class="form-label">写真の差し替え / 追加</label>
-        <input type="file" id="edit-image-file" accept="image/*" style="display:none;" onchange="handleEditImageSelected(event)">
-        <input type="file" id="edit-image-camera" accept="image/*" capture="environment" style="display:none;" onchange="handleEditImageSelected(event)">
+        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+          <label class="form-label">生体写真（複数枚管理）</label>
+          <span id="edit-img-status" style="font-size:0.75rem; color:#64748b;">0枚</span>
+        </div>
+        <input type="file" id="edit-image-file" accept="image/*" multiple style="display:none;" onchange="handleEditImagesSelected(event)">
+        <input type="file" id="edit-image-camera" accept="image/*" capture="environment" style="display:none;" onchange="handleEditImagesSelected(event)">
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:4px;">
-          <button type="button" class="btn-step" style="width:auto; padding:8px 12px; height:auto; background:#f0f9ff; border:1.5px solid #0284c7; color:#0284c7; font-weight:bold; font-size:0.82rem; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" onclick="document.getElementById('edit-image-file').click()">
-            📁 ファイル・写真から選択
+          <button type="button" class="btn-step" style="width:auto; padding:7px 12px; height:auto; background:#f0f9ff; border:1.5px solid #0284c7; color:#0284c7; font-weight:bold; font-size:0.82rem; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" onclick="document.getElementById('edit-image-file').click()">
+            📁 写真を追加
           </button>
-          <button type="button" class="btn-step" style="width:auto; padding:8px 12px; height:auto; background:#0284c7; border:none; color:#fff; font-weight:bold; font-size:0.82rem; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" onclick="document.getElementById('edit-image-camera').click()">
-            📷 カメラ撮影
+          <button type="button" class="btn-step" style="width:auto; padding:7px 12px; height:auto; background:#0284c7; border:none; color:#fff; font-weight:bold; font-size:0.82rem; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" onclick="document.getElementById('edit-image-camera').click()">
+            📷 カメラで撮影
           </button>
-          <span id="edit-img-status" style="font-size:0.75rem; color:#64748b;">変更なし</span>
         </div>
-        <div id="edit-preview-box" style="margin-top:8px; display:none; max-height:140px; border-radius:6px; overflow:hidden; background:#000; justify-content:center; align-items:center;">
-          <img id="edit-preview-img" style="max-height:140px; max-width:100%; object-fit:contain;" src="">
-        </div>
+        <div class="multi-preview-list" id="edit-multi-preview-list" style="margin-top:8px;"></div>
       </div>
+
+      <button type="button" class="btn-submit-form" id="btn-save-edit" onclick="submitEditProduct()">
+        <span>💾 変更を保存する</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- 写真ギャラリーモーダル -->
+  <div class="modal-overlay" id="photo-gallery-modal" style="display:none;" onclick="if(event.target===this) closePhotoGalleryModal()">
+    <div class="modal-card" style="max-width:440px; padding:16px; text-align:center;">
+      <div class="modal-title" style="margin-bottom:10px;">
+        <span id="gallery-modal-title">生体写真</span>
+        <button type="button" class="modal-close" onclick="closePhotoGalleryModal()">✕</button>
+      </div>
+      <div style="position:relative; max-height:280px; display:flex; justify-content:center; align-items:center; background:#000; border-radius:8px; overflow:hidden;">
+        <img id="gallery-main-img" style="max-height:280px; max-width:100%; object-fit:contain;" src="">
+      </div>
+      <div id="gallery-counter" style="margin-top:8px; font-size:0.85rem; font-weight:bold; color:var(--text-muted);">1 / 1</div>
+      <div class="multi-preview-list" id="gallery-thumb-list" style="justify-content:center; margin-top:8px;"></div>
+    </div>
+  </div>
 
       <button type="button" class="btn-submit-form" id="btn-save-edit" onclick="submitEditProduct()">
         <span>💾 変更を保存する</span>
@@ -645,11 +707,15 @@
         else if (firstChar === 'B') tierBadgeHtml = `<span class="badge badge-tier-b">B限定</span>`;
         else if (firstChar === 'C') tierBadgeHtml = `<span class="badge badge-tier-c">C限定</span>`;
 
+        const imgList = (it.img || '').split(',').map(s => s.trim()).filter(Boolean);
+        const primaryImg = imgList[0] || '';
+        const imgCountBadge = imgList.length > 1 ? `<span class="img-count-badge">📷 ${imgList.length}</span>` : '';
+
         html += `
           <div class="product-card ${isOut ? 'out-of-stock' : ''}" id="p-card-${idx}">
             <div class="card-top">
-              <div class="img-box" onclick="openPhotoQuickModal(${idx})">
-                ${it.img ? `<img src="${escapeHtml(it.img)}" loading="lazy" alt="${escapeHtml(it.name)}">` : `<div class="img-placeholder">🐟</div><span class="img-add-badge">＋写真</span>`}
+              <div class="img-box" onclick="openPhotoQuickModal(${idx})" title="写真を確認 / 追加">
+                ${primaryImg ? `<img src="${escapeHtml(primaryImg)}" loading="lazy" alt="${escapeHtml(it.name)}">${imgCountBadge}` : `<div class="img-placeholder">🐟</div><span class="img-add-badge">＋写真</span>`}
               </div>
               <div class="info-box">
                 <div class="badge-row">
@@ -667,9 +733,12 @@
 
             <div class="stock-control-panel">
               <div class="stock-display-wrap">
-                <span class="stock-label">在庫:</span>
-                <span class="stock-number ${isOut ? 'zero' : ''}" id="stock-num-${idx}">${it.stock}</span>
-                <span style="font-size:0.75rem; color:#64748b;">個</span>
+                <span class="stock-label">現在庫:</span>
+                <div class="stock-direct-box">
+                  <input type="number" class="stock-input-direct ${isOut ? 'zero' : ''}" id="stock-input-${idx}" value="${it.stock}" min="0" onkeydown="if(event.key==='Enter') saveDirectStock(${idx})">
+                  <span class="stock-unit">個</span>
+                  <button type="button" class="btn-stock-save" id="btn-save-stock-${idx}" onclick="saveDirectStock(${idx})">確定</button>
+                </div>
               </div>
 
               <div class="stepper-actions">
@@ -686,6 +755,21 @@
       });
 
       container.innerHTML = html;
+    }
+
+    // 在庫数の直接入力・確定
+    async function saveDirectStock(index) {
+      const item = rawStockItems[index];
+      if (!item) return;
+      const inputEl = document.getElementById(`stock-input-${index}`);
+      if (!inputEl) return;
+      const val = parseInt(inputEl.value, 10);
+      if (isNaN(val) || val < 0) {
+        alert("0以上の整数を入力してください。");
+        inputEl.value = item.stock;
+        return;
+      }
+      await applyStockUpdate(item, val, index);
     }
 
     // 在庫数の加減算
@@ -713,10 +797,10 @@
       item.stock = newStock;
       
       // 画面上の数値を即時書き換え
-      const numEl = document.getElementById(`stock-num-${index}`);
-      if (numEl) {
-        numEl.innerText = newStock;
-        numEl.classList.toggle('zero', newStock <= 0);
+      const inEl = document.getElementById(`stock-input-${index}`);
+      if (inEl) {
+        inEl.value = newStock;
+        inEl.classList.toggle('zero', newStock <= 0);
       }
       const cardEl = document.getElementById(`p-card-${index}`);
       if (cardEl) {
@@ -754,21 +838,20 @@
       }
     }
 
-    // ======================== 新規登録の画像ハンドリング ========================
-    function handleImageFileSelected(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      processSelectedImageFile(file);
+    // ======================== 新規登録の画像ハンドリング（複数枚対応） ========================
+    let currentSelectedImages = []; // [{ base64, name }]
+
+    function handleImageFilesSelected(event) {
+      const files = event.target.files;
+      if (!files || files.length === 0) return;
+      Array.from(files).forEach(file => {
+        if (!file.type.startsWith('image/')) return;
+        processImageFileToAddList(file);
+      });
+      event.target.value = '';
     }
 
-    function processSelectedImageFile(file) {
-      if (!file.type.startsWith('image/')) {
-        alert('画像ファイルを選択してください');
-        return;
-      }
-      currentSelectedImageName = file.name;
-
-      // 画像をCanvasでリサイズ（長辺1200px）してBase64化
+    function processImageFileToAddList(file) {
       const reader = new FileReader();
       reader.onload = (e) => {
         const img = new Image();
@@ -783,29 +866,52 @@
           canvas.width = w; canvas.height = h;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, w, h);
-          currentSelectedImageBase64 = canvas.toDataURL('image/jpeg', 0.85);
+          const b64 = canvas.toDataURL('image/jpeg', 0.85);
 
-          // プレビュー表示
-          document.getElementById('drop-prompt').style.display = 'none';
-          document.getElementById('add-preview-box').style.display = 'flex';
-          document.getElementById('add-preview-img').src = currentSelectedImageBase64;
-          document.getElementById('btn-remove-img').style.display = 'block';
+          currentSelectedImages.push({
+            base64: b64,
+            name: file.name
+          });
+          renderAddImagesPreview();
         };
         img.src = e.target.result;
       };
       reader.readAsDataURL(file);
     }
 
+    function renderAddImagesPreview() {
+      const listEl = document.getElementById('add-multi-preview-list');
+      const countEl = document.getElementById('add-img-count');
+      if (currentSelectedImages.length === 0) {
+        listEl.style.display = 'none';
+        listEl.innerHTML = '';
+        countEl.innerText = '0枚選択中';
+        return;
+      }
+      listEl.style.display = 'flex';
+      countEl.innerText = `${currentSelectedImages.length}枚選択中`;
+
+      let html = '';
+      currentSelectedImages.forEach((imgObj, idx) => {
+        html += `
+          <div class="multi-preview-item">
+            <img src="${imgObj.base64}" alt="プレビュー">
+            <span class="multi-preview-num">${idx + 1}</span>
+            <button type="button" class="multi-preview-remove" onclick="removeAddImage(${idx})">✕</button>
+          </div>
+        `;
+      });
+      listEl.innerHTML = html;
+    }
+
+    function removeAddImage(idx) {
+      currentSelectedImages.splice(idx, 1);
+      renderAddImagesPreview();
+    }
+
     function removeSelectedImage() {
-      currentSelectedImageBase64 = "";
-      currentSelectedImageName = "";
-      document.getElementById('add-image-file').value = '';
-      const cam = document.getElementById('add-image-camera');
-      if (cam) cam.value = '';
-      document.getElementById('drop-prompt').style.display = 'block';
-      document.getElementById('add-preview-box').style.display = 'none';
-      document.getElementById('add-preview-img').src = '';
-      document.getElementById('btn-remove-img').style.display = 'none';
+      currentSelectedImages = [];
+      renderAddImagesPreview();
     }
 
     // クリップボードからの画像ペースト対応
@@ -815,8 +921,8 @@
       for (let i = 0; i < items.length; i++) {
         if (items[i].type.indexOf('image') !== -1) {
           const blob = items[i].getAsFile();
-          processSelectedImageFile(blob);
-          showToast('📋 クリップボードの画像を貼り付けました');
+          processImageFileToAddList(blob);
+          showToast('📋 クリップボードの画像を追加しました');
           break;
         }
       }
@@ -855,8 +961,7 @@
           isAsk: isAsk,
           price: price,
           vol: vol,
-          imageBase64: currentSelectedImageBase64 || "",
-          imageFileName: currentSelectedImageName || (name + ".jpg")
+          images: currentSelectedImages
         };
 
         const res = await fetch(GAS_API_URL, {
@@ -868,10 +973,8 @@
 
         if (result.status === 'success') {
           showToast(`🎉 「${name}」を登録しました！`);
-          // フォームリセット
           document.getElementById('add-product-form').reset();
           removeSelectedImage();
-          // リスト再取得して一覧へ遷移
           await fetchStockData();
           switchView('list');
         } else {
@@ -886,7 +989,10 @@
       }
     }
 
-    // ======================== 商品編集モーダル ========================
+    // ======================== 商品編集モーダル（複数枚対応） ========================
+    let editExistingImageUrls = [];
+    let editNewImages = [];
+
     function openEditModal(index) {
       const it = rawStockItems[index];
       if (!it) return;
@@ -905,11 +1011,9 @@
       priceIn.disabled = !!it.isAsk;
       priceIn.value = it.isAsk ? '' : (it.price || '');
 
-      editImageBase64 = "";
-      editImageName = "";
-      document.getElementById('edit-img-status').innerText = it.img ? '既存画像あり' : '画像なし';
-      document.getElementById('edit-preview-box').style.display = it.img ? 'flex' : 'none';
-      document.getElementById('edit-preview-img').src = it.img || '';
+      editExistingImageUrls = (it.img || '').split(',').map(s => s.trim()).filter(Boolean);
+      editNewImages = [];
+      renderEditImagesPreview();
 
       document.getElementById('edit-modal').style.display = 'flex';
     }
@@ -919,6 +1023,7 @@
       if (f) f.value = '';
       const c = document.getElementById('edit-image-camera');
       if (c) c.value = '';
+      editNewImages = [];
       document.getElementById('edit-modal').style.display = 'none';
     }
 
@@ -928,34 +1033,72 @@
       if (isAsk) p.value = '';
     }
 
-    function handleEditImageSelected(e) {
-      const file = e.target.files[0];
-      if (!file) return;
+    function handleEditImagesSelected(e) {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+      Array.from(files).forEach(file => {
+        if (!file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const img = new Image();
+          img.onload = () => {
+            const maxDim = 1200;
+            let w = img.width, h = img.height;
+            if (w > maxDim || h > maxDim) {
+              if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+              else { w = Math.round((w * maxDim) / h); h = maxDim; }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            const b64 = canvas.toDataURL('image/jpeg', 0.85);
 
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const img = new Image();
-        img.onload = () => {
-          const maxDim = 1200;
-          let w = img.width, h = img.height;
-          if (w > maxDim || h > maxDim) {
-            if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
-            else { w = Math.round((w * maxDim) / h); h = maxDim; }
-          }
-          const canvas = document.createElement('canvas');
-          canvas.width = w; canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, w, h);
-          editImageBase64 = canvas.toDataURL('image/jpeg', 0.85);
-          editImageName = file.name;
-
-          document.getElementById('edit-img-status').innerText = '✅ 新規写真選択中';
-          document.getElementById('edit-preview-box').style.display = 'flex';
-          document.getElementById('edit-preview-img').src = editImageBase64;
+            editNewImages.push({ base64: b64, name: file.name });
+            renderEditImagesPreview();
+          };
+          img.src = ev.target.result;
         };
-        img.src = ev.target.result;
-      };
-      reader.readAsDataURL(file);
+        reader.readAsDataURL(file);
+      });
+      e.target.value = '';
+    }
+
+    function renderEditImagesPreview() {
+      const listEl = document.getElementById('edit-multi-preview-list');
+      const totalCount = editExistingImageUrls.length + editNewImages.length;
+      document.getElementById('edit-img-status').innerText = `${totalCount}枚`;
+
+      let html = '';
+      editExistingImageUrls.forEach((url, idx) => {
+        html += `
+          <div class="multi-preview-item">
+            <img src="${escapeHtml(url)}" alt="写真">
+            <span class="multi-preview-num">既存${idx + 1}</span>
+            <button type="button" class="multi-preview-remove" onclick="removeEditExistingImage(${idx})">✕</button>
+          </div>
+        `;
+      });
+      editNewImages.forEach((obj, idx) => {
+        html += `
+          <div class="multi-preview-item" style="border-color:#0284c7;">
+            <img src="${obj.base64}" alt="新規写真">
+            <span class="multi-preview-num" style="background:#0284c7;">新規${idx + 1}</span>
+            <button type="button" class="multi-preview-remove" onclick="removeEditNewImage(${idx})">✕</button>
+          </div>
+        `;
+      });
+      listEl.innerHTML = html;
+    }
+
+    function removeEditExistingImage(idx) {
+      editExistingImageUrls.splice(idx, 1);
+      renderEditImagesPreview();
+    }
+
+    function removeEditNewImage(idx) {
+      editNewImages.splice(idx, 1);
+      renderEditImagesPreview();
     }
 
     async function submitEditProduct() {
@@ -974,9 +1117,8 @@
       const price = isAsk ? 0 : (parseFloat(document.getElementById('edit-price').value) || 0);
 
       try {
-        let uploadedImageUrl = undefined;
-        // 画像の変更がある場合、Driveへアップロード
-        if (editImageBase64) {
+        let uploadedUrls = [];
+        if (editNewImages.length > 0) {
           saveBtn.innerText = '写真をGoogle Driveへ保存中...';
           const upRes = await fetch(GAS_API_URL, {
             method: 'POST',
@@ -985,15 +1127,16 @@
               action: "uploadImage",
               id: id,
               category: cat,
-              imageBase64: editImageBase64,
-              imageFileName: editImageName || (name + ".jpg")
+              images: editNewImages
             })
           });
           const upJson = await upRes.json();
-          if (upJson.status === 'success') {
-            uploadedImageUrl = upJson.url;
+          if (upJson.status === 'success' && upJson.urls) {
+            uploadedUrls = upJson.urls;
           }
         }
+
+        const allImageUrls = [...editExistingImageUrls, ...uploadedUrls].join(',');
 
         const updatePayload = {
           action: "updateStock",
@@ -1005,9 +1148,9 @@
           stock: stock,
           vol: vol,
           isAsk: isAsk,
-          price: price
+          price: price,
+          img: allImageUrls
         };
-        if (uploadedImageUrl) updatePayload.img = uploadedImageUrl;
 
         const res = await fetch(GAS_API_URL, {
           method: 'POST',
@@ -1032,9 +1175,56 @@
       }
     }
 
-    // 写真クリックで拡大または写真追加
+    // ======================== 写真ギャラリーモーダル ========================
+    let currentGalleryImages = [];
+    let currentGalleryIdx = 0;
+
     function openPhotoQuickModal(index) {
-      openEditModal(index);
+      const it = rawStockItems[index];
+      if (!it) return;
+      const imgs = (it.img || '').split(',').map(s => s.trim()).filter(Boolean);
+      if (imgs.length === 0) {
+        openEditModal(index);
+        return;
+      }
+      currentGalleryImages = imgs;
+      currentGalleryIdx = 0;
+      document.getElementById('gallery-modal-title').innerText = it.name;
+      renderGalleryView();
+      document.getElementById('photo-gallery-modal').style.display = 'flex';
+    }
+
+    function renderGalleryView() {
+      const mainImg = document.getElementById('gallery-main-img');
+      const counterEl = document.getElementById('gallery-counter');
+      const thumbList = document.getElementById('gallery-thumb-list');
+
+      mainImg.src = currentGalleryImages[currentGalleryIdx] || '';
+      counterEl.innerText = `${currentGalleryIdx + 1} / ${currentGalleryImages.length}`;
+
+      if (currentGalleryImages.length <= 1) {
+        thumbList.style.display = 'none';
+        return;
+      }
+      thumbList.style.display = 'flex';
+      let html = '';
+      currentGalleryImages.forEach((url, i) => {
+        html += `
+          <div class="multi-preview-item" style="cursor:pointer; width:50px; height:50px; ${i === currentGalleryIdx ? 'border:2px solid var(--primary);' : 'opacity:0.6;'}" onclick="setGalleryIndex(${i})">
+            <img src="${escapeHtml(url)}" alt="写真">
+          </div>
+        `;
+      });
+      thumbList.innerHTML = html;
+    }
+
+    function setGalleryIndex(idx) {
+      currentGalleryIdx = idx;
+      renderGalleryView();
+    }
+
+    function closePhotoGalleryModal() {
+      document.getElementById('photo-gallery-modal').style.display = 'none';
     }
 
     function escapeHtml(str) {

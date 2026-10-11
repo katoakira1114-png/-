@@ -82,9 +82,24 @@
     .modal-btn:disabled { background-color: #ccc !important; cursor: not-allowed; }
     .btn-back { background: #7f8c8d; color: #fff; }
     .btn-send { background: var(--success-color); color: #fff; }
-    .img-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 300; }
+    .img-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.88); display: none; justify-content: center; align-items: center; z-index: 300; padding: 12px; }
     .img-modal-overlay.active { display: flex; }
-    .img-modal-content { max-width: 90%; max-height: 80vh; border-radius: 8px; object-fit: contain; }
+    .img-modal-wrapper { position: relative; max-width: 95%; max-height: 90vh; display: flex; flex-direction: column; align-items: center; }
+    .img-modal-viewer { position: relative; display: flex; align-items: center; justify-content: center; max-width: 100%; }
+    .img-modal-content { max-width: 100%; max-height: 70vh; border-radius: 8px; object-fit: contain; box-shadow: 0 4px 16px rgba(0,0,0,0.5); user-select: none; }
+    .img-modal-close { position: absolute; top: -38px; right: 0; background: rgba(255,255,255,0.25); border: none; color: #fff; font-size: 1.4rem; width: 34px; height: 34px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 20; }
+    .img-modal-close:hover { background: rgba(255,255,255,0.4); }
+    .img-nav-btn { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.55); color: #fff; border: 1px solid rgba(255,255,255,0.3); width: 38px; height: 38px; border-radius: 50%; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; z-index: 10; }
+    .img-nav-btn:hover { background: rgba(0,0,0,0.85); transform: translateY(-50%) scale(1.05); }
+    .img-nav-btn.prev { left: 8px; }
+    .img-nav-btn.next { right: 8px; }
+    .img-nav-btn.hidden { display: none; }
+    .img-modal-counter { color: #fff; font-size: 0.85rem; font-weight: bold; margin-top: 8px; letter-spacing: 1px; }
+    .img-modal-thumbs { display: flex; gap: 6px; margin-top: 6px; max-width: 90vw; overflow-x: auto; padding: 4px; }
+    .img-modal-thumb { width: 44px; height: 44px; border-radius: 4px; object-fit: cover; opacity: 0.6; cursor: pointer; border: 2px solid transparent; transition: all 0.2s; }
+    .img-modal-thumb.active { opacity: 1; border-color: var(--primary-color); transform: scale(1.05); }
+    .img-container-wrapper { position: relative; width: 100%; height: 120px; overflow: hidden; border-radius: 6px; cursor: pointer; }
+    .img-count-badge { position: absolute; bottom: 5px; right: 5px; background: rgba(0, 0, 0, 0.65); color: #fff; font-size: 0.72rem; padding: 2px 7px; border-radius: 12px; font-weight: bold; pointer-events: none; }
     .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255, 255, 255, 0.9); display: none; flex-direction: column; justify-content: center; align-items: center; z-index: 500; }
     .loading-overlay.active { display: flex; }
     .spinner { width: 48px; height: 48px; border: 5px solid #e0e0e0; border-top: 5px solid var(--primary-color); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 16px; }
@@ -234,8 +249,17 @@
     </div>
   </div>
 
-  <div class="img-modal-overlay" id="img-zoom-modal" onclick="closeImageModal()">
-    <img class="img-modal-content" id="zoomed-img" src="" alt="拡大画像">
+  <div class="img-modal-overlay" id="img-zoom-modal" onclick="if(event.target===this) closeImageModal()">
+    <div class="img-modal-wrapper">
+      <button type="button" class="img-modal-close" onclick="closeImageModal()">✕</button>
+      <div class="img-modal-viewer">
+        <button type="button" class="img-nav-btn prev" id="img-prev-btn" onclick="prevModalImage(event)">◀</button>
+        <img class="img-modal-content" id="zoomed-img" src="" alt="拡大画像">
+        <button type="button" class="img-nav-btn next" id="img-next-btn" onclick="nextModalImage(event)">▶</button>
+      </div>
+      <div class="img-modal-counter" id="img-modal-counter">1 / 1</div>
+      <div class="img-modal-thumbs" id="img-modal-thumbs"></div>
+    </div>
   </div>
 
   <script>
@@ -668,8 +692,11 @@
         const card = document.createElement('div');
         card.className = `product-card ${isDisabled ? 'disabled' : ''}`;
         const dummyImg = 'https://via.placeholder.com/300x160?text=No+Image';
-        const rawImgSrc = p.img ? formatImgUrl(p.img) : dummyImg;
-        const safeImgSrc = escapeHtml(rawImgSrc);
+        const rawImgString = String(p.img || '').trim();
+        const rawImgList = rawImgString ? rawImgString.split(/[,\n]/).map(s => s.trim()).filter(Boolean) : [];
+        const formattedImgList = rawImgList.map(formatImgUrl);
+        const mainImgSrc = formattedImgList.length > 0 ? formattedImgList[0] : dummyImg;
+        const safeImgSrc = escapeHtml(mainImgSrc);
         const safeName = escapeHtml(p.name);
         const safeSize = escapeHtml(p.size || '規格なし');
         const safeId = escapeHtml(p.id);
@@ -681,7 +708,10 @@
 
         card.innerHTML = `
           ${isSoldOut ? '<div class="soldout-tag">売り切れ</div>' : ''}
-          <img src="${safeImgSrc}" class="product-img" alt="${safeName}" loading="lazy" onerror="this.src='${dummyImg}';">
+          <div class="img-container-wrapper">
+            <img src="${safeImgSrc}" class="product-img" alt="${safeName}" loading="lazy" onerror="this.src='${dummyImg}';">
+            ${formattedImgList.length > 1 ? `<span class="img-count-badge">📷 ${formattedImgList.length}枚</span>` : ''}
+          </div>
           <div class="product-title">${safeName} ${p.isNew ? '<span style="color:red; font-size:0.75rem;">[NEW]</span>' : ''} ${repeatBadge}</div>
           <div class="product-meta">サイズ:${safeSize} / ${Number(p.vol) || 0}vol / 在庫:${Number(p.stock) || 0}</div>
           <div class="product-price-box">${priceDisplay}</div>
@@ -691,22 +721,113 @@
             <button class="qty-btn" onclick="changeQty('${safeId}', 1)" ${isDisabled ? 'disabled' : ''}>+</button>
           </div>
         `;
-        const imgEl = card.querySelector('.product-img');
-        if (imgEl) {
-          imgEl.onclick = () => openImageModal(rawImgSrc);
+        const imgWrapper = card.querySelector('.img-container-wrapper');
+        if (imgWrapper) {
+          imgWrapper.onclick = () => openImageModal(formattedImgList.length > 0 ? formattedImgList : [dummyImg], 0);
         }
         container.appendChild(card);
       });
     }
 
-    function openImageModal(src) {
-      document.getElementById('zoomed-img').src = src;
+    let currentModalImages = [];
+    let currentModalIndex = 0;
+
+    function openImageModal(imgListOrSrc, index) {
+      if (Array.isArray(imgListOrSrc)) {
+        currentModalImages = imgListOrSrc.filter(Boolean);
+      } else if (typeof imgListOrSrc === 'string' && imgListOrSrc) {
+        currentModalImages = [imgListOrSrc];
+      } else {
+        currentModalImages = [];
+      }
+      if (currentModalImages.length === 0) return;
+      currentModalIndex = Math.max(0, Math.min(Number(index) || 0, currentModalImages.length - 1));
+      updateModalImageView();
       document.getElementById('img-zoom-modal').classList.add('active');
     }
-    
+
+    function updateModalImageView() {
+      const currentSrc = currentModalImages[currentModalIndex];
+      const imgEl = document.getElementById('zoomed-img');
+      if (imgEl) imgEl.src = currentSrc;
+      
+      const hasMultiple = currentModalImages.length > 1;
+      const prevBtn = document.getElementById('img-prev-btn');
+      const nextBtn = document.getElementById('img-next-btn');
+      const counterEl = document.getElementById('img-modal-counter');
+      const thumbsEl = document.getElementById('img-modal-thumbs');
+      
+      if (prevBtn) prevBtn.classList.toggle('hidden', !hasMultiple);
+      if (nextBtn) nextBtn.classList.toggle('hidden', !hasMultiple);
+      if (counterEl) {
+        counterEl.innerText = `${currentModalIndex + 1} / ${currentModalImages.length}`;
+        counterEl.style.display = hasMultiple ? 'block' : 'none';
+      }
+      if (thumbsEl) {
+        if (hasMultiple) {
+          thumbsEl.style.display = 'flex';
+          thumbsEl.innerHTML = currentModalImages.map((src, i) => `
+            <img src="${escapeHtml(src)}" class="img-modal-thumb ${i === currentModalIndex ? 'active' : ''}" onclick="selectModalImage(${i})" alt="thumb-${i+1}">
+          `).join('');
+        } else {
+          thumbsEl.style.display = 'none';
+          thumbsEl.innerHTML = '';
+        }
+      }
+    }
+
+    function prevModalImage(e) {
+      if (e) e.stopPropagation();
+      if (currentModalImages.length <= 1) return;
+      currentModalIndex = (currentModalIndex - 1 + currentModalImages.length) % currentModalImages.length;
+      updateModalImageView();
+    }
+
+    function nextModalImage(e) {
+      if (e) e.stopPropagation();
+      if (currentModalImages.length <= 1) return;
+      currentModalIndex = (currentModalIndex + 1) % currentModalImages.length;
+      updateModalImageView();
+    }
+
+    function selectModalImage(idx) {
+      currentModalIndex = idx;
+      updateModalImageView();
+    }
+
     function closeImageModal() {
       document.getElementById('img-zoom-modal').classList.remove('active');
     }
+
+    window.addEventListener('keydown', (e) => {
+      const modal = document.getElementById('img-zoom-modal');
+      if (!modal || !modal.classList.contains('active')) return;
+      if (e.key === 'ArrowLeft') prevModalImage(e);
+      else if (e.key === 'ArrowRight') nextModalImage(e);
+      else if (e.key === 'Escape') closeImageModal();
+    });
+
+    (function setupModalSwipe() {
+      let touchStartX = 0;
+      let touchEndX = 0;
+      const modal = document.getElementById('img-zoom-modal');
+      if (!modal) return;
+      modal.addEventListener('touchstart', e => {
+        if (e.changedTouches && e.changedTouches[0]) {
+          touchStartX = e.changedTouches[0].screenX;
+        }
+      }, { passive: true });
+      modal.addEventListener('touchend', e => {
+        if (e.changedTouches && e.changedTouches[0]) {
+          touchEndX = e.changedTouches[0].screenX;
+          const diff = touchEndX - touchStartX;
+          if (Math.abs(diff) > 40) {
+            if (diff < 0) nextModalImage();
+            else prevModalImage();
+          }
+        }
+      }, { passive: true });
+    })();
 
     function changeQty(id, delta) {
       if (!isRegistered) return;

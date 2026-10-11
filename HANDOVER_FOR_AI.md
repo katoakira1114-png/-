@@ -287,29 +287,34 @@ Payload is sent as `application/json` (or `text/plain` to bypass CORS preflight)
   "isAsk": false,
   "vol": 100,
   "stock": 3,
-  "imageBase64": "data:image/jpeg;base64,...",
-  "imageFileName": "photo_1791730000.jpg"
+  "images": [
+    { "base64": "data:image/jpeg;base64,...", "fileName": "photo_1.jpg" },
+    { "base64": "data:image/jpeg;base64,...", "fileName": "photo_2.jpg" }
+  ]
 }
 ```
+*(Note: Single photo legacy format `imageBase64` / `imageFileName` is also backward-compatible)*
 - **Processing**:
-  - If `imageBase64` is provided, uploads file to Google Drive folder `川畑水産_観賞魚画像` via `saveImageToDrive()`, sets public view permission, and generates direct thumbnail URL (`https://drive.google.com/thumbnail?id={ID}&sz=w1000`).
+  - For each image in `images`, uploads file to Google Drive folder `川畑水産_観賞魚画像` via `saveImageToDrive()`, sets public view permission, and generates direct thumbnail URL (`https://lh3.googleusercontent.com/d/{ID}` / `https://drive.google.com/thumbnail?id={ID}&sz=w1000`).
   - Auto-generates Product ID: `{TIER}_{CATEGORY}_{TIMESTAMP}` (e.g. `A_魚_1791730000000`) if tier is A/B/C, or `{CATEGORY}_{TIMESTAMP}` if tier is NONE.
-  - Appends new row to the category sheet: `[id, name, size, price, vol, stock, imgUrl, ""]`.
+  - Joins all image URLs with comma (`,`) and appends new row to the category sheet: `[id, name, size, price, vol, stock, commaSeparatedImgUrls, ""]`.
 - **Response**: `{ "status": "success", "productId": "...", "imgUrl": "..." }`
 
-#### 6. `action=uploadImage` (Update Product Image)
+#### 6. `action=uploadImage` (Update Product Image / Multi-Photo Upload)
 - **Payload**:
 ```json
 {
   "action": "uploadImage",
   "category": "魚",
   "rowNumber": 2,
-  "imageBase64": "data:image/jpeg;base64,...",
-  "imageFileName": "kakure.jpg"
+  "images": [
+    { "base64": "data:image/jpeg;base64,...", "fileName": "photo_1.jpg" },
+    { "base64": "data:image/jpeg;base64,...", "fileName": "photo_2.jpg" }
+  ]
 }
 ```
-- **Processing**: Uploads image to Drive folder `川畑水産_観賞魚画像`, updates Column G (画像URL) of specified row.
-- **Response**: `{ "status": "success", "imgUrl": "https://drive.google.com/thumbnail?id=...&sz=w1000" }`
+- **Processing**: Uploads all images to Drive folder `川畑水産_観賞魚画像`, joins URLs with comma, and updates Column G (画像URL) of specified row.
+- **Response**: `{ "status": "success", "imgUrl": "url1,url2", "imgUrls": ["url1", "url2"] }`
 
 ---
 
@@ -342,6 +347,10 @@ Zero-indexed column mapping in GAS:
 
 ### Sheets: `魚`, `サンゴ`, `貝`, `シャコガイ`, `イソギンチャク`, `擬岩`, `その他` (Inventory Catalogs)
 - Standard headers: `[商品ID, 商品名, サイズ, 単価, 容量vol, 在庫, 画像URL, 売り切れ日時]`
+- **Column G (`画像URL`)**: Stores single or multiple Drive thumbnail URLs separated by commas (e.g. `url1,url2`).
+  - Storefront (`index.html`) and Staff console (`stock.html`) parse with `split(/[,\n]/).map(s=>s.trim()).filter(Boolean)`.
+  - When `length > 1`, UI displays badge `📷 N枚` and enables multi-photo gallery navigation (arrows, thumbnails, swipe gestures).
+- **Column F (`在庫`)**: Updated via `updateStock`. Direct numeric typing (e.g. `550`) and delta steppers (`±1`, `±5`) both target this column. Clearing or 0 sets Column H (`売り切れ日時`). Restocking clears Column H.
 
 ---
 
