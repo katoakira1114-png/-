@@ -430,3 +430,17 @@ Future AI agents MUST be aware of these past pitfalls to avoid repeating known i
 8. **GitHub Push Protection & Token Security**:
    - NEVER commit raw GitHub personal access tokens (`ghp_...`) into any markdown, json, or js file in this repository.
    - GitHub secret scanning triggers immediately and blocks the `git push origin main` command. Use placeholder `<GITHUB_PERSONAL_ACCESS_TOKEN>` or environment variables in documentation.
+
+9. **Client-side SWR Caching & Cart Persistence (`index.html`)**:
+   - **Storage Keys**:
+     - `kawabata_catalog_cache_v1`: `{ timestamp, userId, data: { isRegistered, customer, products, userHistory } }`. Dual-stored in `sessionStorage` and `localStorage`.
+     - `kawabata_cart_cache_v1`: Current cart dictionary `{ [productId]: qty }`.
+     - `kawabata_ng_dates_v1`: Array of selected delivery blackout date strings (`["10/14(月)", ...]`).
+     - `kawabata_active_tab`: Last viewed category tab name.
+   - **Lifecycle on `DOMContentLoaded`**:
+     1. `restoreCartFromStorage()`: Instantly rehydrates `cart` and `selectedNgDates`.
+     2. `loadCatalogCache()`: If valid cache exists, immediately invokes `applyCatalogData(cachedData, true)` to present all products, prices, and cart counts in **<0.05 seconds**, completely bypassing the loading spinner. Activates header sync pill (`🔄 最新同期中...`).
+     3. Concurrently, `initLiff()` and `fetchProducts(uid, isBackgroundSync = true)` query fresh inventory in background (SWR pattern).
+     4. When background sync arrives: updates local cache, smooths inventory numbers into UI, maintains scroll offset (`window.scrollTo(0, prevScrollY)`), and clamps any cart item quantity exceeding updated stock without discarding the rest of the cart.
+     5. On order success: clears `kawabata_cart_cache_v1` and `kawabata_ng_dates_v1`.
+
