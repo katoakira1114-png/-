@@ -473,15 +473,14 @@
     <!-- ==================== スライド 1: 表紙 ==================== -->
     <div class="slide slide-cover active" id="slide-1">
       <div class="cover-badge">川畑水産 業務改善プロジェクト</div>
-      <h1 class="cover-title">Web受注・出荷・在庫管理<br>新システム 概要と導入成果</h1>
+      <h1 class="cover-title">Web受注・出荷・在庫管理<br>新システム 概要説明資料</h1>
       <p class="cover-sub">
         電話・LINE・手作業による転記と出荷負担を解消。<br>
         「お客様はLINEからサクサク注文、現場はスマホ1台で完結する」体制の構築
       </p>
       <div class="cover-meta">
         <div>📅 報告日: 2026年10月</div>
-        <div>👥 対象: 代表取締役社長 / 役員・現場責任者</div>
-        <div>⚙️ 状態: 本番稼働中（サーバーレス構成）</div>
+        <div>⚙️ 状態: 本番稼働準備完了（サーバーレス構成）</div>
       </div>
     </div>
 
@@ -496,32 +495,18 @@
       </div>
       <div class="slide-body">
         <div class="grid-2">
-          <div class="card">
-            <div class="card-icon">📞</div>
-            <div class="card-title">① 注文受付の分散と聞き間違いリスク</div>
-            <div class="card-desc">
+          <div class="card" style="padding: 32px 28px;">
+            <div class="card-icon" style="font-size: 2.4rem;">📞</div>
+            <div class="card-title" style="font-size: 1.25rem;">① 注文受付の分散と聞き間違いリスク</div>
+            <div class="card-desc" style="font-size: 1rem; line-height: 1.6; margin-top: 8px;">
               電話、個別LINE、口頭などでバラバラに注文が入るため、受取希望日や希望匹数の聞き間違い、履歴の追跡不能が発生しやすかった。
             </div>
           </div>
-          <div class="card">
-            <div class="card-icon">✍️</div>
-            <div class="card-title">② スプレッドシートへの手作業転記</div>
-            <div class="card-desc">
-              注文内容を台帳へ手入力し、納品書も都度手動で作成。二度手間による転記ミスや業務時間の圧迫が深刻だった。
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-icon">📦</div>
-            <div class="card-title">③ 現場ピッキング時の確認負担</div>
-            <div class="card-desc">
+          <div class="card" style="padding: 32px 28px;">
+            <div class="card-icon" style="font-size: 2.4rem;">📦</div>
+            <div class="card-title" style="font-size: 1.25rem;">② 現場ピッキング時の確認負担</div>
+            <div class="card-desc" style="font-size: 1rem; line-height: 1.6; margin-top: 8px;">
               「今日、誰に何を何匹送るのか」をシートや伝票から探すのに時間がかかり、水槽からの掬い出し漏れや出荷遅延の恐れがあった。
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-icon">🐠</div>
-            <div class="card-title">④ 在庫情報のタイムラグと誤受注</div>
-            <div class="card-desc">
-              水槽の在庫数と台帳の同期が遅れ、すでに売切れた生体を受注してしまったり、新入荷生体の案内が遅れる機会損失が発生していた。
             </div>
           </div>
         </div>
@@ -933,28 +918,28 @@
       </div>
     </div>
 
-    <!-- ==================== スライド 12: 導入による3大成果 ==================== -->
+    <!-- ==================== スライド 12: 導入による期待効果 ==================== -->
     <div class="slide" id="slide-12">
       <div class="slide-header">
         <div>
-          <div class="slide-category">11. 導入成果と効果</div>
-          <h2 class="slide-title">新システム導入による3大成果</h2>
+          <div class="slide-category">11. 期待効果</div>
+          <h2 class="slide-title">新システム導入による期待効果</h2>
         </div>
-        <div class="slide-tag">ROI・業務インパクト</div>
+        <div class="slide-tag">業務インパクト</div>
       </div>
       <div class="slide-body">
         <div class="metric-row">
           <div class="metric-box">
             <div class="card-icon">⏱️</div>
-            <div class="metric-val">80% 削減</div>
-            <div class="card-title">受注・出荷の事務工数</div>
-            <div class="metric-sub">電話聞き取り・シート手入力・納品書作成の手間がゼロに。現場作業に集中可能。</div>
+            <div class="metric-val">大幅削減</div>
+            <div class="card-title">受注・出荷の事務負担</div>
+            <div class="metric-sub">電話聞き取り・シート手入力・納品書作成の手間を自動化。現場作業に集中可能。</div>
           </div>
           <div class="metric-box">
             <div class="card-icon">🎯</div>
-            <div class="metric-val">出荷ミス 0</div>
-            <div class="card-title">聞き間違い・掬い漏れ根絶</div>
-            <div class="card-desc">合計集約とタップチェックにより、入れ忘れや過誤発送を根本から防止。</div>
+            <div class="metric-val">ミス防止</div>
+            <div class="card-title">聞き間違い・掬い漏れ防止</div>
+            <div class="card-desc">合計集約とタップチェックにより、入れ忘れや過誤発送を未然に防止。</div>
           </div>
           <div class="metric-box">
             <div class="card-icon">💰</div>
@@ -1048,7 +1033,7 @@
     let currentSlide = 1;
 
     const slideTitles = [
-      "表紙: 新システム概要と導入成果",
+      "表紙: 新システム概要説明資料",
       "01. これまでの課題と現場の負担",
       "02. 新システムが目指した4つのゴール",
       "03. 注文から発送完了までのシームレスな流れ",
@@ -1059,7 +1044,7 @@
       "08. スマホ特化 在庫・生体管理コンソール",
       "09. 生体写真のGoogleドライブ自動保存連携",
       "10. 納品書PDF自動生成とLINE発送連絡",
-      "11. 新システム導入による3大成果（ROI）",
+      "11. 新システム導入による期待効果",
       "12. 属人化を防ぐ引き継ぎ体制と今後の拡張性",
       "まとめ: 本格運用の開始と実演デモ"
     ];
