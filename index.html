@@ -226,7 +226,7 @@
     // 外部連携設定・環境定数
     // ==========================================
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxIYsPdreUjaOFutfshhQIwOLb_Ke1JprcDZj_LAT9oZnc-l-3jZLsPAsFd_QdQJAQ4eA/exec";
-    const LIFF_ID = "2011871129-P4lflaGc";
+    const LIFF_ID = "2011871129-P4IflaGc";
     const OFFICIAL_LINE_ID = "@721pyqfn";
     
     // カテゴリの固定並び順
@@ -237,7 +237,16 @@
     let userHistory = { purchaseCounts: {}, lastOrderItems: [] };
     let selectedNgDates = new Set(); // 選択された受取不可日
 
-    // ユーザーIDを複数の取得元から安全に抽出する関数
+    // XSS防御用のHTMLエスケープ関数
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
     function extractUserId() {
       if (lineProfile && lineProfile.userId) return lineProfile.userId;
       if (typeof liff !== 'undefined') {
@@ -612,8 +621,10 @@
 
     function formatImgUrl(url) {
       if (!url) return '';
-      const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
-      return (match && match[1]) ? "https://lh3.googleusercontent.com/d/" + match[1] : url;
+      var clean = String(url).trim();
+      if (/^javascript:/i.test(clean)) return '';
+      const match = clean.match(/\/d\/([a-zA-Z0-9_-]+)/) || clean.match(/id=([a-zA-Z0-9_-]+)/);
+      return (match && match[1]) ? "https://lh3.googleusercontent.com/d/" + match[1] : clean;
     }
 
     function renderProducts() {
@@ -641,7 +652,12 @@
         const card = document.createElement('div');
         card.className = `product-card ${isDisabled ? 'disabled' : ''}`;
         const dummyImg = 'https://via.placeholder.com/300x160?text=No+Image';
-        const imgSrc = p.img ? formatImgUrl(p.img) : dummyImg;
+        const rawImgSrc = p.img ? formatImgUrl(p.img) : dummyImg;
+        const safeImgSrc = escapeHtml(rawImgSrc);
+        const safeName = escapeHtml(p.name);
+        const safeSize = escapeHtml(p.size || '規格なし');
+        const safeId = escapeHtml(p.id);
+
         let priceDisplay = !isRegistered ? '<span class="price-ask">非公開 (要登録)</span>' : p.isAsk ? '<span class="price-ask">ASK</span>' : `<span class="product-price">¥${p.price.toLocaleString()}</span>`;
 
         const repeatCount = (userHistory.purchaseCounts && userHistory.purchaseCounts[p.name]) || 0;
@@ -649,16 +665,20 @@
 
         card.innerHTML = `
           ${isSoldOut ? '<div class="soldout-tag">売り切れ</div>' : ''}
-          <img src="${imgSrc}" class="product-img" alt="${p.name}" loading="lazy" onerror="this.src='${dummyImg}';" onclick="openImageModal('${imgSrc}')">
-          <div class="product-title">${p.name} ${p.isNew ? '<span style="color:red; font-size:0.75rem;">[NEW]</span>' : ''} ${repeatBadge}</div>
-          <div class="product-meta">サイズ:${p.size || '規格なし'} / ${p.vol}vol / 在庫:${p.stock}</div>
+          <img src="${safeImgSrc}" class="product-img" alt="${safeName}" loading="lazy" onerror="this.src='${dummyImg}';">
+          <div class="product-title">${safeName} ${p.isNew ? '<span style="color:red; font-size:0.75rem;">[NEW]</span>' : ''} ${repeatBadge}</div>
+          <div class="product-meta">サイズ:${safeSize} / ${Number(p.vol) || 0}vol / 在庫:${Number(p.stock) || 0}</div>
           <div class="product-price-box">${priceDisplay}</div>
           <div class="qty-control">
-            <button class="qty-btn" onclick="changeQty('${p.id}', -1)" ${isDisabled ? 'disabled' : ''}>-</button>
+            <button class="qty-btn" onclick="changeQty('${safeId}', -1)" ${isDisabled ? 'disabled' : ''}>-</button>
             <input type="text" class="qty-input" value="${qty}" readonly>
-            <button class="qty-btn" onclick="changeQty('${p.id}', 1)" ${isDisabled ? 'disabled' : ''}>+</button>
+            <button class="qty-btn" onclick="changeQty('${safeId}', 1)" ${isDisabled ? 'disabled' : ''}>+</button>
           </div>
         `;
+        const imgEl = card.querySelector('.product-img');
+        if (imgEl) {
+          imgEl.onclick = () => openImageModal(rawImgSrc);
+        }
         container.appendChild(card);
       });
     }
@@ -765,7 +785,7 @@
           totalCount += qty;
           const row = document.createElement('div');
           row.className = 'order-item-row';
-          row.innerHTML = `<span>[${p.category}] ${p.name} × ${qty}</span><span>${priceStr}</span>`;
+          row.innerHTML = `<span>[${escapeHtml(p.category)}] ${escapeHtml(p.name)} × ${qty}</span><span>${priceStr}</span>`;
           listContainer.appendChild(row);
         }
       });
@@ -783,11 +803,11 @@
             ${recCandidates.map(p => `
               <div class="recommend-item">
                 <div class="recommend-item-info">
-                  <strong>${p.name}</strong> (${p.size || '規格なし'} / ${p.vol}vol)
+                  <strong>${escapeHtml(p.name)}</strong> (${escapeHtml(p.size || '規格なし')} / ${Number(p.vol) || 0}vol)
                   <span class="recommend-item-price">${p.isAsk ? 'ASK' : '¥' + p.price.toLocaleString()}</span>
-                  <div style="font-size:0.7rem; color:#888;">在庫: ${p.stock}個</div>
+                  <div style="font-size:0.7rem; color:#888;">在庫: ${Number(p.stock) || 0}個</div>
                 </div>
-                <button class="recommend-add-btn" onclick="addRecommendToCart('${p.id}')">＋ 1個追加</button>
+                <button class="recommend-add-btn" onclick="addRecommendToCart('${escapeHtml(p.id)}')">＋ 1個追加</button>
               </div>
             `).join('')}
           </div>

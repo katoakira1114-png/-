@@ -1,0 +1,15 @@
+# Secrets and Sensitive Data
+*token*
+*.token
+*.txt
+.env
+.env.*
+
+# OS and Editor Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# clasp credentials
+.clasprc.json

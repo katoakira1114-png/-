@@ -3,12 +3,15 @@ var PDF_FOLDER_NAME = "川畑水産_納品書PDF";
 var EDIT_FOLDER_NAME = "川畑水産_納品書(編集用)";
 var BACKUP_FOLDER_NAME = "川畑水産_スプレッドシート自動バックアップ";
 
-// LINEアクセストークンの解決（スクリプトプロパティ優先、フォールバック定数）
-var FALLBACK_LINE_TOKEN = "4z5y4BBsTTTEZgfmcaUF7cbc1T1k6qePWr/xKn3Yuk0E1pi4wxY3uPtSar9xW3F8FxIDpqTpma7lfn3HXhQ19LyTaDkNU6s779LkSLtPCUCZNb3nKg/tDSJXLNuADTfjDGoD8SQMw/CYDBdUAgkq3gdB04t89/1O/w1cDnyilFU=";
+// LINEアクセストークンの解決（スクリプトプロパティから取得・ハードコード禁止）
 function getLineChannelAccessToken() {
   var token = PropertiesService.getScriptProperties().getProperty("LINE_CHANNEL_ACCESS_TOKEN") ||
               PropertiesService.getScriptProperties().getProperty("LINE_ACCESS_TOKEN");
-  return (token && token.trim() !== "") ? token.trim() : FALLBACK_LINE_TOKEN;
+  if (!token || token.trim() === "") {
+    console.error("【セキュリティ警告】LINE_CHANNEL_ACCESS_TOKENがスクリプトプロパティに未設定です。コード内平文保存を防止するため、GASのプロジェクト設定でスクリプトプロパティを設定してください。");
+    return "";
+  }
+  return token.trim();
 }
 
 // 管理者（店主）のLINEユーザーIDの解決（スクリプトプロパティ最優先、ハードコードIDがあれば補完）
@@ -307,12 +310,20 @@ function doGet(e) {
     var action = (e && e.parameter && e.parameter.action) ? String(e.parameter.action).trim() : "";
     var customerInfo = null;
 
-    // 「顧客マスタ」の列拡張（チェックボックス化）&「擬岩」シート統一
-    ensureCustomerMasterColumns(ss);
-    ensureGiganiSheet(ss);
-
-    // 顧客登録申請とマスタの自動承認ステータス同期
-    syncApplicationStatus(ss);
+    // メンテナンス処理の定期実行（毎リクエストではなく、キャッシュ等で1時間以上経過時または明示的sync時のみ実行）
+    var cache = CacheService.getScriptCache();
+    var lastSync = cache.get("LAST_SCHEMA_SYNC");
+    var forceSync = (e && e.parameter && (e.parameter.sync === "1" || e.parameter.maintenance === "1"));
+    if (forceSync || !lastSync) {
+      try {
+        ensureCustomerMasterColumns(ss);
+        ensureGiganiSheet(ss);
+        syncApplicationStatus(ss);
+        cache.put("LAST_SCHEMA_SYNC", "done", 3600); // 1時間キャッシュ
+      } catch (syncErr) {
+        console.warn("Schema maintenance warning: " + syncErr);
+      }
+    }
 
     // 【顧客情報参照API】採集リクエストフォームや注文フォームからの自動補完用
     if (action === "lookupCustomer" || action === "searchCustomer") {
@@ -352,7 +363,7 @@ function doGet(e) {
 
             if (isMatched) {
               var fullAddress = (lAddr !== -1) ? String(cDataLookup[lr][lAddr] || "").trim() : "";
-              // 都道府県の抽出
+              // 都道府県の抽出（個人情報保護のため詳細住所・番地は返却せず都道府県のみ）
               var prefMatch = fullAddress.match(/(東京都|北海道|(?:京都|大阪)府|.{2,3}県)/);
               var extractedPref = prefMatch ? prefMatch[0] : "";
 
@@ -360,9 +371,9 @@ function doGet(e) {
                 found: true,
                 name: String(cDataLookup[lr][lName] || "").trim(),
                 phone: String(cDataLookup[lr][lParamPhone] || "").trim(),
-                address: fullAddress,
+                address: "", // セキュリティ対策: 詳細住所の無制限露出を防止
                 prefecture: extractedPref,
-                lineUserId: String(cDataLookup[lr][lUid] || "").trim()
+                lineUserId: "" // セキュリティ対策: UID漏洩を防止
               };
               break;
             }
@@ -474,10 +485,10 @@ function doGet(e) {
             allowedProductGroups: allowedGroups
           };
 
-          // 電話番号一致でLINE ID未登録だった場合は自動補完
+          // セキュリティ対策: 電話番号のみの一致による無検証なLINE UID自動バインドを停止
+          // (第三者による電話番号指定でのアカウント乗っ取り・不正紐付けを防止)
           if (matchPhone && dbUserId === "" && reqUserId !== "") {
-            cSheet.getRange(i + 1, colUid + 1).setValue(reqUserId);
-            customerInfo.lineUserId = reqUserId;
+            console.log("【未紐付けアクセス】電話番号 " + dbPhone + " に対し、未登録LINE UID " + reqUserId + " からの照会を検出しました。");
           }
           break;
         }
@@ -736,7 +747,17 @@ function doPost(e) {
 
     for (var idx = 0; idx < items.length; idx++) {
       var item = items[idx];
-      if (idx < 22) itemRows.push([item.name, item.qty, item.isAsk ? "ASK" : item.appliedPrice]);
+      var qty = parseInt(item.qty, 10);
+      if (isNaN(qty) || qty <= 0) continue;
+      item.qty = qty;
+
+      var appliedPrice = Number(item.appliedPrice);
+      if (isNaN(appliedPrice) || appliedPrice < 0) {
+        appliedPrice = 0;
+      }
+      item.appliedPrice = appliedPrice;
+
+      if (idx < 22) itemRows.push([String(item.name || "").trim(), item.qty, item.isAsk ? "ASK" : item.appliedPrice]);
       if (!item.isAsk) subtotalAmount += item.appliedPrice * item.qty;
       totalVol += (Number(item.vol) || 0) * item.qty;
     }
@@ -889,7 +910,8 @@ function recordOrderDetailsAndSetupPicking(ss, data) {
 
   var dateFormatted = Utilities.formatDate(data.date, "JST", "yyyy/MM/dd HH:mm:ss");
   var shippingMsg = "【発送完了のお知らせ】\n" + (data.customer.name || "お客様") + " 様\n\nご注文いただいた商品を本日発送いたしました。\n基本的には明日の午前中到着予定となります。\n到着後のご準備をお願いいたします。\n\n📄納品書PDF:\n" + data.pdfUrl;
-  var lineUrl = "https://line.me/R/oaMessage/@877qwvyc/?" + encodeURIComponent(shippingMsg);
+  var shippingLineId = PropertiesService.getScriptProperties().getProperty("OFFICIAL_LINE_ID") || "@721pyqfn";
+  var lineUrl = "https://line.me/R/oaMessage/" + shippingLineId + "/?" + encodeURIComponent(shippingMsg);
   var hyperlinkFormula = "=HYPERLINK(\"" + lineUrl + "\", \"📤 発送LINEを送る\")";
 
   var ngDatesStr = Array.isArray(data.ngDates) ? data.ngDates.join(", ") : (data.ngDates || "");

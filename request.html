@@ -398,8 +398,8 @@
 
   <script>
     // 採集リクエスト受付・顧客検索APIのURL
-    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwEEEt2vWPC4BXlnj08pxvW6ARGKX4FVz41anHlh9wWaXmdduhz4Bb7YQsskkGHMwRz-A/exec";
-    const LIFF_ID = "2011653892-RjIQ6YBe";
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxIYsPdreUjaOFutfshhQIwOLb_Ke1JprcDZj_LAT9oZnc-l-3jZLsPAsFd_QdQJAQ4eA/exec";
+    const LIFF_ID = "2011871129-P4IflaGc";
 
     let lineProfile = null;
     let specimenCount = 0;
@@ -420,11 +420,26 @@
       return "";
     }
 
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
     // 生体入力ブロックの動的追加
     function addSpecimenItem(defaultValues = {}) {
       specimenCount++;
       const currentIdx = specimenCount;
       const container = document.getElementById('specimen-list-container');
+
+      const safeSpecies = escapeHtml(defaultValues.species || '');
+      const safeQuantity = escapeHtml(defaultValues.quantity || '1匹');
+      const safeSize = escapeHtml(defaultValues.size || '');
+      const safeBudget = escapeHtml(defaultValues.budget || '');
 
       const block = document.createElement('div');
       block.className = 'specimen-item-block';
@@ -451,22 +466,22 @@
           </div>
           <div>
             <label style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:3px;">希望種・生体名<span class="required-tag">*</span></label>
-            <input type="text" class="form-input item-species" style="padding:7px;" required placeholder="例: ハタタテハゼ、ツツウミヅタ" value="${defaultValues.species || ''}">
+            <input type="text" class="form-input item-species" style="padding:7px;" required placeholder="例: ハタタテハゼ、ツツウミヅタ" value="${safeSpecies}">
           </div>
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
           <div>
             <label style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:3px;">数量<span class="required-tag">*</span></label>
-            <input type="text" class="form-input item-quantity" style="padding:7px;" required placeholder="例: 1匹、2個" value="${defaultValues.quantity || '1匹'}">
+            <input type="text" class="form-input item-quantity" style="padding:7px;" required placeholder="例: 1匹、2個" value="${safeQuantity}">
           </div>
           <div>
             <label style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:3px;">希望サイズ感</label>
-            <input type="text" class="form-input item-size" style="padding:7px;" placeholder="例: 5〜7cm前後、S" value="${defaultValues.size || ''}">
+            <input type="text" class="form-input item-size" style="padding:7px;" placeholder="例: 5〜7cm前後、S" value="${safeSize}">
           </div>
           <div>
             <label style="font-size:0.8rem; font-weight:bold; display:block; margin-bottom:3px;">1個あたりの目安予算</label>
-            <input type="text" class="form-input item-budget" style="padding:7px;" placeholder="例: 3,000円以内" value="${defaultValues.budget || ''}">
+            <input type="text" class="form-input item-budget" style="padding:7px;" placeholder="例: 3,000円以内" value="${safeBudget}">
           </div>
         </div>
       `;
@@ -710,7 +725,7 @@
           }
 
           alert('リクエストが完了しました！\n(LINEアプリが入っている場合は、この後メッセージ画面が立ち上がります)');
-          window.location.href = `https://line.me/R/oaMessage/@877qwvyc/?${encodeURIComponent(msgText)}`;
+          window.location.href = `https://line.me/R/oaMessage/@721pyqfn/?${encodeURIComponent(msgText)}`;
         } else {
           alert('エラーが発生しました: ' + (result.message || '送信に失敗しました'));
         }
