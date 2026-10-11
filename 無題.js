@@ -20,6 +20,12 @@ function getAdminLineUserId() {
   return (uid && uid.trim() !== "") ? uid.trim() : "";
 }
 
+// ピッキング管理用PINコード（スクリプトプロパティADMIN_PIN優先、デフォルト7210）
+function getAdminPin() {
+  var pin = PropertiesService.getScriptProperties().getProperty("ADMIN_PIN");
+  return (pin && pin.trim() !== "") ? pin.trim() : "7210";
+}
+
 // サイトに表示する正規カテゴリ定義（表示名・対応シート名候補）
 var CATEGORY_DEFS = [
   { label: "魚", sheetNames: ["魚"] },
@@ -325,8 +331,17 @@ function doGet(e) {
       }
     }
 
-    // 【ピッキングリスト取得API】出荷ピッキング画面用
+    // 【ピッキングリスト取得API】出荷ピッキング画面用（管理者PIN認証で顧客からのアクセスを遮断）
     if (action === "getPickingList") {
+      var reqPin = String((e && e.parameter && e.parameter.pin) || "").trim();
+      var correctPin = getAdminPin();
+      if (reqPin !== correctPin) {
+        return ContentService.createTextOutput(JSON.stringify({
+          status: "error",
+          message: "管理者認証に失敗しました。正しい暗証番号を入力してください。"
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+
       var detailSheet = ss.getSheetByName("注文明細");
       if (!detailSheet) {
         return ContentService.createTextOutput(JSON.stringify({
@@ -805,8 +820,17 @@ function doPost(e) {
       return handleSpecimenRequest(contents);
     }
 
-    // 【発送ステータス更新API】ピッキング画面からタップで発送済みに切り替え
+    // 【発送ステータス更新API】ピッキング画面からタップで発送済みに切り替え（管理者PIN認証必須）
     if (action === "updateShipStatus" || action === "toggleShipped") {
+      var reqPin = String(contents.pin || "").trim();
+      var correctPin = getAdminPin();
+      if (reqPin !== correctPin) {
+        return ContentService.createTextOutput(JSON.stringify({
+          status: "error",
+          message: "管理者認証に失敗しました。"
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+
       var ssDetail = SpreadsheetApp.openById(SPREADSHEET_ID);
       var dSheet = ssDetail.getSheetByName("注文明細");
       if (!dSheet) throw new Error("注文明細シートが見つかりません。");

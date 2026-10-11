@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=no">
-  <title>ピッキング・出荷管理 - 川畑水産（観賞魚）</title>
+  <title>川畑水産 社内専用 ピッキング管理システム</title>
   <style>
     :root {
       --primary: #005bac;
       --primary-dark: #004380;
-      --bg: #f3f5f8;
+      --bg: #f1f5f9;
       --card-bg: #ffffff;
-      --text: #1e293b;
+      --text: #0f172a;
       --text-muted: #64748b;
       --border: #e2e8f0;
       --success: #16a34a;
@@ -21,7 +21,31 @@
       --danger-bg: #fee2e2;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
-    body { background-color: var(--bg); color: var(--text); padding-bottom: 70px; line-height: 1.4; }
+    body { background-color: var(--bg); color: var(--text); padding-bottom: 60px; line-height: 1.4; }
+
+    /* 管理者認証（ロック画面） */
+    .lock-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: #0f172a; z-index: 1000;
+      display: flex; justify-content: center; align-items: center; padding: 20px;
+    }
+    .lock-box {
+      background: #fff; border-radius: 14px; max-width: 360px; width: 100%;
+      padding: 24px 20px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    }
+    .lock-icon { font-size: 2.5rem; margin-bottom: 10px; }
+    .lock-title { font-size: 1.15rem; font-weight: bold; color: var(--primary); margin-bottom: 6px; }
+    .lock-desc { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 18px; line-height: 1.5; }
+    .lock-input {
+      width: 100%; padding: 12px; font-size: 1.2rem; text-align: center; letter-spacing: 4px;
+      border: 2px solid var(--border); border-radius: 8px; margin-bottom: 12px; font-weight: bold;
+    }
+    .lock-input:focus { outline: none; border-color: var(--primary); }
+    .lock-btn {
+      width: 100%; padding: 12px; background: var(--primary); color: #fff; border: none;
+      border-radius: 8px; font-size: 0.95rem; font-weight: bold; cursor: pointer;
+    }
+    .lock-err { font-size: 0.78rem; color: var(--danger); margin-top: 10px; display: none; font-weight: bold; }
 
     /* ヘッダー */
     header {
@@ -32,20 +56,23 @@
       box-shadow: 0 2px 8px rgba(0, 91, 172, 0.25);
     }
     .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .header-title { font-size: 1.05rem; font-weight: bold; display: flex; align-items: center; gap: 6px; }
-    .header-actions { display: flex; align-items: center; gap: 8px; }
-    .refresh-btn {
-      background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.3);
-      padding: 5px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: bold; cursor: pointer;
-      display: inline-flex; align-items: center; gap: 4px;
+    .header-title { font-size: 1.02rem; font-weight: bold; display: flex; align-items: center; gap: 6px; }
+    .admin-badge {
+      font-size: 0.68rem; background: #ea580c; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: bold;
     }
-    .refresh-btn:active { background: rgba(255,255,255,0.35); }
+    .header-actions { display: flex; align-items: center; gap: 6px; }
+    .btn-header {
+      background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.3);
+      padding: 5px 9px; border-radius: 6px; font-size: 0.75rem; font-weight: bold; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 3px;
+    }
+    .btn-header:active { background: rgba(255,255,255,0.35); }
     .refresh-btn.spinning .spin-icon { animation: rotate 1s linear infinite; }
     @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
     /* ナビゲーションタブ */
     .nav-tabs {
-      display: flex; gap: 6px; background: rgba(0,0,0,0.12); padding: 4px; border-radius: 8px;
+      display: flex; gap: 6px; background: rgba(0,0,0,0.15); padding: 4px; border-radius: 8px;
     }
     .tab-btn {
       flex: 1; padding: 8px 10px; border: none; border-radius: 6px; font-size: 0.85rem; font-weight: bold;
@@ -83,7 +110,7 @@
       margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); overflow: hidden;
       transition: border-color 0.15s ease;
     }
-    .order-card.shipped { opacity: 0.65; border-color: #cbd5e1; background: #f8fafc; }
+    .order-card.shipped { opacity: 0.6; border-color: #cbd5e1; background: #f8fafc; }
     .order-card-header {
       padding: 10px 12px; display: flex; justify-content: space-between; align-items: flex-start;
       border-bottom: 1px solid #f1f5f9; background: #fff;
@@ -187,7 +214,7 @@
     /* フッター */
     footer {
       position: fixed; bottom: 0; left: 0; right: 0; background: #fff;
-      border-top: 1px solid var(--border); padding: 8px 12px; font-size: 0.75rem;
+      border-top: 1px solid var(--border); padding: 8px 14px; font-size: 0.75rem;
       text-align: center; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center;
     }
     .footer-link { color: var(--primary); text-decoration: none; font-weight: bold; }
@@ -195,17 +222,36 @@
 </head>
 <body>
 
+  <!-- 社内専用PIN認証オーバーレイ -->
+  <div class="lock-overlay" id="lock-overlay">
+    <div class="lock-box">
+      <div class="lock-icon">🔒</div>
+      <div class="lock-title">川畑水産 出荷管理</div>
+      <div class="lock-desc">
+        この画面は<strong>社内スタッフ・関係者専用</strong>です。<br>
+        管理用暗証番号（PIN）を入力してください。
+      </div>
+      <form onsubmit="handleUnlock(event)">
+        <input type="password" id="pin-input" class="lock-input" placeholder="••••" maxlength="8" inputmode="numeric" autofocus>
+        <button type="submit" class="lock-btn">認証して開く</button>
+      </form>
+      <div class="lock-err" id="lock-err-msg">暗証番号が正しくありません</div>
+    </div>
+  </div>
+
   <header>
     <div class="header-top">
       <div class="header-title">
         <span>📦</span>
-        <span>川畑水産 ピッキング管理</span>
+        <span>川畑水産 出荷ピッキング</span>
+        <span class="admin-badge">社内専用</span>
       </div>
       <div class="header-actions">
-        <button class="refresh-btn" id="refresh-btn" onclick="fetchPickingData()">
+        <button class="btn-header refresh-btn" id="refresh-btn" onclick="fetchPickingData()">
           <span class="spin-icon">🔄</span>
           <span id="refresh-time-text">更新</span>
         </button>
+        <button class="btn-header" onclick="handleLock()" title="画面をロック">🔒 施錠</button>
       </div>
     </div>
     
@@ -216,7 +262,7 @@
   </header>
 
   <div class="filter-bar">
-    <input type="text" class="search-input" id="search-input" placeholder="🔍 店舗名・商品名で絞り込み..." oninput="handleSearch()">
+    <input type="text" class="search-input" id="search-input" placeholder="🔍 店舗名・生体名で検索..." oninput="handleSearch()">
     <select class="filter-select" id="status-filter" onchange="handleFilterChange()">
       <option value="unshipped">未発送のみ</option>
       <option value="all">すべて表示</option>
@@ -263,34 +309,98 @@
   </div>
 
   <footer>
-    <a href="index.html" class="footer-link">← 注文フォームへ</a>
-    <span id="last-sync-label">自動同期中 (60秒毎)</span>
+    <span id="last-sync-label">社内出荷管理システム (60秒毎自動同期)</span>
     <a href="https://docs.google.com/spreadsheets/d/1l5uJihoagHbMAwiCulpt9Zy9PIV6RRDneUYJ6QbiBbU/edit" target="_blank" class="footer-link">📊 スプレッドシート</a>
   </footer>
 
   <script>
     const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxIYsPdreUjaOFutfshhQIwOLb_Ke1JprcDZj_LAT9oZnc-l-3jZLsPAsFd_QdQJAQ4eA/exec";
     const OFFICIAL_LINE_ID = "@721pyqfn";
+    const DEFAULT_PIN = "7210";
 
+    let currentPin = "";
     let currentTab = "orders";
     let rawOrders = [];
     let rawTotalSummary = [];
-    let checkedItemsMap = {}; // ローカルの品目チェック状態保持 { "orderId_itemIndex": true }
-    let pickedSummaryMap = {}; // 生体集約のローカルチェック保持 { "category_species": true }
+    let checkedItemsMap = {};
+    let pickedSummaryMap = {};
 
-    // 初期読み込み
     window.addEventListener('DOMContentLoaded', () => {
-      // 記憶領域からチェック状態を復元
+      // 記憶領域からPINとチェック状態を復元
       try {
+        currentPin = localStorage.getItem('kawabata_admin_pin') || "";
         checkedItemsMap = JSON.parse(localStorage.getItem('kawabata_picking_checks') || "{}");
         pickedSummaryMap = JSON.parse(localStorage.getItem('kawabata_summary_checks') || "{}");
       } catch (e) {}
 
-      fetchPickingData();
+      if (currentPin) {
+        document.getElementById('lock-overlay').style.display = 'none';
+        fetchPickingData();
+      } else {
+        document.getElementById('lock-overlay').style.display = 'flex';
+        document.getElementById('pin-input').focus();
+      }
 
       // 60秒ごとに自動更新
-      setInterval(fetchPickingData, 60000);
+      setInterval(() => {
+        if (currentPin) fetchPickingData();
+      }, 60000);
     });
+
+    // 暗証番号（PIN）認証処理
+    async function handleUnlock(event) {
+      if (event) event.preventDefault();
+      const input = document.getElementById('pin-input');
+      const errEl = document.getElementById('lock-err-msg');
+      const val = input.value.trim();
+
+      if (!val) {
+        input.focus();
+        return;
+      }
+
+      errEl.style.display = 'none';
+
+      // GASへPINを送信して検証
+      try {
+        const res = await fetch(`${GAS_API_URL}?action=getPickingList&pin=${encodeURIComponent(val)}&showAll=0`);
+        const data = await res.json();
+
+        if (data.status === 'success') {
+          currentPin = val;
+          try {
+            localStorage.setItem('kawabata_admin_pin', currentPin);
+          } catch(e) {}
+          document.getElementById('lock-overlay').style.display = 'none';
+          rawOrders = data.orders || [];
+          rawTotalSummary = data.totalSummary || [];
+          updateStats();
+          renderCurrentView();
+        } else {
+          errEl.style.display = 'block';
+          errEl.innerText = data.message || '暗証番号が正しくありません';
+          input.value = '';
+          input.focus();
+        }
+      } catch (err) {
+        errEl.style.display = 'block';
+        errEl.innerText = '通信エラーが発生しました。もう一度お試しください。';
+      }
+    }
+
+    // 画面ロック（ログアウト）
+    function handleLock() {
+      if (confirm('画面をロックしますか？（暗証番号の再入力が必要になります）')) {
+        currentPin = "";
+        try {
+          localStorage.removeItem('kawabata_admin_pin');
+        } catch(e) {}
+        document.getElementById('pin-input').value = '';
+        document.getElementById('lock-err-msg').style.display = 'none';
+        document.getElementById('lock-overlay').style.display = 'flex';
+        document.getElementById('pin-input').focus();
+      }
+    }
 
     // タブ切り替え
     function switchTab(tab) {
@@ -304,12 +414,14 @@
 
     // データ取得
     async function fetchPickingData() {
+      if (!currentPin) return;
+
       const btn = document.getElementById('refresh-btn');
       btn.classList.add('spinning');
 
       try {
         const showAll = document.getElementById('status-filter').value !== 'unshipped' ? '1' : '0';
-        const res = await fetch(`${GAS_API_URL}?action=getPickingList&showAll=${showAll}`);
+        const res = await fetch(`${GAS_API_URL}?action=getPickingList&pin=${encodeURIComponent(currentPin)}&showAll=${showAll}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         
         const data = await res.json();
@@ -323,11 +435,12 @@
           const now = new Date();
           const timeStr = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
           document.getElementById('refresh-time-text').innerText = timeStr;
-        } else {
-          console.error("API error:", data.message);
+        } else if (data.message && data.message.indexOf("認証") !== -1) {
+          // PIN無効化時のロック戻し
+          handleLock();
         }
       } catch (err) {
-        console.error("fetchPickingData failed:", err);
+        console.error("fetchPickingData error:", err);
       } finally {
         btn.classList.remove('spinning');
       }
@@ -551,12 +664,13 @@
 
     // 注文単位の「発送完了にする / 未発送に戻す」
     async function toggleOrderStatus(orderId, setShipped) {
+      if (!currentPin) return;
       if (navigator.vibrate) navigator.vibrate(40);
       
       const targetOrder = rawOrders.find(o => o.orderId === orderId);
       if (!targetOrder) return;
 
-      // 楽観的UI更新（先に画面を更新して体感を高速化）
+      // 楽観的UI更新
       targetOrder.isShipped = setShipped;
       targetOrder.items.forEach((it, idx) => {
         checkedItemsMap[`${orderId}_${idx}`] = setShipped;
@@ -572,13 +686,14 @@
           body: JSON.stringify({
             action: "updateShipStatus",
             orderId: orderId,
+            pin: currentPin,
             isShipped: setShipped
           })
         });
         const result = await res.json();
         if (result.status !== 'success') {
-          alert('ステータス更新でエラーが発生しました: ' + (result.message || ''));
-          fetchPickingData(); // ロールバック
+          alert('更新エラー: ' + (result.message || ''));
+          fetchPickingData();
         }
       } catch (err) {
         console.error("toggleOrderStatus error:", err);
