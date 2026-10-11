@@ -331,16 +331,8 @@ function doGet(e) {
       }
     }
 
-    // 【ピッキングリスト取得API】出荷ピッキング画面用（管理者PIN認証で顧客からのアクセスを遮断）
+    // 【ピッキングリスト取得API】出荷ピッキング画面用（現場専用ツールとしてダイレクト表示）
     if (action === "getPickingList") {
-      var reqPin = String((e && e.parameter && e.parameter.pin) || "").trim();
-      var correctPin = getAdminPin();
-      if (reqPin !== correctPin) {
-        return ContentService.createTextOutput(JSON.stringify({
-          status: "error",
-          message: "管理者認証に失敗しました。正しい暗証番号を入力してください。"
-        })).setMimeType(ContentService.MimeType.JSON);
-      }
 
       var detailSheet = ss.getSheetByName("注文明細");
       if (!detailSheet) {
@@ -820,16 +812,8 @@ function doPost(e) {
       return handleSpecimenRequest(contents);
     }
 
-    // 【発送ステータス更新API】ピッキング画面からタップで発送済みに切り替え（管理者PIN認証必須）
+    // 【発送ステータス更新API】ピッキング画面からタップで発送済みに切り替え
     if (action === "updateShipStatus" || action === "toggleShipped") {
-      var reqPin = String(contents.pin || "").trim();
-      var correctPin = getAdminPin();
-      if (reqPin !== correctPin) {
-        return ContentService.createTextOutput(JSON.stringify({
-          status: "error",
-          message: "管理者認証に失敗しました。"
-        })).setMimeType(ContentService.MimeType.JSON);
-      }
 
       var ssDetail = SpreadsheetApp.openById(SPREADSHEET_ID);
       var dSheet = ssDetail.getSheetByName("注文明細");
