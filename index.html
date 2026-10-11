@@ -219,7 +219,7 @@
         <div style="background:#fffdf0; border:1px solid #f6d899; border-radius:6px; padding:9px 10px; margin-top:10px; font-size:0.75rem; color:#7d5a00; line-height:1.45;">
           ⚠️ <strong>在庫・受注確定に関するご案内</strong><br>
           生体のコンディション管理および同時注文の都合上、万一欠品や状態不良が生じた場合は店舗より個別にご連絡差し上げます。<br>
-          <span style="font-size:0.72rem; color:#a04000;">※正式な受注および発送日程は、店舗からの発送確認連絡をもって確定となります。</span>
+          <span style="font-size:0.72rem; color:#a04000;">※正式な受注および発送日程は、川畑水産からの発送確認連絡をもって確定となります。</span>
         </div>
 
         <!-- 混雑時・送信エラー時のセーフティ案内バナー（初期非表示） -->
@@ -907,7 +907,7 @@
         totalVol += item.vol * item.qty;
       });
       msgText += `-------------------\n商品計: ¥${subtotalAmount.toLocaleString()}${hasAsk ? ' + ASK' : ''}\n容量: ${totalVol.toLocaleString()} vol (約${(totalVol/1000).toFixed(1)}箱)\n`;
-      msgText += `\n※正式な受注および発送日程は店舗からのご連絡をもって確定となります。\n`;
+      msgText += `\n※正式な受注および発送日程は、川畑水産からの発送確認連絡をもって確定となります。\n`;
       lastOrderMsgText = msgText;
 
       const payload = {
