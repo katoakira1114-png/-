@@ -366,6 +366,36 @@ function doGet(e) {
       }
     }
 
+    // 【診断API】顧客マスタと申請シートの登録状況確認用
+    if (action === "debugCustomerMaster") {
+      var dbgCSheet = ss.getSheetByName("顧客マスタ");
+      var dbgCData = dbgCSheet ? dbgCSheet.getDataRange().getValues() : [];
+      var dbgAppSheet = ss.getSheetByName("顧客登録申請");
+      var dbgAppData = dbgAppSheet ? dbgAppSheet.getDataRange().getValues() : [];
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        headers: dbgCData.length > 0 ? dbgCData[0] : [],
+        customers: dbgCData.slice(1).map(function(r) {
+          return {
+            uid: String(r[1] || ""),
+            name: String(r[2] || ""),
+            phone: String(r[3] || ""),
+            rate: r[0],
+            rawRow: r
+          };
+        }),
+        applications: dbgAppData.slice(1).map(function(r) {
+          return {
+            date: r[0],
+            uid: String(r[1] || ""),
+            name: String(r[2] || ""),
+            phone: String(r[3] || ""),
+            status: String(r[5] || "")
+          };
+        })
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     // 【ピッキングリスト取得API】出荷ピッキング画面用（現場専用ツールとしてダイレクト表示）
     if (action === "getPickingList") {
 
@@ -611,7 +641,8 @@ function doGet(e) {
       var cHeaders = cData[0];
       for (var ch = 0; ch < cHeaders.length; ch++) {
         var chTitle = String(cHeaders[ch]).trim();
-        if (chTitle.indexOf("LINE") !== -1 || chTitle.indexOf("UID") !== -1 || chTitle.indexOf("ユーザーID") !== -1) {
+        var chTitleLower = chTitle.toLowerCase();
+        if (chTitleLower.indexOf("line") !== -1 || chTitleLower.indexOf("uid") !== -1 || chTitleLower.indexOf("userid") !== -1 || chTitle.indexOf("ユーザーID") !== -1) {
           colUid = ch;
         } else if (chTitle.indexOf("店舗") !== -1 || chTitle.indexOf("氏名") !== -1 || chTitle.indexOf("顧客名") !== -1) {
           colName = ch;
@@ -638,13 +669,23 @@ function doGet(e) {
       if (colPhone === -1) colPhone = 3; // D列
       if (colRate === -1) colRate = 0; // A列(または旧仕様)
 
-      for (var i = 1; i < cData.length; i++) {
-        var dbUserId = String(cData[i][colUid] || "").trim();
-        var dbPhone = String(cData[i][colPhone] || "").replace(/[^0-9]/g, "");
-        if (dbPhone.length === 10 && !dbPhone.startsWith("0")) dbPhone = "0" + dbPhone;
+      var cleanReqUserId = reqUserId.replace(/[\s\uFEFF\xA0]/g, "").toLowerCase();
 
-        // 顧客認証: LINEユーザーIDの完全一致のみを条件とする（電話番号による認証は廃止して安全性を最大化）
-        var matchUid = (dbUserId !== "" && reqUserId !== "" && dbUserId.toLowerCase() === reqUserId.toLowerCase());
+      for (var i = 1; i < cData.length; i++) {
+        var dbUserId = String(cData[i][colUid] || "").replace(/[\s\uFEFF\xA0]/g, "").toLowerCase();
+        var matchUid = (dbUserId !== "" && cleanReqUserId !== "" && dbUserId === cleanReqUserId);
+
+        // 列ズレ・誤配置対策: もしcolUidで一致しなかった場合、その行の全列からUIDを照合
+        if (!matchUid && cleanReqUserId.length >= 8) {
+          for (var cIdx = 0; cIdx < cData[i].length; cIdx++) {
+            var cellVal = String(cData[i][cIdx] || "").replace(/[\s\uFEFF\xA0]/g, "").toLowerCase();
+            if (cellVal === cleanReqUserId) {
+              matchUid = true;
+              dbUserId = cellVal;
+              break;
+            }
+          }
+        }
 
         if (matchUid) {
           var rateVal = 1.0;
@@ -690,12 +731,6 @@ function doGet(e) {
             allowedCategories: allowedCategories,
             allowedProductGroups: allowedGroups
           };
-
-          // セキュリティ対策: 電話番号のみの一致による無検証なLINE UID自動バインドを停止
-          // (第三者による電話番号指定でのアカウント乗っ取り・不正紐付けを防止)
-          if (matchPhone && dbUserId === "" && reqUserId !== "") {
-            console.log("【未紐付けアクセス】電話番号 " + dbPhone + " に対し、未登録LINE UID " + reqUserId + " からの照会を検出しました。");
-          }
           break;
         }
       }
