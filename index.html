@@ -121,7 +121,10 @@
           🎣 生体リクエスト
         </a>
       </div>
-      <div><span class="user-badge" id="user-badge" style="display:none;"></span></div>
+      <div style="margin-top: 3px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+        <span class="user-badge" id="user-badge" style="display:none;"></span>
+        <span id="sync-indicator" style="display:none; font-size: 0.72rem; color: #005bac; font-weight: bold; background: #eef5fc; padding: 2px 8px; border-radius: 10px; border: 1px solid #bce1ff;">🔄 最新同期中...</span>
+      </div>
     </header>
 
     <!-- 未登録ユーザー向けの会員登録・利用申請画面 -->
@@ -177,7 +180,7 @@
             登録完了後、再度このページを開いていただくと商品一覧をご覧いただけます。<br>
             今しばらくお待ちください。
           </div>
-          <button class="confirm-btn" style="background:var(--primary-color);" onclick="location.reload()">再読み込み（登録状況の確認）</button>
+          <button class="confirm-btn" style="background:var(--primary-color);" onclick="removeStorageItem('kawabata_catalog_cache_v1'); location.reload();">再読み込み（登録状況の確認）</button>
         </div>
       </div>
     </div>
@@ -273,10 +276,99 @@
     // カテゴリの固定並び順
     const ORDERED_CATEGORIES = ["魚", "シャコガイ", "貝", "サンゴ", "イソギンチャク", "擬岩", "その他"];
 
+    // 高速化・状態永続化用ストレージキー (SWRキャッシュ)
+    const CATALOG_CACHE_KEY = 'kawabata_catalog_cache_v1';
+    const CART_CACHE_KEY = 'kawabata_cart_cache_v1';
+    const NG_DATES_CACHE_KEY = 'kawabata_ng_dates_v1';
+    const ACTIVE_TAB_KEY = 'kawabata_active_tab';
+
     let allProducts = [], categories = [], currentCategory = '', cart = {};
     let lineProfile = null, isRegistered = false, customerMaster = null;
     let userHistory = { purchaseCounts: {}, lastOrderItems: [] };
     let selectedNgDates = new Set(); // 選択された受取不可日
+
+    // ==========================================
+    // ストレージ・キャッシュヘルパー (SWR)
+    // ==========================================
+    function getStorageItem(key) {
+      try {
+        const sVal = sessionStorage.getItem(key);
+        if (sVal !== null) return sVal;
+      } catch(e) {}
+      try {
+        const lVal = localStorage.getItem(key);
+        if (lVal !== null) return lVal;
+      } catch(e) {}
+      return null;
+    }
+
+    function setStorageItem(key, val) {
+      try { sessionStorage.setItem(key, val); } catch(e) {}
+      try { localStorage.setItem(key, val); } catch(e) {}
+    }
+
+    function removeStorageItem(key) {
+      try { sessionStorage.removeItem(key); } catch(e) {}
+      try { localStorage.removeItem(key); } catch(e) {}
+    }
+
+    function saveCartToStorage() {
+      try {
+        setStorageItem(CART_CACHE_KEY, JSON.stringify(cart));
+      } catch(e) {}
+    }
+
+    function restoreCartFromStorage() {
+      try {
+        const raw = getStorageItem(CART_CACHE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === 'object') {
+            cart = parsed;
+          }
+        }
+        const rawDates = getStorageItem(NG_DATES_CACHE_KEY);
+        if (rawDates) {
+          const parsedDates = JSON.parse(rawDates);
+          if (Array.isArray(parsedDates)) {
+            selectedNgDates = new Set(parsedDates);
+          }
+        }
+      } catch(e) {}
+    }
+
+    function saveCatalogCache(data, uid) {
+      try {
+        const cacheObj = {
+          timestamp: Date.now(),
+          userId: uid || "",
+          data: data
+        };
+        setStorageItem(CATALOG_CACHE_KEY, JSON.stringify(cacheObj));
+      } catch(e) {
+        console.warn("Failed to save catalog cache:", e);
+      }
+    }
+
+    function loadCatalogCache(currentUid) {
+      try {
+        const raw = getStorageItem(CATALOG_CACHE_KEY);
+        if (!raw) return null;
+        const cacheObj = JSON.parse(raw);
+        if (!cacheObj || !cacheObj.data) return null;
+        if (currentUid && cacheObj.userId && currentUid !== cacheObj.userId) {
+          return null;
+        }
+        // キャッシュ有効期間（SWRで最新同期するため24時間保持でOK）
+        const MAX_AGE = 24 * 60 * 60 * 1000;
+        if (Date.now() - cacheObj.timestamp > MAX_AGE) {
+          return null;
+        }
+        return cacheObj.data;
+      } catch(e) {
+        return null;
+      }
+    }
 
     // XSS防御用のHTMLエスケープ関数
     function escapeHtml(str) {
@@ -306,24 +398,34 @@
 
     window.addEventListener('DOMContentLoaded', async () => {
       const container = document.getElementById('product-container');
+      const syncIndicator = document.getElementById('sync-indicator');
+
+      // 1. 保存されたカートおよび受取不可日の即時復元（画面間移動時のカート保持）
+      restoreCartFromStorage();
+
+      // 2. キャッシュされたカタログ・顧客情報が存在すれば即時描画（0.01秒で表示）
+      const cachedData = loadCatalogCache();
+      let hasRenderedFromCache = false;
+      if (cachedData && cachedData.products && cachedData.products.length > 0) {
+        applyCatalogData(cachedData, true);
+        hasRenderedFromCache = true;
+        console.log("⚡ [Cache] 前回のカタログデータを即時展開しました");
+        if (syncIndicator) syncIndicator.style.display = 'inline-block';
+      }
+
+      // 3. バックグラウンドでLIFF認証および最新商品データ照会（SWR）
       try {
-        // 1. LIFF初期化とLINEプロフィール取得
         await initLiff();
-
-        // 2. スマホの記憶領域へのアクセス（ブロックされても無視）
-        let savedPhone = "";
-        try {
-          savedPhone = localStorage.getItem('kawabata_phone') || "";
-        } catch (storageErr) {
-          console.warn("localStorage access denied:", storageErr);
-        }
-
-        // 3. 商品データ & 顧客認証の照会
-        await fetchProducts(savedPhone);
-
+        const uid = extractUserId();
+        await fetchProducts(uid, hasRenderedFromCache);
       } catch (mainErr) {
-        container.style.display = 'block';
-        container.innerHTML = `<div class="loading-text" style="color:red; font-weight:bold;">通信エラーが発生しました。<br>${mainErr.message}</div>`;
+        console.warn("[Sync Error]", mainErr);
+        if (!hasRenderedFromCache) {
+          container.style.display = 'block';
+          container.innerHTML = `<div class="loading-text" style="color:red; font-weight:bold;">通信エラーが発生しました。<br>${mainErr.message}</div>`;
+        }
+      } finally {
+        if (syncIndicator) syncIndicator.style.display = 'none';
       }
     });
 
@@ -449,17 +551,106 @@
       }
     }
 
-    async function fetchProducts(savedPhone = "") {
+    function applyCatalogData(data, isFromCache = false) {
+      if (!data) return false;
+      isRegistered = !!data.isRegistered;
+      customerMaster = data.customer;
+      userHistory = data.userHistory || { purchaseCounts: {}, lastOrderItems: [] };
+
+      const alertBox = document.getElementById('unregistered-alert');
+      const mainUI = document.getElementById('main-ui');
+      const footerBar = document.getElementById('footer-bar');
+      const badge = document.getElementById('user-badge');
       const container = document.getElementById('product-container');
-      container.innerHTML = '<div class="loading-text">商品データを読み込んでいます...</div>';
+
+      if (!isRegistered) {
+        console.warn("[GAS API] 未登録判定の理由: 送信されたUIDが顧客マスタに未登録または承認待ちのため");
+        alertBox.style.display = 'block';
+        mainUI.style.display = 'none';
+        footerBar.style.display = 'none';
+        container.style.display = 'none';
+        applyProfileToUI();
+        if (!extractUserId()) {
+          badge.innerText = `👤 未登録`;
+          badge.style.display = 'inline-block';
+        }
+        return true;
+      }
+
+      alertBox.style.display = 'none';
+      mainUI.style.display = 'block';
+      footerBar.style.display = 'block';
+      container.style.display = 'grid';
+
+      if (customerMaster && customerMaster.name) {
+        badge.innerText = `🏢 ${customerMaster.name} 様`;
+        badge.style.display = 'inline-block';
+        const nameEl = document.getElementById('cust-name');
+        const phoneEl = document.getElementById('cust-phone');
+        if (nameEl) nameEl.value = customerMaster.name || '';
+        if (phoneEl) phoneEl.value = customerMaster.phone || '';
+        try {
+          if (customerMaster.phone) localStorage.setItem('kawabata_phone', customerMaster.phone);
+        } catch(e) {}
+      }
+
+      const discountRate = (isRegistered && customerMaster && customerMaster.discountRate) ? customerMaster.discountRate : 1.0;
+      allProducts = (data.products || []).map(p => {
+        const appliedPrice = p.isAsk ? 0 : Math.floor(p.price * discountRate);
+        return { ...p, price: appliedPrice, vol: Number(p.vol) || 0, stock: Number(p.stock) || 0 };
+      });
+
+      // カートの在庫超過チェック（在庫が減っていた場合はクランプ）
+      let cartChanged = false;
+      allProducts.forEach(p => {
+        if (cart[p.id] === undefined) {
+          cart[p.id] = 0;
+        } else if (cart[p.id] > p.stock) {
+          cart[p.id] = Math.max(0, p.stock);
+          cartChanged = true;
+        }
+      });
+      if (cartChanged) {
+        saveCartToStorage();
+      }
+
+      // カテゴリの並び替え
+      const availableCats = new Set(allProducts.map(p => p.category));
+      categories = ORDERED_CATEGORIES.filter(cat => availableCats.has(cat));
+      allProducts.forEach(p => {
+        if (!categories.includes(p.category)) categories.push(p.category);
+      });
+
+      // 保存されていたアクティブタブの復元
+      let savedTab = "";
+      try { savedTab = sessionStorage.getItem(ACTIVE_TAB_KEY) || ""; } catch(e) {}
+      if (savedTab && categories.includes(savedTab)) {
+        currentCategory = savedTab;
+      } else if (categories.length > 0 && !categories.includes(currentCategory)) {
+        currentCategory = categories[0];
+      }
+
+      const prevScrollY = window.scrollY;
+      renderTabs();
+      renderProducts();
+      updateSummary();
+      if (!isFromCache && prevScrollY > 0) {
+        window.scrollTo(0, prevScrollY);
+      }
+      return true;
+    }
+
+    async function fetchProducts(uid = "", isBackgroundSync = false) {
+      const container = document.getElementById('product-container');
+      if (!isBackgroundSync) {
+        container.innerHTML = '<div class="loading-text">商品データを読み込んでいます...</div>';
+      }
       
       try {
-        const uid = extractUserId();
+        if (!uid) uid = extractUserId();
         let fetchUrl = GAS_API_URL + "?";
         if (uid) fetchUrl += `userId=${encodeURIComponent(uid)}&`;
-        // セキュリティ改善: 電話番号による認証バイパスを廃止し、LINEユーザーIDの完全一致のみで認証
-        console.log(`[GAS API] 認証パラメータ: userId="${uid || '(未取得)'}"`);
-        console.log(`[GAS API] リクエストURL: ${fetchUrl}`);
+        console.log(`[GAS API] 認証パラメータ: userId="${uid || '(未取得)'}" (bgSync: ${isBackgroundSync})`);
         updateDebugLog('gas', `照会中... (送信UID: ${uid ? uid.substring(0, 10) + '...' : '❌未取得(LIFF未認証)'})`);
 
         const res = await fetch(fetchUrl);
@@ -474,79 +665,21 @@
         }
 
         console.log("[GAS API] 受信レスポンスJSON:", data);
-
         if (data.error) throw new Error(data.error);
 
-        isRegistered = !!data.isRegistered;
-        customerMaster = data.customer;
-        userHistory = data.userHistory || { purchaseCounts: {}, lastOrderItems: [] };
-        
+        // キャッシュを最新データで更新
+        saveCatalogCache(data, uid);
+
+        // 最新データを画面に反映
+        applyCatalogData(data, false);
         updateDebugLog('gas', `応答受信: 登録状態=${isRegistered ? '✅ 承認済み(' + (customerMaster ? customerMaster.name : '') + ' 様)' : '⚠️ 未登録/認証未通過'}`);
 
-        const alertBox = document.getElementById('unregistered-alert');
-        const mainUI = document.getElementById('main-ui');
-        const footerBar = document.getElementById('footer-bar');
-        const badge = document.getElementById('user-badge');
-
-        if (!isRegistered) {
-          console.warn("[GAS API] 未登録判定の理由:", !uid ? "LIFF初期化エラーによりLINE UIDがGASへ未送信のため" : "送信されたUIDが顧客マスタに未登録または承認待ちのため");
-          
-          // 未登録時は商品一覧・注文UIを完全に非表示
-          alertBox.style.display = 'block';
-          mainUI.style.display = 'none';
-          footerBar.style.display = 'none';
-          container.style.display = 'none';
-          
-          applyProfileToUI();
-          if (!extractUserId()) {
-            badge.innerText = `👤 未登録`;
-            badge.style.display = 'inline-block';
-          }
-          return;
-        }
-
-        // 登録承認済みの場合のみ表示
-        alertBox.style.display = 'none';
-        mainUI.style.display = 'block';
-        footerBar.style.display = 'block';
-        container.style.display = 'grid';
-
-        // 掛け率の表示は削除し、店舗名/お名前のみ表示
-        badge.innerText = `🏢 ${customerMaster.name} 様`;
-        badge.style.display = 'inline-block';
-        document.getElementById('cust-name').value = customerMaster.name || '';
-        document.getElementById('cust-phone').value = customerMaster.phone || '';
-        
-        try {
-          if (customerMaster.phone) localStorage.setItem('kawabata_phone', customerMaster.phone);
-        } catch(e) {}
-
-        const discountRate = (isRegistered && customerMaster) ? customerMaster.discountRate : 1.0;
-        allProducts = (data.products || []).map(p => {
-          const appliedPrice = p.isAsk ? 0 : Math.floor(p.price * discountRate);
-          return { ...p, price: appliedPrice, vol: Number(p.vol) || 0, stock: Number(p.stock) || 0 };
-        });
-
-        allProducts.forEach(p => { if (cart[p.id] === undefined) cart[p.id] = 0; });
-
-        // 指定順序（ORDERED_CATEGORIES）でカテゴリを並び替え
-        const availableCats = new Set(allProducts.map(p => p.category));
-        categories = ORDERED_CATEGORIES.filter(cat => availableCats.has(cat));
-        allProducts.forEach(p => {
-          if (!categories.includes(p.category)) categories.push(p.category);
-        });
-
-        if (categories.length > 0 && !categories.includes(currentCategory)) {
-          currentCategory = categories[0];
-        }
-
-        renderTabs();
-        renderProducts();
-        updateSummary();
-
       } catch (err) {
-        container.style.display = 'block';
-        container.innerHTML = `<div class="loading-text" style="color:red; font-weight:bold;">${err.message}</div>`;
+        if (!isBackgroundSync) {
+          container.style.display = 'block';
+          container.innerHTML = `<div class="loading-text" style="color:red; font-weight:bold;">${err.message}</div>`;
+        }
+        throw err;
       }
     }
 
@@ -652,6 +785,7 @@
         btn.innerText = cat;
         btn.onclick = () => {
           currentCategory = cat;
+          try { sessionStorage.setItem(ACTIVE_TAB_KEY, cat); } catch(e) {}
           document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.innerText === cat));
           renderProducts();
         };
@@ -837,6 +971,7 @@
       if (newQty < 0) newQty = 0;
       if (newQty > product.stock) return alert(`在庫上限は ${product.stock} 個です。`);
       cart[id] = newQty;
+      saveCartToStorage();
       renderProducts();
       updateSummary();
     }
@@ -900,6 +1035,9 @@
           } else {
             selectedNgDates.add(dateKey);
           }
+          try {
+            setStorageItem(NG_DATES_CACHE_KEY, JSON.stringify(Array.from(selectedNgDates)));
+          } catch(e) {}
           renderNgDateChips();
         };
         container.appendChild(chip);
@@ -964,6 +1102,7 @@
       const p = allProducts.find(item => String(item.id) === String(productId));
       if (!p || p.stock <= 0) return;
       cart[productId] = 1;
+      saveCartToStorage();
       calculateModalTotal();
       updateSummary();
       renderProducts();
@@ -1104,6 +1243,8 @@
         // 正常完了時のみカートと受取不可日をリセット
         Object.keys(cart).forEach(id => { cart[id] = 0; });
         selectedNgDates.clear();
+        removeStorageItem(CART_CACHE_KEY);
+        removeStorageItem(NG_DATES_CACHE_KEY);
 
         closeModal();
         renderProducts();
