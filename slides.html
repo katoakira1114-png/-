@@ -85,6 +85,111 @@
     .btn-control:hover { background: rgba(255,255,255,0.25); }
     .btn-control:active { transform: scale(0.97); }
 
+    /* セクション切り替えタブ */
+    .section-nav {
+      display: flex;
+      background: rgba(255,255,255,0.08);
+      border-radius: 6px;
+      padding: 2px;
+      gap: 2px;
+      margin-right: 4px;
+    }
+    .btn-sec {
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      padding: 5px 12px;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+    .btn-sec:hover { color: #fff; }
+    .btn-sec.active {
+      background: var(--primary-light);
+      color: #fff;
+    }
+
+    /* 仕様テーブル・コード・アラートボックス */
+    .slide-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.81rem;
+      margin-top: 4px;
+    }
+    .slide-table th {
+      background: #004380;
+      color: #fff;
+      padding: 6px 10px;
+      text-align: left;
+      font-weight: bold;
+      border: 1px solid #003366;
+      font-size: 0.78rem;
+    }
+    .slide-table td {
+      padding: 6px 10px;
+      border: 1px solid #cbd5e1;
+      background: #fff;
+      line-height: 1.35;
+      color: #1e293b;
+    }
+    .slide-table tr:nth-child(even) td { background: #f8fafc; }
+    .code-badge {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      background: #e2e8f0;
+      color: #0f172a;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      word-break: break-all;
+    }
+    .alert-box {
+      background: #fff1f2;
+      border-left: 4px solid #e11d48;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      color: #9f1239;
+      line-height: 1.4;
+    }
+    .tip-box {
+      background: #eff6ff;
+      border-left: 4px solid #2563eb;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      color: #1e40af;
+      line-height: 1.4;
+    }
+    .warn-box {
+      background: #fffbeb;
+      border-left: 4px solid #d97706;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      color: #92400e;
+      line-height: 1.4;
+    }
+    .badge-admin {
+      background: #ea580c;
+      color: #fff;
+      font-size: 0.68rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    .badge-dev {
+      background: #7c3aed;
+      color: #fff;
+      font-size: 0.68rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+
     /* プログレスバー */
     .progress-track {
       height: 4px;
@@ -454,8 +559,12 @@
       <span class="tag">社内DXプレゼン資料</span>
     </div>
     <div class="top-controls">
+      <div class="section-nav">
+        <button class="btn-sec active" id="btn-sec-1" onclick="jumpToSlide(1)">第1部: 概要・機能</button>
+        <button class="btn-sec" id="btn-sec-2" onclick="jumpToSlide(15)">第2部: 保守運用仕様</button>
+      </div>
       <button class="btn-control" onclick="prevSlide()">◀ 前へ</button>
-      <span class="slide-counter" id="slide-counter">1 / 14</span>
+      <span class="slide-counter" id="slide-counter">1 / 25</span>
       <button class="btn-control" onclick="nextSlide()">次へ ▶</button>
       <button class="btn-control" onclick="openOverview()">📑 一覧</button>
       <button class="btn-control" onclick="toggleFullScreen()">⛶ 全画面</button>
@@ -513,7 +622,7 @@
       </div>
       <div class="slide-footer">
         <span>川畑水産（八重山）業務改善報告資料</span>
-        <span>2 / 14</span>
+        <span>2 / 25</span>
       </div>
     </div>
 
@@ -556,7 +665,7 @@
       </div>
       <div class="slide-footer">
         <span>川畑水産（八重山）業務改善報告資料</span>
-        <span>3 / 14</span>
+        <span>3 / 25</span>
       </div>
     </div>
 
@@ -608,7 +717,7 @@
       </div>
       <div class="slide-footer">
         <span>川畑水産（八重山）業務改善報告資料</span>
-        <span>4 / 14</span>
+        <span>4 / 25</span>
       </div>
     </div>
 
@@ -659,7 +768,7 @@
       </div>
       <div class="slide-footer">
         <span>川畑水産（八重山）業務改善報告資料</span>
-        <span>5 / 14</span>
+        <span>5 / 25</span>
       </div>
     </div>
 
@@ -699,7 +808,7 @@
       </div>
       <div class="slide-footer">
         <span>川畑水産（八重山）業務改善報告資料</span>
-        <span>6 / 14</span>
+        <span>6 / 25</span>
       </div>
     </div>
 
@@ -746,7 +855,7 @@
       </div>
       <div class="slide-footer">
         <span>川畑水産（八重山）業務改善報告資料</span>
-        <span>7 / 14</span>
+        <span>7 / 25</span>
       </div>
     </div>
 
@@ -792,7 +901,7 @@
       </div>
       <div class="slide-footer">
         <span>川畑水産（八重山）業務改善報告資料</span>
-        <span>8 / 14</span>
+        <span>8 / 25</span>
       </div>
     </div>
 
@@ -809,9 +918,9 @@
         <div class="grid-2">
           <div class="card highlight">
             <div class="card-icon">⚡</div>
-            <div class="card-title">水槽を見ながらワンタップ増減</div>
+            <div class="card-title">数値直接手入力 ＆ ワンタップ増減</div>
             <div class="card-desc">
-              スプレッドシートを開く必要なし！各生体カードの「-5」「-1」「+1」「+5」を押すだけで、スプレッドシートの在庫数がリアルタイムに更新されます。
+              550匹など大量入荷・群れ魚は入力枠に数値を直打ちして「確定」で一発反映！日々の微調整は「-5」「-1」「+1」「+5」ボタンで瞬時に増減同期します。
             </div>
           </div>
           <div class="card highlight">
@@ -839,47 +948,47 @@
       </div>
       <div class="slide-footer">
         <span>川畑水産（八重山）業務改善報告資料</span>
-        <span>9 / 14</span>
+        <span>9 / 25</span>
       </div>
     </div>
 
-    <!-- ==================== スライド 10: 写真撮影・Drive自動連携 ==================== -->
+    <!-- ==================== スライド 10: 複数写真撮影・Drive自動連携 ==================== -->
     <div class="slide" id="slide-10">
       <div class="slide-header">
         <div>
           <div class="slide-category">09. 在庫管理機能</div>
-          <h2 class="slide-title">生体写真のGoogleドライブ自動保存連携</h2>
+          <h2 class="slide-title">複数写真の同時添付とGoogle Drive自動保存</h2>
         </div>
-        <div class="slide-tag">現場作業の手間をゼロに</div>
+        <div class="slide-tag">写真ギャラリー対応</div>
       </div>
       <div class="slide-body">
         <div class="grid-3">
           <div class="card highlight">
-            <div class="card-icon">📱</div>
-            <div class="card-title">スマホ写真フォルダ & カメラ両対応</div>
+            <div class="card-icon">📸</div>
+            <div class="card-title">複数枚を一括選択・プレビュー</div>
             <div class="card-desc">
-              水槽前でその場でカメラ撮影して添付するのも、スマホ内のファイルや写真フォルダから過去に撮った写真を選ぶのもワンタップで対応。
+              スマホのカメラ撮影や写真フォルダ・ファイルから一度に複数枚の写真を選択可能。サムネイル一覧で確認し不要な写真は✕で除外できます。
             </div>
           </div>
           <div class="card highlight">
             <div class="card-icon">☁️</div>
             <div class="card-title">Googleドライブへ自動保存</div>
             <div class="card-desc">
-              アップロードされた写真は自動で最適サイズに圧縮され、川畑水産アカウントの専用フォルダ『川畑水産_観賞魚画像』へ即座に保管。
+              アップロード写真は自動で最適サイズに圧縮され、専用フォルダ『川畑水産_観賞魚画像』へ保管。シートへカンマ区切りで自動直リンク記録。
             </div>
           </div>
           <div class="card highlight">
-            <div class="card-icon">🔗</div>
-            <div class="card-title">スプレッドシートへ直リンク記録</div>
+            <div class="card-icon">🖼️</div>
+            <div class="card-title">社内＆顧客用 ギャラリービュー</div>
             <div class="card-desc">
-              画像の公開URLがシートに自動記録され、お客様の注文画面（カタログ）にも綺麗な高画質写真が即座に反映されます。
+              カードに「📷 3枚」等のバッジを表示。タップすると拡大ギャラリーが開き、矢印やスワイプで各個体の別アングルをじっくり閲覧できます。
             </div>
           </div>
         </div>
       </div>
       <div class="slide-footer">
         <span>川畑水産（八重山）業務改善報告資料</span>
-        <span>10 / 14</span>
+        <span>10 / 25</span>
       </div>
     </div>
 
@@ -914,7 +1023,7 @@
       </div>
       <div class="slide-footer">
         <span>川畑水産（八重山）業務改善報告資料</span>
-        <span>11 / 14</span>
+        <span>11 / 25</span>
       </div>
     </div>
 
@@ -951,7 +1060,7 @@
       </div>
       <div class="slide-footer">
         <span>川畑水産（八重山）業務改善報告資料</span>
-        <span>12 / 14</span>
+        <span>12 / 25</span>
       </div>
     </div>
 
@@ -994,13 +1103,13 @@
       </div>
       <div class="slide-footer">
         <span>川畑水産（八重山）業務改善報告資料</span>
-        <span>13 / 14</span>
+        <span>13 / 25</span>
       </div>
     </div>
 
     <!-- ==================== スライド 14: まとめ ==================== -->
     <div class="slide slide-cover" id="slide-14">
-      <div class="cover-badge">まとめ</div>
+      <div class="cover-badge">第1部 まとめ</div>
       <h1 class="cover-title">八重山の豊かな海の恵みを、<br>確実・迅速にお客様のもとへ</h1>
       <p class="cover-sub">
         川畑水産の現場力と信頼を最大化する新インフラ。<br>
@@ -1008,7 +1117,532 @@
       </p>
       <div style="margin-top: 24px; font-size: 1.1rem; color: #fff; font-weight: bold;">
         ご清聴ありがとうございました<br>
-        <span style="font-size: 0.9rem; font-weight: normal; color: #bae6fd;">（実際のスマートフォン画面でのデモ実演に移ります）</span>
+        <span style="font-size: 0.9rem; font-weight: normal; color: #bae6fd;">（続けて管理者・後任者向けの「第2部：仕様・保守運用マニュアル」を収録しています）</span>
+      </div>
+    </div>
+
+    <!-- ==================== スライド 15: 第2部 表紙 ==================== -->
+    <div class="slide slide-cover" id="slide-15">
+      <div class="cover-badge" style="background: rgba(249, 115, 22, 0.25); border-color: rgba(249, 115, 22, 0.5); color: #fed7aa;">第2部: 実務・保守編</div>
+      <h1 class="cover-title">システム仕様 &amp; 保守運用マニュアル</h1>
+      <p class="cover-sub">
+        後任者・管理者向け 完全引き継ぎガイド<br>
+        スプレッドシートの構造、顧客承認・掛率設定、在庫管理、トラブルシューティング、アカウント情報
+      </p>
+      <div class="cover-meta">
+        <div>👤 対象: システム管理者・現場運用リーダー・後任担当者</div>
+        <div>📄 原本ドキュメント: HANDOVER_FOR_HUMAN.md 準拠</div>
+      </div>
+    </div>
+
+    <!-- ==================== スライド 16: 13. システム全体構成 ＆ URL一覧 ==================== -->
+    <div class="slide" id="slide-16">
+      <div class="slide-header">
+        <div>
+          <div class="slide-category">13. システム構成 &amp; URL</div>
+          <h2 class="slide-title">システム全体アーキテクチャとアクセスURL一覧</h2>
+        </div>
+        <div class="slide-tag">公開・社内URLマップ</div>
+      </div>
+      <div class="slide-body">
+        <table class="slide-table">
+          <thead>
+            <tr>
+              <th style="width: 22%;">画面・システム名</th>
+              <th style="width: 15%;">対象者</th>
+              <th style="width: 33%;">アクセスURL / 格納場所</th>
+              <th style="width: 30%;">主な役割・運用</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>🛒 商品注文フォーム</strong></td>
+              <td>一般顧客</td>
+              <td><span class="code-badge">kawabatasuisanyaeyama.github.io/</span></td>
+              <td>LINE自動認証・生体Web注文・受取不可日指定</td>
+            </tr>
+            <tr>
+              <td><strong>🎣 生体リクエスト</strong></td>
+              <td>一般顧客</td>
+              <td><span class="code-badge">.../request.html</span></td>
+              <td>未入荷生体・特定種の採集リクエスト受付</td>
+            </tr>
+            <tr>
+              <td><strong>📦 出荷ピッキング</strong></td>
+              <td><span class="badge-admin">社内専用</span></td>
+              <td><span class="code-badge">.../picking.html</span></td>
+              <td>未発送のみ集約、生体合計表示、電話追加登録</td>
+            </tr>
+            <tr>
+              <td><strong>🐠 在庫・生体管理</strong></td>
+              <td><span class="badge-admin">社内専用</span></td>
+              <td><span class="code-badge">.../stock.html</span></td>
+              <td>数値直接入力/±増減、写真添付、新規商品登録</td>
+            </tr>
+            <tr>
+              <td><strong>📊 スプレッドシート原本</strong></td>
+              <td>管理者</td>
+              <td><span class="code-badge">Googleスプレッドシート本番</span></td>
+              <td>顧客マスタ、在庫、全注文履歴・明細のマスター</td>
+            </tr>
+            <tr>
+              <td><strong>📁 Drive 画像保管庫</strong></td>
+              <td>管理者</td>
+              <td>Google Drive: <span class="code-badge">川畑水産_観賞魚画像</span></td>
+              <td>生体写真の自動保存・公開リンク格納フォルダ</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="tip-box" style="margin-top: 10px;">
+          💡 <strong>セキュリティ方針</strong>: 社内専用画面（picking / stock）は、顧客用注文フォームから完全にリンクを隔離しています。現場スタッフはスマホのブラウザでブックマークまたは「ホーム画面に追加」して日常利用します。
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>川畑水産（八重山）業務改善報告資料</span>
+        <span>16 / 25</span>
+      </div>
+    </div>
+
+    <!-- ==================== スライド 17: 14. スプレッドシートの構造とルール ==================== -->
+    <div class="slide" id="slide-17">
+      <div class="slide-header">
+        <div>
+          <div class="slide-category">14. スプレッドシート仕様</div>
+          <h2 class="slide-title">4大シートの役割と厳守すべき編集ルール</h2>
+        </div>
+        <div class="slide-tag">原本データベース</div>
+      </div>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card" style="padding: 16px;">
+            <div class="card-title" style="font-size: 1rem; color: var(--primary);">① 顧客マスタ</div>
+            <div class="card-desc" style="font-size: 0.85rem;">
+              • <strong>A列</strong>: 個別掛率（例: <span class="code-badge">0.9</span> = 10%引）<br>
+              • <strong>B〜D列</strong>: LINE UID、店舗名、電話番号<br>
+              • <strong>E列以降</strong>: カテゴリ閲覧許可（魚・サンゴ・擬岩等）および限定ランク（A/B/C）のチェックボックス
+            </div>
+          </div>
+          <div class="card" style="padding: 16px;">
+            <div class="card-title" style="font-size: 1rem; color: var(--primary);">② 商品カテゴリ（魚/サンゴ/貝...）</div>
+            <div class="card-desc" style="font-size: 0.85rem;">
+              • 各カテゴリごとの商品マスタ（商品ID、商品名、サイズ、単価、vol、在庫、画像URL、売り切れ日時）<br>
+              • G列に画像URL（カンマ区切りで複数保持可能）<br>
+              • ※編集は <span class="code-badge">stock.html</span> からを強く推奨
+            </div>
+          </div>
+          <div class="card" style="padding: 16px;">
+            <div class="card-title" style="font-size: 1rem; color: var(--primary);">③ 注文明細</div>
+            <div class="card-desc" style="font-size: 0.85rem;">
+              • Web・電話から入った全注文の履歴原本<br>
+              • <strong>K列（発送済チェック）</strong> がピッキング画面と双方向リアルタイム連動（チェックを入れるとピッキング画面から自動非表示）
+            </div>
+          </div>
+          <div class="card" style="padding: 16px;">
+            <div class="card-title" style="font-size: 1rem; color: var(--primary);">④ 納品書テンプレート</div>
+            <div class="card-desc" style="font-size: 0.85rem;">
+              • 注文受信時に納品書PDFを自動出力するための雛形<br>
+              • タイトル、自社情報、明細行のレイアウト枠を定義<br>
+              • ※セルの結合や行位置の変更はPDF出力ズレの原因になります
+            </div>
+          </div>
+        </div>
+        <div class="warn-box" style="margin-top: 10px;">
+          ⚠️ <strong>編集の絶対ルール</strong>: 1行目のヘッダー行（列名）は絶対に変更・削除しないでください。プログラムが列位置を参照しているため、列の順序を入れ替えるとシステム誤作動の原因になります。
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>川畑水産（八重山）業務改善報告資料</span>
+        <span>17 / 25</span>
+      </div>
+    </div>
+
+    <!-- ==================== スライド 18: 15. 新規顧客の登録・承認と掛率・権限設定 ==================== -->
+    <div class="slide" id="slide-18">
+      <div class="slide-header">
+        <div>
+          <div class="slide-category">15. 顧客マスタ管理</div>
+          <h2 class="slide-title">新規顧客の承認手順と個別掛率・閲覧権限の設定</h2>
+        </div>
+        <div class="slide-tag">卸取引の設定</div>
+      </div>
+      <div class="slide-body">
+        <div class="flow-steps">
+          <div class="flow-step">
+            <div class="step-num">1</div>
+            <div class="step-title">📩 お客様が申請送信</div>
+            <div class="step-desc">
+              未登録客が注文画面を開くと申請画面が表示。<br>
+              名前・電話番号を入力し「公式LINEへ登録申請を送る」を押すと、シート「顧客登録申請」に自動記録。
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num">2</div>
+            <div class="step-title">📋 顧客マスタへ転記</div>
+            <div class="step-desc">
+              「顧客登録申請」シートの内容を確認し、「顧客マスタ」シートの最下行へ転記（LINE UID、店舗名、電話番号）。
+            </div>
+          </div>
+          <div class="flow-step active-step">
+            <div class="step-num">3</div>
+            <div class="step-title">💰 個別掛率の入力</div>
+            <div class="step-desc">
+              <strong>A列（掛率）</strong> に数値を設定。<br>
+              • 定価販売: <span class="code-badge">1.0</span><br>
+              • 10%引き: <span class="code-badge">0.9</span><br>
+              • 15%引き: <span class="code-badge">0.85</span><br>
+              （注文画面で自動割引計算）
+            </div>
+          </div>
+          <div class="flow-step active-step">
+            <div class="step-num">4</div>
+            <div class="step-title">🔒 カテゴリ・限定許可</div>
+            <div class="step-desc">
+              閲覧を許可するカテゴリ（魚、サンゴ等）にチェック。<br>
+              上得意先であれば限定ランク（A / B / C）にチェックを入れる。
+            </div>
+          </div>
+        </div>
+        <div class="tip-box" style="margin-top: 10px;">
+          💡 <strong>承認後の動作</strong>: 設定が完了すると、お客様が次回注文画面を開いた瞬間に自動認証が通り、「〇〇アクアリウム 様」と店舗名が表示され、専用卸価格で商品が閲覧・注文可能になります。
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>川畑水産（八重山）業務改善報告資料</span>
+        <span>18 / 25</span>
+      </div>
+    </div>
+
+    <!-- ==================== スライド 19: 16. 在庫・価格・限定ランクの日常管理 ==================== -->
+    <div class="slide" id="slide-19">
+      <div class="slide-header">
+        <div>
+          <div class="slide-category">16. 在庫・生体管理</div>
+          <h2 class="slide-title">スマホでの在庫直接入力と商品情報メンテナンス</h2>
+        </div>
+        <div class="slide-tag">stock.html の活用法</div>
+      </div>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card highlight">
+            <div class="card-icon">⌨️</div>
+            <div class="card-title">在庫数の直接手入力（大量入荷対応）</div>
+            <div class="card-desc">
+              • スズメダイなど <strong>550匹</strong> といった大量入荷時は、各カードの在庫入力枠に直接数値を入力し <strong>「確定」</strong>（またはEnter）を押すだけで即座にスプレッドシートへ反映。<br>
+              • 日常の細かい増減は <strong>「-5」「-1」「+1」「+5」</strong> ボタンでワンタップ。
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-icon">🚫</div>
+            <div class="card-title">売切処理 ＆ 再入荷ワンタップ</div>
+            <div class="card-desc">
+              • 生体が完売した時は <strong>「売切」</strong> ボタンを押すと在庫0になり売り切れ表示に。<br>
+              • 再入荷した時は <strong>「補充+10」</strong> を押すと即座にWeb上で再販スタートできます。
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-icon">✏️</div>
+            <div class="card-title">詳細編集モーダル</div>
+            <div class="card-desc">
+              • 各カードの <strong>「詳細編集」</strong> をタップすると、サイズ規格（例: 4〜5cm）、単価（またはASK切り替え）、容量volをいつでも現場から修正・更新可能。
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-icon">➕</div>
+            <div class="card-title">新規生体の登録 ＆ 自動発番</div>
+            <div class="card-desc">
+              • 「➕ 新規商品登録」から入力。商品IDは規則に従い自動発番（例: <span class="code-badge">魚_1791730000000</span>、限定時は <span class="code-badge">A_魚_1791730000000</span>）。重複や入力ミスの心配がありません。
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>川畑水産（八重山）業務改善報告資料</span>
+        <span>19 / 25</span>
+      </div>
+    </div>
+
+    <!-- ==================== スライド 20: 17. 複数写真管理とGoogle Drive保存の仕組み ==================== -->
+    <div class="slide" id="slide-20">
+      <div class="slide-header">
+        <div>
+          <div class="slide-category">17. 画像管理仕様</div>
+          <h2 class="slide-title">複数写真の撮影・自動圧縮・Google Drive連携</h2>
+        </div>
+        <div class="slide-tag">写真ギャラリー仕様</div>
+      </div>
+      <div class="slide-body">
+        <div class="grid-3">
+          <div class="card highlight">
+            <div class="card-icon">📸</div>
+            <div class="card-title">複数枚を一括選択・プレビュー</div>
+            <div class="card-desc">
+              • スマホのカメラ撮影や写真フォルダ・ファイルから一度に複数枚の写真を選択可能。<br>
+              • サムネイル一覧で事前確認でき、誤った写真は個別除外（✕）できます。
+            </div>
+          </div>
+          <div class="card highlight">
+            <div class="card-icon">☁️</div>
+            <div class="card-title">全自動の圧縮 ＆ Drive保管</div>
+            <div class="card-desc">
+              • アップロード写真は自動で適切な解像度（長辺1200px）に圧縮され、Drive専用フォルダ『川畑水産_観賞魚画像』へ即座に保管。<br>
+              • スプレッドシートG列に複数URLがカンマ区切り（<span class="code-badge">url1,url2</span>）で自動記録。
+            </div>
+          </div>
+          <div class="card highlight">
+            <div class="card-icon">🖼️</div>
+            <div class="card-title">拡大ギャラリービューアー</div>
+            <div class="card-desc">
+              • カードに「📷 3枚」バッジを表示。<br>
+              • タップで拡大モーダルが開き、左右矢印（◀/▶）、スマホの横スワイプ、下部サムネイルで別アングルをじっくり閲覧可能。
+            </div>
+          </div>
+        </div>
+        <div class="tip-box" style="margin-top: 10px;">
+          💡 <strong>容量圧迫防止</strong>: 画像は端末側で自動圧縮してから送信されるため、Googleドライブの容量を無駄遣いせず、お客様のスマホでも高速に写真が表示されます。
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>川畑水産（八重山）業務改善報告資料</span>
+        <span>20 / 25</span>
+      </div>
+    </div>
+
+    <!-- ==================== スライド 21: 18. 現場出荷ピッキングと急な電話注文への対応 ==================== -->
+    <div class="slide" id="slide-21">
+      <div class="slide-header">
+        <div>
+          <div class="slide-category">18. 現場出荷運用</div>
+          <h2 class="slide-title">未発送集約ピッキングと急な電話追加注文の即応手順</h2>
+        </div>
+        <div class="slide-tag">picking.html の実務</div>
+      </div>
+      <div class="slide-body">
+        <div class="flow-steps">
+          <div class="flow-step">
+            <div class="step-num">1</div>
+            <div class="step-title">📦 ピッキング画面を開く</div>
+            <div class="step-desc">
+              未発送の注文のみが自動表示。<br>
+              「生体集約・合計」タブで本日発送の全生体合計（例: カクレクマノミ 計5匹）を見て水槽から一気に掬い出し。タップで消し込み。
+            </div>
+          </div>
+          <div class="flow-step active-step">
+            <div class="step-num">2</div>
+            <div class="step-title">📞 急な電話追加への即応</div>
+            <div class="step-desc">
+              注文カードの「➕ 生体を追加」をタップ。<br>
+              生体名入力で在庫からサジェスト選択（手入力も可）。<br>
+              <strong>在庫0やマイナスでも入力可能</strong>（急な水揚げ・電話営業をブロックしない現場主義）。
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num">3</div>
+            <div class="step-title">📤 発送LINEメッセージ送信</div>
+            <div class="step-desc">
+              梱包完了後、「📤 発送LINE」を押すと、お客様宛てのLINE送信画面が起動。<br>
+              納品書PDFリンク付きのメッセージを1タップ送信。
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="step-num">4</div>
+            <div class="step-title">✅ 発送完了アーカイブ</div>
+            <div class="step-desc">
+              「📦 発送完了にする」を押すと、シートの発送済チェック（K列）がONになり、ピッキング画面から自動非表示。
+            </div>
+          </div>
+        </div>
+        <div class="tip-box" style="margin-top: 10px;">
+          💡 <strong>完全新規の電話注文</strong>: Web注文を使っていないお客様からの電話注文も、上部バーの「📞 新規注文」から直接作成可能です。
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>川畑水産（八重山）業務改善報告資料</span>
+        <span>21 / 25</span>
+      </div>
+    </div>
+
+    <!-- ==================== スライド 22: 19. トラブルシューティング① 顧客認証・表示関連 ==================== -->
+    <div class="slide" id="slide-22">
+      <div class="slide-header">
+        <div>
+          <div class="slide-category">19. トラブルシューティング</div>
+          <h2 class="slide-title">顧客認証エラー・在庫反映ラグ・画像表示の対処法</h2>
+        </div>
+        <div class="slide-tag">よくある不具合と解決策①</div>
+      </div>
+      <div class="slide-body">
+        <div class="grid-3">
+          <div class="card" style="padding: 18px;">
+            <div class="card-icon" style="color: #dc2626;">❓</div>
+            <div class="card-title" style="font-size: 1rem;">①「登録申請したのに商品が見られない」</div>
+            <div class="card-desc" style="font-size: 0.85rem;">
+              <strong>【原因】</strong>: 「顧客マスタ」にLINE UIDが未転記、またはカテゴリ閲覧許可チェックが入っていない。<br>
+              <strong>【対処】</strong>: 「顧客登録申請」シートからLINE UID（<span class="code-badge">U...</span>）をコピーし、「顧客マスタ」のB列に貼り付け。魚などの閲覧カテゴリにチェックを入れます。
+            </div>
+          </div>
+          <div class="card" style="padding: 18px;">
+            <div class="card-icon" style="color: #d97706;">⏳</div>
+            <div class="card-title" style="font-size: 1rem;">②「在庫を変更したのにすぐ反映されない」</div>
+            <div class="card-desc" style="font-size: 0.85rem;">
+              <strong>【原因】</strong>: 通信高速化のためのキャッシュ（約1分間）。<br>
+              <strong>【対処】</strong>: システムは毎回の過負荷を防ぐため1分間データをキャッシュしています。1分待つか、ブラウザを「再読み込み（リロード）」すると最新データが取得されます。
+            </div>
+          </div>
+          <div class="card" style="padding: 18px;">
+            <div class="card-icon" style="color: #2563eb;">🖼️</div>
+            <div class="card-title" style="font-size: 1rem;">③「商品画像がNo Imageになる」</div>
+            <div class="card-desc" style="font-size: 0.85rem;">
+              <strong>【原因】</strong>: Googleドライブフォルダの公開共有権限が外れている可能性。<br>
+              <strong>【対処】</strong>: Googleドライブで『川畑水産_観賞魚画像』フォルダを右クリック →「共有」→ 一般アクセスを「リンクを知っている全員（閲覧者）」に再設定してください。
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>川畑水産（八重山）業務改善報告資料</span>
+        <span>22 / 25</span>
+      </div>
+    </div>
+
+    <!-- ==================== スライド 23: 20. トラブルシューティング② 送信エラー・データ保守 ==================== -->
+    <div class="slide" id="slide-23">
+      <div class="slide-header">
+        <div>
+          <div class="slide-category">20. トラブルシューティング</div>
+          <h2 class="slide-title">注文送信エラー時の安全設計と定期データ保守</h2>
+        </div>
+        <div class="slide-tag">よくある不具合と解決策②</div>
+      </div>
+      <div class="slide-body">
+        <div class="grid-2">
+          <div class="card highlight">
+            <div class="card-icon">🛡️</div>
+            <div class="card-title">電波障害・混雑時の二重セーフティ設計</div>
+            <div class="card-desc">
+              お客様の電波が弱い場所での送信エラー時も、入力内容やカート商品は絶対に消失しません。<br>
+              • <strong>「🔄 今すぐ再送する」</strong>: 電波が回復したら1タップでそのまま再送信。<br>
+              • <strong>「💬 LINEで直接送る」</strong>: サーバーに繋がらない場合でも、LINEトークへ全注文内容が自動転記されて直接メッセージ送信できます。
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-icon">🗄️</div>
+            <div class="card-title">スプレッドシートの定期保守（年1回推奨）</div>
+            <div class="card-desc">
+              「注文明細」シートに数千件の注文が蓄積されるとスプレッドシートの動作が重くなります。<br>
+              • <strong>アーカイブ手順</strong>: 年末などに、過去の発送済み行を「注文明細_2026年」などの別シートへ切り取って貼り付け、原本を身軽に保ちます。<br>
+              • <strong>テンプレート保護</strong>: 「納品書テンプレート」シートのセル位置は動かさないでください。
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>川畑水産（八重山）業務改善報告資料</span>
+        <span>23 / 25</span>
+      </div>
+    </div>
+
+    <!-- ==================== スライド 24: 21. 重要アカウント・設定パラメーター・連絡先 ==================== -->
+    <div class="slide" id="slide-24">
+      <div class="slide-header">
+        <div>
+          <div class="slide-category">21. アカウント &amp; パラメーター</div>
+          <h2 class="slide-title">引き継ぎに必要なID・キー・管理アカウント一覧</h2>
+        </div>
+        <div class="slide-tag">後任者・管理者用</div>
+      </div>
+      <div class="slide-body">
+        <table class="slide-table">
+          <thead>
+            <tr>
+              <th style="width: 25%;">サービス / 項目</th>
+              <th style="width: 35%;">アカウント / ID / 設定値</th>
+              <th style="width: 40%;">用途・注意事項</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Google 本番オーナー</strong></td>
+              <td><span class="code-badge">kawabatasuisam@gmail.com</span></td>
+              <td>スプレッドシート、Google Drive、GASの最高管理者</td>
+            </tr>
+            <tr>
+              <td><strong>スプレッドシートID</strong></td>
+              <td><span class="code-badge">1ZiNel8TGJ-e7JMolkRagVOSnr1UczvQzpTa-F-s4p3o</span></td>
+              <td>「石垣島観賞魚販売管理」本番原本</td>
+            </tr>
+            <tr>
+              <td><strong>公式LINE ID / チャネル</strong></td>
+              <td><span class="code-badge">@721pyqfn</span> (チャネルID: 2011871129)</td>
+              <td>顧客向けLINE窓口、注文受付・発送完了連絡</td>
+            </tr>
+            <tr>
+              <td><strong>LIFF ID (LINE連携)</strong></td>
+              <td><span class="code-badge">2011871129-P4IflaGc</span></td>
+              <td>LINEアプリ内自動認証（※13文字目は大文字の「I」）</td>
+            </tr>
+            <tr>
+              <td><strong>GitHub リポジトリ</strong></td>
+              <td><span class="code-badge">kawabatasuisanyaeyama.github.io</span></td>
+              <td>フロントエンド（HTML/CSS/JS）公開ホスティング</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="tip-box" style="margin-top: 10px;">
+          🤖 <strong>AIへの引き継ぎ</strong>: 今後AI（Antigravity、ChatGPT等）に機能追加や改修を依頼する際は、リポジトリ内の <span class="code-badge">HANDOVER_FOR_AI.md</span> を読み込ませるだけで、アーキテクチャやAPI仕様を100%把握して安全に作業してくれます。
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>川畑水産（八重山）業務改善報告資料</span>
+        <span>24 / 25</span>
+      </div>
+    </div>
+
+    <!-- ==================== スライド 25: 22. まとめ & 保守運用チェックリスト ==================== -->
+    <div class="slide" id="slide-25">
+      <div class="slide-header">
+        <div>
+          <div class="slide-category">22. 運用チェックリスト</div>
+          <h2 class="slide-title">川畑水産 日常・週次・月次の運用チェックリスト</h2>
+        </div>
+        <div class="slide-tag">運用サイクルの確立</div>
+      </div>
+      <div class="slide-body">
+        <div class="grid-3">
+          <div class="card" style="padding: 18px;">
+            <div class="card-icon">☀️</div>
+            <div class="card-title" style="color: var(--primary-light);">毎日の運用（現場）</div>
+            <div class="card-desc" style="font-size: 0.84rem; line-height: 1.5;">
+              ☑ 朝: <span class="code-badge">stock.html</span> で水槽の生体数を直接入力または±ボタンで微調整<br>
+              ☑ 昼〜夕: <span class="code-badge">picking.html</span> で「生体集約」を見て水槽から掬い出し＆梱包<br>
+              ☑ 発送時: 「発送LINE」で納品書リンク送信 → 「発送完了」タップ
+            </div>
+          </div>
+          <div class="card" style="padding: 18px;">
+            <div class="card-icon">📅</div>
+            <div class="card-title" style="color: var(--primary-light);">週次の運用（管理者）</div>
+            <div class="card-desc" style="font-size: 0.84rem; line-height: 1.5;">
+              ☑ 「顧客登録申請」シートに新規申請がないか確認 → マスタ反映＆掛率・閲覧許可設定<br>
+              ☑ 「生体リクエスト」シートを確認し、未入荷生体の採集計画へ反映<br>
+              ☑ 長期在庫切れ商品のステータス確認
+            </div>
+          </div>
+          <div class="card" style="padding: 18px;">
+            <div class="card-icon">🗓️</div>
+            <div class="card-title" style="color: var(--primary-light);">月次・年次の運用</div>
+            <div class="card-desc" style="font-size: 0.84rem; line-height: 1.5;">
+              ☑ Googleドライブ「川畑水産_納品書PDF」のバックアップ確認<br>
+              ☑ 年末等に「注文明細」の過去データを年度別シートへアーカイブ<br>
+              ☑ 新規カテゴリ追加や価格改定時のマスタメンテナンス
+            </div>
+          </div>
+        </div>
+        <div class="tip-box" style="margin-top: 10px; text-align: center; font-weight: bold;">
+          🚢 川畑水産（八重山）の現場力と顧客満足度を、シンプルで強固なシステムで支え続けます。
+        </div>
+      </div>
+      <div class="slide-footer">
+        <span>川畑水産（八重山）業務改善報告資料</span>
+        <span>25 / 25</span>
       </div>
     </div>
 
@@ -1029,7 +1663,7 @@
   </div>
 
   <script>
-    const totalSlides = 14;
+    const totalSlides = 25;
     let currentSlide = 1;
 
     const slideTitles = [
@@ -1042,11 +1676,22 @@
       "06. 社内専用 出荷ピッキング管理コンソール",
       "07. 急な電話注文・生体追加への即応システム",
       "08. スマホ特化 在庫・生体管理コンソール",
-      "09. 生体写真のGoogleドライブ自動保存連携",
+      "09. 複数写真の同時添付とGoogle Drive自動保存",
       "10. 納品書PDF自動生成とLINE発送連絡",
       "11. 新システム導入による期待効果",
       "12. 属人化を防ぐ引き継ぎ体制と今後の拡張性",
-      "まとめ: 本格運用の開始と実演デモ"
+      "第1部まとめ: 本格運用の開始と実演デモ",
+      "第2部表紙: システム仕様 & 保守運用マニュアル",
+      "13. 全体アーキテクチャとアクセスURL一覧",
+      "14. 4大シートの役割と厳守すべき編集ルール",
+      "15. 新規顧客の承認手順と個別掛率・権限設定",
+      "16. スマホでの在庫直接入力と商品情報メンテ",
+      "17. 複数写真管理とGoogle Drive保存の仕組み",
+      "18. 未発送集約ピッキングと急な電話追加運用",
+      "19. 顧客認証エラー・在庫反映ラグ・画像の対処",
+      "20. 注文送信エラー時の安全設計と定期保守",
+      "21. 引き継ぎに必要なID・キー・管理アカウント",
+      "22. 日常・週次・月次の運用チェックリスト"
     ];
 
     function showSlide(index) {
@@ -1065,6 +1710,18 @@
       document.getElementById('slide-counter').innerText = `${currentSlide} / ${totalSlides}`;
       const progress = ((currentSlide - 1) / (totalSlides - 1)) * 100;
       document.getElementById('progress-bar').style.width = `${progress}%`;
+
+      // セクションボタンスイッチの連動
+      const secBtn1 = document.getElementById('btn-sec-1');
+      const secBtn2 = document.getElementById('btn-sec-2');
+      if (secBtn1 && secBtn2) {
+        secBtn1.classList.toggle('active', currentSlide <= 14);
+        secBtn2.classList.toggle('active', currentSlide >= 15);
+      }
+    }
+
+    function jumpToSlide(index) {
+      showSlide(index);
     }
 
     function nextSlide() {
@@ -1080,7 +1737,6 @@
     }
 
     function handleViewportClick(e) {
-      // 画面の右半分クリックで次へ、左半分で前へ
       if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.top-bar')) return;
       const x = e.clientX;
       const w = window.innerWidth;
@@ -1091,7 +1747,6 @@
       }
     }
 
-    // キーボードショートカット
     window.addEventListener('keydown', (e) => {
       if (document.getElementById('overview-modal').style.display === 'block') {
         if (e.key === 'Escape') closeOverview();
@@ -1114,7 +1769,6 @@
       }
     });
 
-    // スワイプ対応
     let touchStartX = 0;
     window.addEventListener('touchstart', (e) => {
       touchStartX = e.changedTouches[0].screenX;
@@ -1128,7 +1782,6 @@
       }
     }, false);
 
-    // フルスクリーン切り替え
     function toggleFullScreen() {
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen().catch(err => console.log(err));
@@ -1139,14 +1792,37 @@
       }
     }
 
-    // スライド一覧モーダル
     function openOverview() {
       const modal = document.getElementById('overview-modal');
       const grid = document.getElementById('overview-grid');
       grid.innerHTML = '';
 
+      const part1Header = document.createElement('div');
+      part1Header.style.gridColumn = '1 / -1';
+      part1Header.style.color = '#38bdf8';
+      part1Header.style.fontWeight = 'bold';
+      part1Header.style.fontSize = '1.05rem';
+      part1Header.style.borderBottom = '1px solid rgba(255,255,255,0.2)';
+      part1Header.style.paddingBottom = '6px';
+      part1Header.style.marginTop = '10px';
+      part1Header.innerText = '■ 第1部：システム概要・現場機能紹介（全14スライド）';
+      grid.appendChild(part1Header);
+
       slideTitles.forEach((title, idx) => {
         const num = idx + 1;
+        if (num === 15) {
+          const part2Header = document.createElement('div');
+          part2Header.style.gridColumn = '1 / -1';
+          part2Header.style.color = '#fb923c';
+          part2Header.style.fontWeight = 'bold';
+          part2Header.style.fontSize = '1.05rem';
+          part2Header.style.borderBottom = '1px solid rgba(255,255,255,0.2)';
+          part2Header.style.paddingBottom = '6px';
+          part2Header.style.marginTop = '24px';
+          part2Header.innerText = '■ 第2部：管理者向け仕様・保守運用マニュアル（全11スライド）';
+          grid.appendChild(part2Header);
+        }
+
         const card = document.createElement('div');
         card.className = `overview-card ${num === currentSlide ? 'current' : ''}`;
         card.onclick = () => {
@@ -1154,7 +1830,7 @@
           closeOverview();
         };
         card.innerHTML = `
-          <div class="overview-num">SLIDE ${num}</div>
+          <div class="overview-num">${num <= 14 ? 'PART 1' : 'PART 2'} - SLIDE ${num}</div>
           <div class="overview-title">${title}</div>
         `;
         grid.appendChild(card);
@@ -1167,7 +1843,6 @@
       document.getElementById('overview-modal').style.display = 'none';
     }
 
-    // 初期化
     showSlide(1);
   </script>
 </body>

@@ -50,7 +50,7 @@
 | **生体リクエスト** | [https://kawabatasuisanyaeyama.github.io/request.html](https://kawabatasuisanyaeyama.github.io/request.html) | 一般顧客 | 未入荷生体や特定種の採集リクエスト受付 |
 | **出荷ピッキング管理** | [https://kawabatasuisanyaeyama.github.io/picking.html](https://kawabatasuisanyaeyama.github.io/picking.html) | **社内専用** | 現場での出荷ピッキング、未発送管理、電話追加登録 |
 | **在庫・生体管理** | [https://kawabatasuisanyaeyama.github.io/stock.html](https://kawabatasuisanyaeyama.github.io/stock.html) | **社内専用** | 在庫数ワンタップ増減、カメラ写真/ファイル添付(Drive自動連携)、新規商品登録 |
-| **社内説明用スライド** | [https://kawabatasuisanyaeyama.github.io/slides.html](https://kawabatasuisanyaeyama.github.io/slides.html) | **社内専用** | 社長・役員へのシステム概要説明・プレゼン用スライド（PC全画面対応・PDF印刷対応） |
+| **社内説明・引き継ぎスライド** | [https://kawabatasuisanyaeyama.github.io/slides.html](https://kawabatasuisanyaeyama.github.io/slides.html) | **社内専用** | 社長への概要説明（第1部）＆ 管理者・後任者向け仕様・保守運用マニュアル（第2部・全25スライド、全画面・PDF印刷対応） |
 | **スプレッドシート(本番)** | [スプレッドシートを開く](https://docs.google.com/spreadsheets/d/1ZiNel8TGJ-e7JMolkRagVOSnr1UczvQzpTa-F-s4p3o/edit) | 管理者 | 在庫マスタ、顧客マスタ、全注文履歴・明細の原本 |
 | **Google Drive(画像)** | `川畑水産_観賞魚画像` (Google Driveフォルダ) | 管理者 | 新規生体登録時にアップロードされた写真の自動格納庫 |
 | **Apps Script(GAS)** | [GASエディタを開く](https://script.google.com/u/0/home/projects/1tIl_FYj2PWaSfsvajNXkBgZdgqr4-NMtb9yZsbWPQmSvdfCVQR3n6lv0/edit) | 開発/保守 | バックエンド処理（API、PDF生成、通知、画像保存） |
