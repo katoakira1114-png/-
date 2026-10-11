@@ -75,6 +75,7 @@ c:\Users\81909\Desktop\shop-project\
 ├── request.html         # Public specimen collection request form
 ├── picking.html         # Staff picking and dispatch management console
 ├── stock.html           # Staff stock inventory & new product registration console
+├── slides.html          # Executive presentation slide deck for stakeholder review
 ├── 無題.js              # GAS backend implementation (~1600+ LOC)
 ├── HANDOVER_FOR_HUMAN.md# Operational handover manual for human administrators
 └── HANDOVER_FOR_AI.md   # This specification document for AI assistants

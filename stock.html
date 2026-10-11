@@ -391,13 +391,25 @@
         <!-- 画像ファイル添付エリア -->
         <div class="form-group">
           <label class="form-label">生体写真・画像添付<span class="desc">Google Driveへ自動保存</span></label>
-          <input type="file" id="add-image-file" accept="image/*" capture="environment" style="display:none;" onchange="handleImageFileSelected(event)">
+          <!-- 端末内のファイル・写真ライブラリから選択（captureなし） -->
+          <input type="file" id="add-image-file" accept="image/*" style="display:none;" onchange="handleImageFileSelected(event)">
+          <!-- スマホのカメラを直接起動して撮影（capture="environment"） -->
+          <input type="file" id="add-image-camera" accept="image/*" capture="environment" style="display:none;" onchange="handleImageFileSelected(event)">
           
-          <div class="image-drop-area" id="image-drop-area" onclick="document.getElementById('add-image-file').click()">
+          <div class="image-drop-area" id="image-drop-area">
             <div id="drop-prompt">
-              <div style="font-size:2rem; margin-bottom:4px;">📷</div>
-              <div style="font-weight:bold; color:var(--primary); font-size:0.92rem;">カメラで撮影 / 画像を選択</div>
-              <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">タップで写真選択、または画像をここに貼り付け (Ctrl+V)</div>
+              <div style="font-size:2rem; margin-bottom:4px;">🖼️</div>
+              <div style="font-weight:bold; color:var(--primary); font-size:0.95rem;">画像を選択 / カメラ撮影</div>
+              <div style="font-size:0.76rem; color:var(--text-muted); margin-top:2px;">スマホの写真フォルダ・ファイルから選択、または直接撮影</div>
+              
+              <div style="margin-top:12px; display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">
+                <button type="button" class="btn-step" style="width:auto; padding:9px 15px; height:auto; background:#fff; border:1.5px solid var(--primary); color:var(--primary); font-weight:bold; font-size:0.85rem; border-radius:8px; display:inline-flex; align-items:center; gap:5px; cursor:pointer;" onclick="document.getElementById('add-image-file').click()">
+                  📁 ファイル・写真から選択
+                </button>
+                <button type="button" class="btn-step" style="width:auto; padding:9px 15px; height:auto; background:var(--primary); border:none; color:#fff; font-weight:bold; font-size:0.85rem; border-radius:8px; display:inline-flex; align-items:center; gap:5px; cursor:pointer;" onclick="document.getElementById('add-image-camera').click()">
+                  📷 その場でカメラ撮影
+                </button>
+              </div>
             </div>
             <div class="image-preview-box" id="add-preview-box">
               <img id="add-preview-img" src="" alt="プレビュー">
@@ -460,14 +472,18 @@
       <!-- 写真の差し替え・Drive保存 -->
       <div class="form-group">
         <label class="form-label">写真の差し替え / 追加</label>
-        <input type="file" id="edit-image-file" accept="image/*" capture="environment" style="display:none;" onchange="handleEditImageSelected(event)">
-        <div style="display:flex; gap:8px; align-items:center;">
-          <button type="button" class="btn-step" style="width:auto; padding:0 12px; height:40px; background:#f0f9ff; border-color:#0284c7; color:#0284c7; font-weight:bold;" onclick="document.getElementById('edit-image-file').click()">
-            📷 写真を選択 / 撮影
+        <input type="file" id="edit-image-file" accept="image/*" style="display:none;" onchange="handleEditImageSelected(event)">
+        <input type="file" id="edit-image-camera" accept="image/*" capture="environment" style="display:none;" onchange="handleEditImageSelected(event)">
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:4px;">
+          <button type="button" class="btn-step" style="width:auto; padding:8px 12px; height:auto; background:#f0f9ff; border:1.5px solid #0284c7; color:#0284c7; font-weight:bold; font-size:0.82rem; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" onclick="document.getElementById('edit-image-file').click()">
+            📁 ファイル・写真から選択
+          </button>
+          <button type="button" class="btn-step" style="width:auto; padding:8px 12px; height:auto; background:#0284c7; border:none; color:#fff; font-weight:bold; font-size:0.82rem; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;" onclick="document.getElementById('edit-image-camera').click()">
+            📷 カメラ撮影
           </button>
           <span id="edit-img-status" style="font-size:0.75rem; color:#64748b;">変更なし</span>
         </div>
-        <div id="edit-preview-box" style="margin-top:6px; display:none; max-height:140px; border-radius:6px; overflow:hidden; background:#000;">
+        <div id="edit-preview-box" style="margin-top:8px; display:none; max-height:140px; border-radius:6px; overflow:hidden; background:#000; justify-content:center; align-items:center;">
           <img id="edit-preview-img" style="max-height:140px; max-width:100%; object-fit:contain;" src="">
         </div>
       </div>
@@ -784,6 +800,8 @@
       currentSelectedImageBase64 = "";
       currentSelectedImageName = "";
       document.getElementById('add-image-file').value = '';
+      const cam = document.getElementById('add-image-camera');
+      if (cam) cam.value = '';
       document.getElementById('drop-prompt').style.display = 'block';
       document.getElementById('add-preview-box').style.display = 'none';
       document.getElementById('add-preview-img').src = '';
@@ -897,6 +915,10 @@
     }
 
     function closeEditModal() {
+      const f = document.getElementById('edit-image-file');
+      if (f) f.value = '';
+      const c = document.getElementById('edit-image-camera');
+      if (c) c.value = '';
       document.getElementById('edit-modal').style.display = 'none';
     }
 
