@@ -848,6 +848,123 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
+    // 【生体追加API】電話追加などでピッキング管理画面から手動で生体・品目を追加
+    if (action === "addOrderItem") {
+      var targetOrderId = String(contents.orderId || "").trim();
+      var itemData = contents.item || {};
+      var prodName = String(itemData.name || "").trim();
+      var qty = parseInt(itemData.qty, 10) || 1;
+      var category = String(itemData.category || "魚").trim();
+      var isAsk = !!itemData.isAsk;
+      var unitPrice = isAsk ? "ASK" : (Number(itemData.price) || 0);
+      var subtotal = isAsk ? "ASK" : (Number(itemData.subtotal) || (unitPrice * qty));
+
+      if (!prodName) throw new Error("商品名を入力してください。");
+      if (qty <= 0) throw new Error("匹数(数量)は1以上を指定してください。");
+
+      var ssMaster = SpreadsheetApp.openById(SPREADSHEET_ID);
+      var dSheet = ssMaster.getSheetByName("注文明細");
+      if (!dSheet) throw new Error("注文明細シートが見つかりません。");
+
+      var nowTime = new Date();
+      var dateFormatted = Utilities.formatDate(nowTime, "JST", "yyyy/MM/dd HH:mm:ss");
+
+      var custName = "電話注文客";
+      var custPhone = "";
+      var pdfUrl = "";
+      var editSsUrl = "";
+      var ngDatesStr = "";
+      var notesStr = "【電話追加】";
+      var hyperlinkFormula = "";
+
+      // 既存注文への追加の場合、注文情報を引き継ぐ
+      if (targetOrderId && targetOrderId !== "NEW") {
+        var dVals = dSheet.getDataRange().getValues();
+        for (var rIdx = 1; rIdx < dVals.length; rIdx++) {
+          if (String(dVals[rIdx][1] || "").trim() === targetOrderId) {
+            custName = String(dVals[rIdx][2] || custName).trim();
+            custPhone = String(dVals[rIdx][3] || "").trim();
+            pdfUrl = String(dVals[rIdx][9] || "").trim();
+            editSsUrl = String(dVals[rIdx][12] || "").trim();
+            ngDatesStr = String(dVals[rIdx][13] || "").trim();
+            notesStr = String(dVals[rIdx][14] || "").trim();
+            if (notesStr && notesStr.indexOf("電話追加") === -1) {
+              notesStr += " (電話追加あり)";
+            }
+            break;
+          }
+        }
+      } else {
+        var dateIdStr = Utilities.formatDate(nowTime, "JST", "yyyyMMdd_HHmmss");
+        targetOrderId = "TEL-" + dateIdStr;
+        if (contents.customerName) custName = String(contents.customerName).trim();
+        if (contents.phone) custPhone = String(contents.phone).trim();
+      }
+
+      var shippingLineId = PropertiesService.getScriptProperties().getProperty("OFFICIAL_LINE_ID") || "@721pyqfn";
+      var shippingMsg = "【発送完了のお知らせ】\n" + custName + " 様\n\nご注文いただいた商品を本日発送いたしました。\n基本的には明日の午前中到着予定となります。\n到着後のご準備をお願いいたします。" + (pdfUrl ? "\n\n📄納品書PDF:\n" + pdfUrl : "");
+      var lineUrl = "https://line.me/R/oaMessage/" + shippingLineId + "/?" + encodeURIComponent(shippingMsg);
+      hyperlinkFormula = "=HYPERLINK(\"" + lineUrl + "\", \"📤 発送LINEを送る\")";
+
+      // 注文明細に行を追加
+      var newRow = [
+        dateFormatted,
+        targetOrderId,
+        custName,
+        custPhone,
+        category,
+        prodName,
+        qty,
+        unitPrice,
+        subtotal,
+        pdfUrl,
+        false, // 未発送
+        hyperlinkFormula,
+        editSsUrl,
+        ngDatesStr,
+        notesStr
+      ];
+
+      dSheet.appendRow(newRow);
+
+      // 在庫の減算（シートに該当商品が存在する場合は在庫を減算。在庫0以下・マイナスも許容）
+      try {
+        var catSheet = getSheetForCategory(ssMaster, category);
+        if (catSheet) {
+          var cData = catSheet.getDataRange().getValues();
+          if (cData.length > 1) {
+            var cHead = cData[0];
+            var colN = -1, colS = -1;
+            for (var c = 0; c < cHead.length; c++) {
+              var th = String(cHead[c]).trim();
+              if (th.indexOf("名") !== -1 || th.indexOf("商品") !== -1) colN = c;
+              else if (th.indexOf("在庫") !== -1) colS = c;
+            }
+            if (colN !== -1 && colS !== -1) {
+              for (var rowI = 1; rowI < cData.length; rowI++) {
+                if (String(cData[rowI][colN]).trim() === prodName) {
+                  var curStock = parseInt(cData[rowI][colS], 10) || 0;
+                  var updatedStock = curStock - qty;
+                  catSheet.getRange(rowI + 1, colS + 1).setValue(updatedStock);
+                  break;
+                }
+              }
+            }
+          }
+        }
+      } catch (stockErr) {
+        console.warn("Stock update warning: " + stockErr);
+      }
+
+      SpreadsheetApp.flush();
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "生体「" + prodName + "」(" + qty + "匹) を追加しました",
+        orderId: targetOrderId
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     // --- ここから注文処理 ---
     var items = contents.items || [];
     var customer = contents.customer || {};

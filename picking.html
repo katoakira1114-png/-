@@ -194,7 +194,150 @@
       border-top: 1px solid var(--border); padding: 8px 14px; font-size: 0.75rem;
       text-align: center; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center;
     }
-    .footer-link { color: var(--primary); text-decoration: none; font-weight: bold; }
+    /* 生体追加トリガーボタン */
+    .btn-add-item-trigger {
+      width: 100%; margin-top: 10px; padding: 9px 12px;
+      background: #f0f9ff; border: 1.5px dashed #0284c7; border-radius: 8px;
+      color: #0369a1; font-size: 0.85rem; font-weight: bold; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      transition: all 0.15s ease;
+    }
+    .btn-add-item-trigger:active { background: #e0f2fe; transform: scale(0.99); }
+
+    /* モーダルスタイル */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.6); z-index: 1000;
+      display: flex; justify-content: center; align-items: flex-end;
+      backdrop-filter: blur(2px);
+    }
+    @media (min-width: 640px) {
+      .modal-overlay { align-items: center; padding: 20px; }
+    }
+    .modal-sheet {
+      background: #fff; width: 100%; max-width: 500px;
+      border-radius: 18px 18px 0 0; max-height: 90vh;
+      display: flex; flex-direction: column; overflow: hidden;
+      box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.2);
+      animation: slideUp 0.2s ease-out;
+    }
+    @media (min-width: 640px) {
+      .modal-sheet { border-radius: 16px; max-height: 85vh; }
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+    .modal-header {
+      padding: 14px 16px; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center;
+      background: #f8fafc;
+    }
+    .modal-header-title { font-size: 1.05rem; font-weight: bold; color: var(--text); }
+    .modal-header-sub { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+    .modal-close-btn {
+      background: none; border: none; font-size: 1.4rem; color: #94a3b8;
+      cursor: pointer; padding: 4px 8px; line-height: 1; border-radius: 6px;
+    }
+    .modal-body {
+      padding: 16px; overflow-y: auto; flex: 1;
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .input-label { font-size: 0.82rem; font-weight: bold; color: #334155; margin-bottom: 5px; display: block; }
+    .modal-search-input {
+      width: 100%; padding: 11px 13px; font-size: 0.95rem; border: 2px solid #0284c7;
+      border-radius: 8px; outline: none; background: #fff; box-sizing: border-box;
+    }
+    .modal-search-input:focus { box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15); }
+    .suggest-container {
+      max-height: 240px; overflow-y: auto; border: 1px solid var(--border);
+      border-radius: 8px; background: #fff;
+    }
+    .suggest-item {
+      padding: 10px 12px; border-bottom: 1px solid #f1f5f9; cursor: pointer;
+      display: flex; justify-content: space-between; align-items: center;
+      transition: background 0.1s ease;
+    }
+    .suggest-item:active, .suggest-item:hover { background: #f0f9ff; }
+    .suggest-item-name { font-size: 0.92rem; font-weight: bold; color: var(--text); }
+    .suggest-item-badge {
+      display: inline-block; font-size: 0.7rem; padding: 2px 6px;
+      border-radius: 4px; background: #e0f2fe; color: #0369a1; font-weight: bold; margin-right: 4px;
+    }
+    .suggest-item-right { text-align: right; }
+    .suggest-item-price { font-size: 0.9rem; font-weight: bold; color: var(--primary); }
+    .suggest-item-stock { font-size: 0.75rem; color: #64748b; }
+    .suggest-manual-item {
+      padding: 12px 14px; background: #fffbeb; border-top: 2px dashed #f59e0b;
+      cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+      color: #b45309; font-weight: bold; font-size: 0.88rem;
+    }
+    .suggest-manual-item:active { background: #fef3c7; }
+
+    /* 確定商品の入力エリア */
+    .confirmed-box {
+      background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 10px;
+      padding: 14px; display: flex; flex-direction: column; gap: 12px;
+    }
+    .confirmed-title-row {
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .confirmed-badge {
+      font-size: 0.75rem; padding: 3px 8px; border-radius: 4px; font-weight: bold;
+    }
+    .confirmed-badge.master { background: #dcfce7; color: #15803d; }
+    .confirmed-badge.manual { background: #fef3c7; color: #b45309; }
+    .btn-reselect {
+      font-size: 0.78rem; background: none; border: 1px solid #94a3b8;
+      border-radius: 4px; padding: 3px 8px; color: #475569; cursor: pointer;
+    }
+    .qty-stepper {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .stepper-btn {
+      width: 44px; height: 44px; border: 1px solid var(--border); background: #fff;
+      border-radius: 8px; font-size: 1.3rem; font-weight: bold; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; color: var(--primary);
+    }
+    .stepper-btn:active { background: #f1f5f9; }
+    .qty-input {
+      flex: 1; height: 44px; text-align: center; font-size: 1.25rem; font-weight: bold;
+      border: 1.5px solid var(--border); border-radius: 8px; outline: none;
+    }
+    .qty-input:focus { border-color: var(--primary); }
+    .price-calc-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    }
+    .calc-input-box { display: flex; flex-direction: column; }
+    .calc-input {
+      height: 42px; padding: 8px 10px; font-size: 1.05rem; font-weight: bold;
+      border: 1.5px solid var(--border); border-radius: 8px; outline: none; text-align: right; box-sizing: border-box;
+    }
+    .calc-input:focus { border-color: var(--primary); }
+    .modal-footer {
+      padding: 12px 16px; border-top: 1px solid var(--border); background: #fff;
+      display: flex; gap: 10px;
+    }
+    .btn-modal-cancel {
+      flex: 1; padding: 12px; border: 1px solid var(--border); background: #f8fafc;
+      border-radius: 8px; font-weight: bold; color: #64748b; cursor: pointer;
+    }
+    .btn-modal-submit {
+      flex: 2; padding: 12px; border: none; background: var(--primary);
+      border-radius: 8px; font-weight: bold; color: #fff; font-size: 0.95rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .btn-modal-submit:active { opacity: 0.9; }
+    .btn-modal-submit:disabled { background: #cbd5e1; cursor: not-allowed; }
+
+    /* トースト通知 */
+    .toast-notice {
+      position: fixed; bottom: 65px; left: 50%; transform: translateX(-50%);
+      background: #1e293b; color: #fff; padding: 10px 18px; border-radius: 30px;
+      font-size: 0.85rem; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+      z-index: 2000; display: none; align-items: center; gap: 6px; animation: fadeIn 0.2s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, 10px); } to { opacity: 1; transform: translate(-50%, 0); } }
   </style>
 </head>
 <body>
@@ -227,6 +370,7 @@
       <option value="all">すべて表示</option>
       <option value="shipped">発送済のみ</option>
     </select>
+    <button type="button" class="btn-action" style="background:#0284c7; color:#fff; border:none; white-space:nowrap; padding:8px 12px; font-weight:bold; border-radius:6px;" onclick="openAddFishModal('NEW', '新規電話注文')">📞 新規注文</button>
   </div>
 
   <div class="container">
@@ -267,6 +411,109 @@
     </div>
   </div>
 
+  <!-- 電話生体追加モーダル -->
+  <div class="modal-overlay" id="add-fish-modal" style="display:none;" onclick="if(event.target===this) closeAddFishModal()">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <div>
+          <div class="modal-header-title">🐠 生体を手動追加</div>
+          <div class="modal-header-sub" id="modal-target-order-label">対象: 注文番号</div>
+        </div>
+        <button class="modal-close-btn" onclick="closeAddFishModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- 新規電話注文時の顧客名入力（NEW時のみ表示） -->
+        <div id="new-order-cust-section" style="display:none;">
+          <label class="input-label">🏢 お客様名 / 店舗名 (必須)</label>
+          <input type="text" id="new-order-cust-name" class="modal-search-input" placeholder="例: サンゴ堂 石垣店 様" style="margin-bottom:8px;">
+          <label class="input-label">📞 お電話番号 (任意)</label>
+          <input type="tel" id="new-order-cust-phone" class="modal-search-input" placeholder="例: 090-1234-5678" style="margin-bottom:12px;">
+        </div>
+
+        <!-- 検索入力 -->
+        <div id="fish-search-section">
+          <label class="input-label">1. 生体名・商品名を検索または手入力</label>
+          <input type="text" id="add-fish-search" class="modal-search-input" placeholder="🔍 生体名を入力 (例: カクレクマノミ, スズメ...)" oninput="handleFishSearchInput()" autocomplete="off">
+          <div id="fish-suggestions-box" class="suggest-container" style="margin-top:8px;"></div>
+        </div>
+
+        <!-- 確定・匹数・単価設定エリア -->
+        <div id="add-fish-detail-area" style="display:none;">
+          <div class="confirmed-box">
+            <div class="confirmed-title-row">
+              <span class="confirmed-badge" id="confirmed-badge">マスタ品</span>
+              <button type="button" class="btn-reselect" onclick="reselectFish()">🔍 別の魚を再検索</button>
+            </div>
+
+            <!-- 商品名（マスタ品なら表示のみ、手入力なら編集可） -->
+            <div>
+              <label class="input-label" style="margin-bottom:3px;">商品名</label>
+              <input type="text" id="confirmed-name-input" class="modal-search-input" style="padding:8px 10px; font-weight:bold;">
+            </div>
+
+            <!-- カテゴリ選択 -->
+            <div>
+              <label class="input-label" style="margin-bottom:3px;">カテゴリ</label>
+              <select id="confirmed-category-select" class="filter-select" style="width:100%; height:38px;">
+                <option value="魚">魚</option>
+                <option value="シャコガイ">シャコガイ</option>
+                <option value="貝">貝</option>
+                <option value="サンゴ">サンゴ</option>
+                <option value="イソギンチャク">イソギンチャク</option>
+                <option value="擬岩">擬岩</option>
+                <option value="その他">その他</option>
+              </select>
+            </div>
+
+            <!-- 匹数(数量) -->
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                <label class="input-label" style="margin-bottom:0;">2. 匹数 (数量)</label>
+                <span id="stock-hint-label" style="font-size:0.75rem; color:#64748b;">在庫: -</span>
+              </div>
+              <div class="qty-stepper">
+                <button type="button" class="stepper-btn" onclick="stepQty(-1)">−</button>
+                <input type="number" id="confirmed-qty-input" class="qty-input" value="1" min="1" step="1" oninput="onQtyChanged()">
+                <button type="button" class="stepper-btn" onclick="stepQty(1)">＋</button>
+              </div>
+              <div style="font-size:0.72rem; color:#64748b; margin-top:3px;">※ 在庫0以下でも追加可能です（電話営業・突発入荷に対応）</div>
+            </div>
+
+            <!-- 単価・合計金額 -->
+            <div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                <label class="input-label" style="margin-bottom:0;">3. 単価 / 合計金額</label>
+                <label style="font-size:0.78rem; display:flex; align-items:center; gap:4px; cursor:pointer;">
+                  <input type="checkbox" id="confirmed-is-ask" onchange="onAskToggle()"> ASK (要問合せ)
+                </label>
+              </div>
+              <div class="price-calc-grid" id="price-inputs-grid">
+                <div class="calc-input-box">
+                  <span style="font-size:0.72rem; color:#64748b; margin-bottom:2px;">1匹単価 (円)</span>
+                  <input type="number" id="confirmed-unit-price" class="calc-input" placeholder="0" min="0" oninput="onUnitPriceChanged()">
+                </div>
+                <div class="calc-input-box">
+                  <span style="font-size:0.72rem; color:#64748b; margin-bottom:2px;">合計金額 (円)</span>
+                  <input type="number" id="confirmed-total-price" class="calc-input" placeholder="0" min="0" oninput="onTotalPriceChanged()">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-modal-cancel" onclick="closeAddFishModal()">キャンセル</button>
+        <button type="button" class="btn-modal-submit" id="btn-submit-add-fish" onclick="submitAddFishItem()" disabled>
+          <span>➕ 注文に追加する</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-notice" id="toast-notice"></div>
+
   <footer>
     <span id="last-sync-label">社内出荷管理システム (60秒毎自動同期)</span>
     <a href="https://docs.google.com/spreadsheets/d/1ZiNel8TGJ-e7JMolkRagVOSnr1UczvQzpTa-F-s4p3o/edit" target="_blank" class="footer-link">📊 スプレッドシート</a>
@@ -281,6 +528,10 @@
     let rawTotalSummary = [];
     let checkedItemsMap = {};
     let pickedSummaryMap = {};
+    let allProductsMaster = [];
+    let currentAddOrderId = "";
+    let currentAddCustomerName = "";
+    let selectedProductState = null;
 
     window.addEventListener('DOMContentLoaded', () => {
       try {
@@ -289,6 +540,7 @@
       } catch (e) {}
 
       fetchPickingData();
+      loadProductsMaster();
 
       // 60秒ごとに自動更新
       setInterval(fetchPickingData, 60000);
@@ -467,6 +719,9 @@
 
             <div class="order-items-list">
               ${itemsHtml}
+              <button type="button" class="btn-add-item-trigger" onclick="openAddFishModal('${escapeHtml(order.orderId)}', '${escapeHtml(order.customerName)}')">
+                ➕ 生体を追加（電話追加など）
+              </button>
             </div>
 
             <div class="order-actions">
@@ -587,6 +842,363 @@
         alert('通信エラーが発生しました。電波の良い場所で再度お試しください。');
         fetchPickingData();
       }
+    }
+
+    // ==========================================
+    // 生体手動追加モーダル処理
+    // ==========================================
+
+    // マスタ商品データのバックグラウンド取得
+    async function loadProductsMaster() {
+      try {
+        const res = await fetch(`${GAS_API_URL}?action=fetchProducts`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && data.products) {
+          allProductsMaster = data.products;
+        }
+      } catch (e) {
+        console.warn("loadProductsMaster error:", e);
+      }
+    }
+
+    // モーダルを開く
+    function openAddFishModal(orderId, customerName) {
+      currentAddOrderId = orderId;
+      currentAddCustomerName = customerName || "";
+      
+      const labelEl = document.getElementById('modal-target-order-label');
+      const custSection = document.getElementById('new-order-cust-section');
+      
+      if (orderId === 'NEW') {
+        labelEl.innerText = '📞 新規電話注文の作成';
+        custSection.style.display = 'block';
+        document.getElementById('new-order-cust-name').value = '';
+        document.getElementById('new-order-cust-phone').value = '';
+      } else {
+        labelEl.innerText = `🏢 ${customerName} 様 (${orderId})`;
+        custSection.style.display = 'none';
+      }
+
+      // 入力リセット
+      selectedProductState = null;
+      document.getElementById('add-fish-search').value = '';
+      document.getElementById('fish-search-section').style.display = 'block';
+      document.getElementById('add-fish-detail-area').style.display = 'none';
+      document.getElementById('btn-submit-add-fish').disabled = true;
+
+      handleFishSearchInput();
+
+      document.getElementById('add-fish-modal').style.display = 'flex';
+      setTimeout(() => {
+        if (orderId === 'NEW') {
+          document.getElementById('new-order-cust-name').focus();
+        } else {
+          document.getElementById('add-fish-search').focus();
+        }
+      }, 80);
+    }
+
+    // モーダルを閉じる
+    function closeAddFishModal() {
+      document.getElementById('add-fish-modal').style.display = 'none';
+    }
+
+    // 文字入力時の候補絞り込み（インクリメンタルサーチ）
+    function handleFishSearchInput() {
+      const query = (document.getElementById('add-fish-search').value || '').trim().toLowerCase();
+      const box = document.getElementById('fish-suggestions-box');
+      
+      let matches = [];
+      if (query) {
+        matches = allProductsMaster.filter(p => {
+          const pName = (p.name || '').toLowerCase();
+          const pCat = (p.category || '').toLowerCase();
+          const pSize = (p.size || '').toLowerCase();
+          return pName.includes(query) || pCat.includes(query) || pSize.includes(query);
+        }).slice(0, 25);
+      } else {
+        matches = allProductsMaster.slice(0, 15);
+      }
+
+      let html = '';
+      matches.forEach(p => {
+        const stockNum = p.stock !== undefined ? p.stock : 0;
+        const stockStr = stockNum <= 0 ? `<span style="color:#ef4444; font-weight:bold;">在庫: ${stockNum} (0以下も追加可)</span>` : `在庫: ${stockNum}`;
+        const priceStr = p.isAsk ? 'ASK' : `¥${(p.price || 0).toLocaleString()}`;
+        const safeName = escapeHtml(p.name);
+        const safeCat = escapeHtml(p.category || '魚');
+        const safeSize = p.size ? ` (${escapeHtml(p.size)})` : '';
+        
+        html += `
+          <div class="suggest-item" onclick="selectMasterFish('${escapeHtml(p.id)}')">
+            <div>
+              <div><span class="suggest-item-badge">${safeCat}</span><span class="suggest-item-name">${safeName}</span><span style="font-size:0.75rem; color:#64748b;">${safeSize}</span></div>
+              <div class="suggest-item-meta">${stockStr}</div>
+            </div>
+            <div class="suggest-item-right">
+              <div class="suggest-item-price">${priceStr}</div>
+            </div>
+          </div>
+        `;
+      });
+
+      // 候補の一番下に「スプレッドシートに無い商品（直接手入力）」を配置
+      const rawQuery = (document.getElementById('add-fish-search').value || '').trim();
+      const manualLabel = rawQuery ? `「${escapeHtml(rawQuery)}」を直接手入力（未登録商品）` : 'スプレッドシートに無い商品を直接手入力';
+      html += `
+        <div class="suggest-manual-item" onclick="selectManualFish()">
+          <span>➕ ${manualLabel}</span>
+          <span style="font-size:0.75rem; color:#b45309;">タップして確定 →</span>
+        </div>
+      `;
+
+      box.innerHTML = html;
+    }
+
+    // マスタ商品タップで確定
+    function selectMasterFish(productId) {
+      const p = allProductsMaster.find(item => String(item.id) === String(productId));
+      if (!p) return;
+
+      selectedProductState = {
+        isManual: false,
+        id: p.id,
+        name: p.name,
+        category: p.category || '魚',
+        stock: p.stock || 0,
+        price: p.price || 0,
+        isAsk: !!p.isAsk,
+        qty: 1
+      };
+
+      setupConfirmedView();
+    }
+
+    // マスタ外手入力タップで確定
+    function selectManualFish() {
+      const query = (document.getElementById('add-fish-search').value || '').trim();
+      selectedProductState = {
+        isManual: true,
+        id: '',
+        name: query || '',
+        category: '魚',
+        stock: 0,
+        price: 0,
+        isAsk: false,
+        qty: 1
+      };
+
+      setupConfirmedView();
+    }
+
+    // 確定後の匹数・単価入力画面をセットアップ
+    function setupConfirmedView() {
+      document.getElementById('fish-search-section').style.display = 'none';
+      document.getElementById('add-fish-detail-area').style.display = 'block';
+
+      const badge = document.getElementById('confirmed-badge');
+      const nameInput = document.getElementById('confirmed-name-input');
+      const catSelect = document.getElementById('confirmed-category-select');
+      const stockHint = document.getElementById('stock-hint-label');
+      const qtyInput = document.getElementById('confirmed-qty-input');
+      const unitPriceInput = document.getElementById('confirmed-unit-price');
+      const totalPriceInput = document.getElementById('confirmed-total-price');
+      const askCheckbox = document.getElementById('confirmed-is-ask');
+
+      if (selectedProductState.isManual) {
+        badge.className = 'confirmed-badge manual';
+        badge.innerText = '✍️ 未登録・手入力';
+        nameInput.readOnly = false;
+        nameInput.value = selectedProductState.name;
+        stockHint.innerText = 'マスタ外商品';
+      } else {
+        badge.className = 'confirmed-badge master';
+        badge.innerText = '📋 マスタ登録品';
+        nameInput.readOnly = true;
+        nameInput.value = selectedProductState.name;
+        stockHint.innerText = `現在庫: ${selectedProductState.stock} (在庫0以下でも追加可)`;
+      }
+
+      catSelect.value = selectedProductState.category || '魚';
+      qtyInput.value = selectedProductState.qty || 1;
+      askCheckbox.checked = selectedProductState.isAsk;
+
+      if (selectedProductState.isAsk) {
+        unitPriceInput.value = '';
+        totalPriceInput.value = '';
+        unitPriceInput.disabled = true;
+        totalPriceInput.disabled = true;
+      } else {
+        unitPriceInput.disabled = false;
+        totalPriceInput.disabled = false;
+        unitPriceInput.value = selectedProductState.price || '';
+        totalPriceInput.value = (selectedProductState.price * (selectedProductState.qty || 1)) || '';
+      }
+
+      document.getElementById('btn-submit-add-fish').disabled = false;
+      setTimeout(() => {
+        qtyInput.focus();
+        qtyInput.select();
+      }, 80);
+    }
+
+    // 別の魚を再検索
+    function reselectFish() {
+      document.getElementById('fish-search-section').style.display = 'block';
+      document.getElementById('add-fish-detail-area').style.display = 'none';
+      document.getElementById('btn-submit-add-fish').disabled = true;
+      handleFishSearchInput();
+      document.getElementById('add-fish-search').focus();
+    }
+
+    // 匹数の増減
+    function stepQty(delta) {
+      const input = document.getElementById('confirmed-qty-input');
+      let val = parseInt(input.value, 10) || 1;
+      val = Math.max(1, val + delta);
+      input.value = val;
+      onQtyChanged();
+    }
+
+    // 匹数変更時の再計算
+    function onQtyChanged() {
+      const qty = parseInt(document.getElementById('confirmed-qty-input').value, 10) || 1;
+      if (selectedProductState) selectedProductState.qty = qty;
+
+      const isAsk = document.getElementById('confirmed-is-ask').checked;
+      if (!isAsk) {
+        const unitPrice = parseFloat(document.getElementById('confirmed-unit-price').value) || 0;
+        document.getElementById('confirmed-total-price').value = Math.round(unitPrice * qty);
+      }
+    }
+
+    // 1匹単価入力時の合計金額自動計算
+    function onUnitPriceChanged() {
+      const qty = parseInt(document.getElementById('confirmed-qty-input').value, 10) || 1;
+      const unitPrice = parseFloat(document.getElementById('confirmed-unit-price').value) || 0;
+      document.getElementById('confirmed-total-price').value = Math.round(unitPrice * qty);
+    }
+
+    // 合計金額入力時の1匹単価自動計算
+    function onTotalPriceChanged() {
+      const qty = parseInt(document.getElementById('confirmed-qty-input').value, 10) || 1;
+      const totalPrice = parseFloat(document.getElementById('confirmed-total-price').value) || 0;
+      document.getElementById('confirmed-unit-price').value = qty > 0 ? Math.round(totalPrice / qty) : 0;
+    }
+
+    // ASK切り替え
+    function onAskToggle() {
+      const isAsk = document.getElementById('confirmed-is-ask').checked;
+      const unitPriceInput = document.getElementById('confirmed-unit-price');
+      const totalPriceInput = document.getElementById('confirmed-total-price');
+      if (isAsk) {
+        unitPriceInput.value = '';
+        totalPriceInput.value = '';
+        unitPriceInput.disabled = true;
+        totalPriceInput.disabled = true;
+      } else {
+        unitPriceInput.disabled = false;
+        totalPriceInput.disabled = false;
+        const basePrice = selectedProductState ? selectedProductState.price : 0;
+        const qty = parseInt(document.getElementById('confirmed-qty-input').value, 10) || 1;
+        unitPriceInput.value = basePrice || '';
+        totalPriceInput.value = (basePrice * qty) || '';
+      }
+    }
+
+    // 確定・サーバー送信
+    async function submitAddFishItem() {
+      if (!selectedProductState) return;
+
+      const nameInput = document.getElementById('confirmed-name-input');
+      const finalName = nameInput.value.trim();
+      if (!finalName) {
+        alert('商品名を入力してください');
+        nameInput.focus();
+        return;
+      }
+
+      const catSelect = document.getElementById('confirmed-category-select');
+      const finalCat = catSelect.value || '魚';
+      const qtyInput = document.getElementById('confirmed-qty-input');
+      const finalQty = parseInt(qtyInput.value, 10) || 1;
+      if (finalQty <= 0) {
+        alert('匹数は1以上を指定してください');
+        qtyInput.focus();
+        return;
+      }
+
+      const isAsk = document.getElementById('confirmed-is-ask').checked;
+      let finalUnitPrice = 0;
+      let finalTotalPrice = 0;
+      if (!isAsk) {
+        finalUnitPrice = parseFloat(document.getElementById('confirmed-unit-price').value) || 0;
+        finalTotalPrice = parseFloat(document.getElementById('confirmed-total-price').value) || (finalUnitPrice * finalQty);
+      }
+
+      let payloadCustName = currentAddCustomerName;
+      let payloadPhone = "";
+      if (currentAddOrderId === 'NEW') {
+        payloadCustName = (document.getElementById('new-order-cust-name').value || '').trim();
+        payloadPhone = (document.getElementById('new-order-cust-phone').value || '').trim();
+        if (!payloadCustName) {
+          alert('お客様名 / 店舗名を入力してください');
+          document.getElementById('new-order-cust-name').focus();
+          return;
+        }
+      }
+
+      const submitBtn = document.getElementById('btn-submit-add-fish');
+      submitBtn.disabled = true;
+      submitBtn.innerText = '追加処理中...';
+
+      try {
+        const res = await fetch(GAS_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: "addOrderItem",
+            orderId: currentAddOrderId,
+            customerName: payloadCustName,
+            phone: payloadPhone,
+            item: {
+              name: finalName,
+              category: finalCat,
+              qty: finalQty,
+              price: finalUnitPrice,
+              subtotal: finalTotalPrice,
+              isAsk: isAsk
+            }
+          })
+        });
+        const result = await res.json();
+        if (result.status === 'success') {
+          if (navigator.vibrate) navigator.vibrate(50);
+          closeAddFishModal();
+          showToast(`✅ ${finalName} (${finalQty}匹) を追加しました！`);
+          fetchPickingData();
+        } else {
+          alert('追加エラー: ' + (result.message || ''));
+        }
+      } catch (err) {
+        console.error("submitAddFishItem error:", err);
+        alert('通信エラーが発生しました。電波の良い場所で再度お試しください。');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = '➕ 注文に追加する';
+      }
+    }
+
+    // トースト通知の表示
+    function showToast(msg) {
+      const t = document.getElementById('toast-notice');
+      if (!t) return;
+      t.innerText = msg;
+      t.style.display = 'flex';
+      setTimeout(() => {
+        t.style.display = 'none';
+      }, 3500);
     }
   </script>
 </body>
