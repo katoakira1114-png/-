@@ -43,6 +43,41 @@ function authorize() {
   UrlFetchApp.fetch("https://www.google.com", { muteHttpExceptions: true });
 }
 
+var FISH_IMAGE_FOLDER_NAME = "川畑水産_観賞魚画像";
+
+// アップロード画像をGoogle Driveの観賞魚フォルダへ保存し、直リンクURLを発行
+function saveImageToDrive(base64Data, fileName) {
+  var folder;
+  var folders = DriveApp.getFoldersByName(FISH_IMAGE_FOLDER_NAME);
+  if (folders.hasNext()) {
+    folder = folders.next();
+  } else {
+    folder = DriveApp.createFolder(FISH_IMAGE_FOLDER_NAME);
+  }
+
+  var pureBase64 = base64Data;
+  var mimeType = "image/jpeg";
+  if (base64Data.indexOf("data:") === 0) {
+    var parts = base64Data.split(",");
+    var mimeMatch = parts[0].match(/:(.*?);/);
+    if (mimeMatch) mimeType = mimeMatch[1];
+    pureBase64 = parts[1];
+  }
+
+  var decodedBytes = Utilities.base64Decode(pureBase64);
+  var blob = Utilities.newBlob(decodedBytes, mimeType, fileName || ("fish_" + new Date().getTime() + ".jpg"));
+  var file = folder.createFile(blob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  var fileId = file.getId();
+  var directUrl = "https://drive.google.com/thumbnail?id=" + fileId + "&sz=w1000";
+  return {
+    fileId: fileId,
+    url: directUrl,
+    viewUrl: file.getUrl()
+  };
+}
+
 // カテゴリに対応するシートを取得するヘルパー
 function getSheetForCategory(ss, catLabel) {
   for (var i = 0; i < CATEGORY_DEFS.length; i++) {
@@ -429,6 +464,70 @@ function doGet(e) {
         status: "success",
         orders: ordersList,
         totalSummary: totalList
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 【在庫管理一覧取得API】社内在庫管理・商品登録画面用
+    if (action === "getStockList") {
+      var allItems = [];
+      var catList = ["魚", "シャコガイ", "貝", "サンゴ", "イソギンチャク", "擬岩", "その他"];
+
+      for (var ci = 0; ci < CATEGORY_DEFS.length; ci++) {
+        var cDef = CATEGORY_DEFS[ci];
+        var sh = getSheetForCategory(ss, cDef.label);
+        if (!sh) continue;
+
+        var sData = sh.getDataRange().getValues();
+        if (sData.length < 2) continue;
+
+        var sHead = sData[0];
+        var colI = -1, colN = -1, colSz = -1, colP = -1, colV = -1, colS = -1, colIm = -1, colSd = -1;
+        for (var sc = 0; sc < sHead.length; sc++) {
+          var titleStr = String(sHead[sc]).trim();
+          if (titleStr.indexOf("ID") !== -1 || titleStr.indexOf("id") !== -1) colI = sc;
+          else if (titleStr.indexOf("名") !== -1 || titleStr.indexOf("商品") !== -1) colN = sc;
+          else if (titleStr.indexOf("サイズ") !== -1 || titleStr.indexOf("規格") !== -1) colSz = sc;
+          else if (titleStr.indexOf("価格") !== -1 || titleStr.indexOf("単価") !== -1) colP = sc;
+          else if (titleStr.indexOf("vol") !== -1 || titleStr.indexOf("容量") !== -1) colV = sc;
+          else if (titleStr.indexOf("在庫") !== -1) colS = sc;
+          else if (titleStr.indexOf("画像") !== -1 || titleStr.indexOf("img") !== -1) colIm = sc;
+          else if (titleStr.indexOf("売り切れ日時") !== -1) colSd = sc;
+        }
+
+        if (colN === -1) colN = 1;
+        if (colP === -1) colP = 3;
+        if (colS === -1) colS = 5;
+
+        for (var sr = 1; sr < sData.length; sr++) {
+          var sRow = sData[sr];
+          var itName = String(sRow[colN] || "").trim();
+          if (!itName) continue;
+
+          var itId = (colI !== -1 && sRow[colI]) ? String(sRow[colI]).trim() : cDef.label + "_" + sr;
+          var itPrice = sRow[colP];
+          var itIsAsk = String(itPrice).trim().toLowerCase() === "ask" || itPrice === "";
+          var itNumPrice = itIsAsk ? 0 : (Number(itPrice) || 0);
+
+          allItems.push({
+            category: cDef.label,
+            rowNumber: sr + 1,
+            id: itId,
+            name: itName,
+            size: (colSz !== -1) ? String(sRow[colSz] || "").trim() : "",
+            price: itNumPrice,
+            isAsk: itIsAsk,
+            vol: (colV !== -1) ? (Number(sRow[colV]) || 0) : 0,
+            stock: (colS !== -1) ? (parseInt(sRow[colS], 10) || 0) : 0,
+            img: (colIm !== -1) ? String(sRow[colIm] || "").trim() : "",
+            soldOutAt: (colSd !== -1 && sRow[colSd]) ? String(sRow[colSd]) : ""
+          });
+        }
+      }
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        categories: catList,
+        items: allItems
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -962,6 +1061,201 @@ function doPost(e) {
         status: "success",
         message: "生体「" + prodName + "」(" + qty + "匹) を追加しました",
         orderId: targetOrderId
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 【在庫・商品情報更新API】在庫管理画面からの増減・編集用
+    if (action === "updateStock") {
+      var category = String(contents.category || "").trim();
+      var prodId = String(contents.id || "").trim();
+      var rowNum = parseInt(contents.rowNumber, 10) || -1;
+      var newStock = parseInt(contents.stock, 10);
+      if (isNaN(newStock)) throw new Error("在庫数を指定してください。");
+
+      var ssStock = SpreadsheetApp.openById(SPREADSHEET_ID);
+      var targetSheet = getSheetForCategory(ssStock, category);
+      if (!targetSheet) throw new Error("カテゴリシート「" + category + "」が見つかりません。");
+
+      var tData = targetSheet.getDataRange().getValues();
+      var tHead = tData[0];
+      var colI = -1, colN = -1, colSz = -1, colP = -1, colV = -1, colS = -1, colIm = -1, colSd = -1;
+      for (var c = 0; c < tHead.length; c++) {
+        var hTitle = String(tHead[c]).trim();
+        if (hTitle.indexOf("ID") !== -1 || hTitle.indexOf("id") !== -1) colI = c;
+        else if (hTitle.indexOf("名") !== -1 || hTitle.indexOf("商品") !== -1) colN = c;
+        else if (hTitle.indexOf("サイズ") !== -1 || hTitle.indexOf("規格") !== -1) colSz = c;
+        else if (hTitle.indexOf("価格") !== -1 || hTitle.indexOf("単価") !== -1) colP = c;
+        else if (hTitle.indexOf("vol") !== -1 || hTitle.indexOf("容量") !== -1) colV = c;
+        else if (hTitle.indexOf("在庫") !== -1) colS = c;
+        else if (hTitle.indexOf("画像") !== -1 || hTitle.indexOf("img") !== -1) colIm = c;
+        else if (hTitle.indexOf("売り切れ日時") !== -1) colSd = c;
+      }
+
+      if (colS === -1) throw new Error("在庫列が見つかりません。");
+
+      // 該当行の特定
+      var foundRow = -1;
+      if (rowNum >= 2 && rowNum <= tData.length) {
+        if (colI !== -1 && String(tData[rowNum - 1][colI]).trim() === prodId) {
+          foundRow = rowNum;
+        } else if (String(tData[rowNum - 1][colN]).trim() === String(contents.name || "").trim()) {
+          foundRow = rowNum;
+        }
+      }
+      if (foundRow === -1) {
+        for (var r = 1; r < tData.length; r++) {
+          if ((colI !== -1 && String(tData[r][colI]).trim() === prodId) ||
+              (colN !== -1 && String(tData[r][colN]).trim() === String(contents.name || "").trim())) {
+            foundRow = r + 1;
+            break;
+          }
+        }
+      }
+
+      if (foundRow === -1) throw new Error("対象の商品が見つかりません。");
+
+      // 在庫数の更新
+      targetSheet.getRange(foundRow, colS + 1).setValue(newStock);
+
+      // 売り切れ日時列のメンテナンス
+      if (colSd !== -1) {
+        if (newStock <= 0) {
+          var curSold = targetSheet.getRange(foundRow, colSd + 1).getValue();
+          if (!curSold) {
+            targetSheet.getRange(foundRow, colSd + 1).setValue(new Date());
+          }
+        } else {
+          targetSheet.getRange(foundRow, colSd + 1).setValue("");
+        }
+      }
+
+      // 単価、サイズ、vol、画像等の更新指定があれば反映
+      if (contents.price !== undefined && colP !== -1) {
+        targetSheet.getRange(foundRow, colP + 1).setValue(contents.isAsk ? "ASK" : contents.price);
+      }
+      if (contents.size !== undefined && colSz !== -1) {
+        targetSheet.getRange(foundRow, colSz + 1).setValue(contents.size);
+      }
+      if (contents.vol !== undefined && colV !== -1) {
+        targetSheet.getRange(foundRow, colV + 1).setValue(contents.vol);
+      }
+      if (contents.img !== undefined && colIm !== -1) {
+        targetSheet.getRange(foundRow, colIm + 1).setValue(contents.img);
+      }
+
+      SpreadsheetApp.flush();
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "在庫を更新しました",
+        newStock: newStock
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 【新規商品登録API】管理画面からの新規登録・画像Drive保存
+    if (action === "createProduct") {
+      var category = String(contents.category || "魚").trim();
+      var prodName = String(contents.name || "").trim();
+      var tier = String(contents.tier || "NONE").trim().toUpperCase();
+      var size = String(contents.size || "").trim();
+      var stock = parseInt(contents.stock, 10);
+      if (isNaN(stock)) stock = 1;
+      var isAsk = !!contents.isAsk;
+      var price = isAsk ? "ASK" : (Number(contents.price) || 0);
+      var vol = Number(contents.vol) || 100;
+
+      if (!prodName) throw new Error("商品名を入力してください。");
+
+      var ssProd = SpreadsheetApp.openById(SPREADSHEET_ID);
+      var targetSheet = getSheetForCategory(ssProd, category);
+      if (!targetSheet) {
+        targetSheet = ssProd.insertSheet(category);
+        var stdHeaders = ["商品ID", "商品名", "サイズ", "単価", "vol", "在庫", "画像", "売り切れ日時"];
+        targetSheet.getRange(1, 1, 1, stdHeaders.length).setValues([stdHeaders])
+          .setBackground("#005bac").setFontColor("#ffffff").setFontWeight("bold");
+        targetSheet.setFrozenRows(1);
+      }
+
+      // 画像のDrive保存（指定がある場合）
+      var imageUrl = String(contents.imageUrl || "").trim();
+      if (contents.imageBase64) {
+        try {
+          var saved = saveImageToDrive(contents.imageBase64, contents.imageFileName || (prodName + ".jpg"));
+          imageUrl = saved.url;
+        } catch (imgErr) {
+          console.error("Image upload failed: " + imgErr);
+        }
+      }
+
+      // 商品IDの自動生成（頭にABCをつけるかどうかの指定に対応）
+      var nowTime = new Date();
+      var idDateStr = Utilities.formatDate(nowTime, "JST", "yyyyMMdd_HHmmss");
+      var autoId = "";
+      if (tier === "A" || tier === "B" || tier === "C") {
+        autoId = tier + "_" + category + "_" + idDateStr;
+      } else {
+        autoId = category + "_" + idDateStr;
+      }
+
+      var rowData = [
+        autoId,
+        prodName,
+        size,
+        price,
+        vol,
+        stock,
+        imageUrl,
+        (stock <= 0) ? Utilities.formatDate(nowTime, "JST", "yyyy/MM/dd HH:mm:ss") : ""
+      ];
+
+      targetSheet.appendRow(rowData);
+      SpreadsheetApp.flush();
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "商品「" + prodName + "」を登録しました",
+        productId: autoId,
+        imageUrl: imageUrl
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // 【画像アップロードAPI】既存商品への画像添付・Drive保存
+    if (action === "uploadImage") {
+      if (!contents.imageBase64) throw new Error("画像データがありません。");
+      var saved = saveImageToDrive(contents.imageBase64, contents.imageFileName || "fish.jpg");
+
+      // 商品IDとカテゴリが指定されていればシートにも即時反映
+      if (contents.id && contents.category) {
+        try {
+          var ssUp = SpreadsheetApp.openById(SPREADSHEET_ID);
+          var shUp = getSheetForCategory(ssUp, contents.category);
+          if (shUp) {
+            var upData = shUp.getDataRange().getValues();
+            var colId = -1, colImg = -1;
+            for (var c = 0; c < upData[0].length; c++) {
+              var h = String(upData[0][c]).trim();
+              if (h.indexOf("ID") !== -1 || h.indexOf("id") !== -1) colId = c;
+              else if (h.indexOf("画像") !== -1 || h.indexOf("img") !== -1) colImg = c;
+            }
+            if (colId !== -1 && colImg !== -1) {
+              for (var r = 1; r < upData.length; r++) {
+                if (String(upData[r][colId]).trim() === String(contents.id).trim()) {
+                  shUp.getRange(r + 1, colImg + 1).setValue(saved.url);
+                  break;
+                }
+              }
+            }
+          }
+        } catch(e) {
+          console.warn("Sheet image update warning: " + e);
+        }
+      }
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "画像をGoogle Driveに保存しました",
+        url: saved.url,
+        fileId: saved.fileId
       })).setMimeType(ContentService.MimeType.JSON);
     }
 

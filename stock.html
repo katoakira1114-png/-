@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>川畑水産 在庫・生体管理コンソール（社内専用）</title>
+  <style>
+    :root {
+      --primary: #005bac;
+      --primary-light: #e0f2fe;
+      --primary-dark: #003e7e;
+      --accent: #0284c7;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --success: #16a34a;
+      --success-bg: #dcfce7;
+      --danger: #dc2626;
+      --danger-bg: #fee2e2;
+      --warning: #d97706;
+      --warning-bg: #fef3c7;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { background-color: var(--bg); color: var(--text); padding-bottom: 70px; line-height: 1.4; }
+
+    /* ヘッダー */
+    header {
+      position: sticky; top: 0; z-index: 100;
+      background-color: var(--primary);
+      color: #fff;
+      padding: 10px 14px;
+      box-shadow: 0 2px 8px rgba(0, 91, 172, 0.25);
+    }
+    .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .header-title { font-size: 1.05rem; font-weight: bold; display: flex; align-items: center; gap: 6px; }
+    .admin-badge {
+      font-size: 0.65rem; background: rgba(255, 255, 255, 0.25);
+      padding: 2px 6px; border-radius: 4px; font-weight: normal; letter-spacing: 0.5px;
+    }
+    .header-actions { display: flex; gap: 6px; }
+    .btn-header {
+      background: rgba(255, 255, 255, 0.2); border: 1px solid rgba(255, 255, 255, 0.35);
+      color: #fff; border-radius: 6px; padding: 5px 10px; font-size: 0.78rem; font-weight: bold;
+      cursor: pointer; display: inline-flex; align-items: center; gap: 4px; text-decoration: none;
+    }
+    .btn-header:active { background: rgba(255, 255, 255, 0.35); }
+    .refresh-btn.spinning .spin-icon { animation: spin 1s linear infinite; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+
+    /* タブ切り替え */
+    .nav-tabs {
+      display: flex; gap: 6px; background: rgba(0, 0, 0, 0.15);
+      padding: 4px; border-radius: 8px;
+    }
+    .tab-btn {
+      flex: 1; padding: 8px 6px; font-size: 0.85rem; font-weight: bold;
+      border: none; background: transparent; color: rgba(255, 255, 255, 0.85);
+      border-radius: 6px; cursor: pointer; text-align: center; transition: all 0.15s ease;
+    }
+    .tab-btn.active {
+      background: #fff; color: var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    /* 検索・フィルターバー */
+    .filter-panel {
+      background: #fff; border-bottom: 1px solid var(--border);
+      padding: 10px 14px; display: flex; flex-direction: column; gap: 8px;
+    }
+    .search-row { display: flex; gap: 8px; align-items: center; }
+    .search-input {
+      flex: 1; padding: 9px 12px; font-size: 0.9rem; border: 1px solid var(--border);
+      border-radius: 8px; outline: none; background: #f8fafc;
+    }
+    .search-input:focus { border-color: var(--primary); background: #fff; }
+    .status-select {
+      padding: 9px 10px; font-size: 0.82rem; border: 1px solid var(--border);
+      border-radius: 8px; outline: none; background: #fff; font-weight: bold; color: #475569;
+    }
+
+    /* カテゴリチップ */
+    .category-chips {
+      display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px;
+      -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    }
+    .category-chips::-webkit-scrollbar { display: none; }
+    .chip-btn {
+      white-space: nowrap; padding: 5px 12px; font-size: 0.78rem; font-weight: bold;
+      border-radius: 20px; border: 1px solid var(--border); background: #f8fafc;
+      color: #64748b; cursor: pointer; transition: all 0.12s ease;
+    }
+    .chip-btn.active {
+      background: var(--primary); color: #fff; border-color: var(--primary);
+    }
+
+    /* メインコンテナ */
+    .container { max-width: 720px; margin: 0 auto; padding: 12px; }
+
+    /* サマリーカード */
+    .summary-card {
+      background: #fff; border: 1px solid var(--border); border-radius: 10px;
+      padding: 10px 14px; margin-bottom: 12px; display: flex; justify-content: space-around;
+      text-align: center;
+    }
+    .sum-val { font-size: 1.25rem; font-weight: bold; color: var(--primary); }
+    .sum-label { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; }
+
+    /* 商品リストカード */
+    .product-card {
+      background: #fff; border: 1px solid var(--border); border-radius: 12px;
+      padding: 12px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      display: flex; flex-direction: column; gap: 10px; transition: all 0.15s ease;
+    }
+    .product-card.out-of-stock {
+      border-color: #fca5a5; background: #fffdfd;
+    }
+    .card-top { display: flex; gap: 12px; align-items: flex-start; }
+    .img-box {
+      width: 76px; height: 76px; border-radius: 8px; background: #f1f5f9;
+      border: 1px solid var(--border); flex-shrink: 0; overflow: hidden;
+      display: flex; align-items: center; justify-content: center; position: relative;
+      cursor: pointer;
+    }
+    .img-box img { width: 100%; height: 100%; object-fit: cover; }
+    .img-placeholder { font-size: 1.8rem; color: #94a3b8; }
+    .img-add-badge {
+      position: absolute; bottom: 2px; right: 2px; background: rgba(0, 91, 172, 0.85);
+      color: #fff; font-size: 0.6rem; padding: 2px 4px; border-radius: 4px; font-weight: bold;
+    }
+    .info-box { flex: 1; min-width: 0; }
+    .badge-row { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 4px; }
+    .badge {
+      font-size: 0.68rem; font-weight: bold; padding: 2px 6px; border-radius: 4px;
+    }
+    .badge-cat { background: #e0f2fe; color: #0369a1; }
+    .badge-tier-a { background: #fef3c7; color: #b45309; }
+    .badge-tier-b { background: #e0e7ff; color: #4338ca; }
+    .badge-tier-c { background: #fce7f3; color: #be185d; }
+    .prod-name { font-size: 1rem; font-weight: bold; color: var(--text); line-height: 1.3; }
+    .prod-meta { font-size: 0.78rem; color: var(--text-muted); margin-top: 3px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .prod-price { font-size: 0.95rem; font-weight: bold; color: var(--primary); }
+
+    /* 在庫数コントロールバー */
+    .stock-control-panel {
+      background: #f8fafc; border-radius: 8px; padding: 8px 10px;
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    }
+    .stock-display-wrap { display: flex; align-items: baseline; gap: 4px; }
+    .stock-label { font-size: 0.72rem; color: var(--text-muted); font-weight: bold; }
+    .stock-number {
+      font-size: 1.4rem; font-weight: 800; color: var(--text); min-width: 38px; text-align: center;
+    }
+    .stock-number.zero { color: var(--danger); }
+    .stepper-actions { display: flex; gap: 4px; align-items: center; }
+    .btn-step {
+      width: 36px; height: 36px; border: 1px solid var(--border); background: #fff;
+      border-radius: 6px; font-size: 0.85rem; font-weight: bold; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; color: var(--text);
+      user-select: none;
+    }
+    .btn-step:active { background: #e2e8f0; transform: scale(0.96); }
+    .btn-step.quick-zero { background: var(--danger-bg); color: var(--danger); border-color: #fca5a5; font-size: 0.75rem; width: auto; padding: 0 8px; }
+    .btn-step.quick-add { background: var(--success-bg); color: var(--success); border-color: #bbf7d0; font-size: 0.75rem; width: auto; padding: 0 8px; }
+    .btn-edit-item {
+      padding: 0 10px; height: 36px; background: #fff; border: 1px solid var(--border);
+      border-radius: 6px; font-size: 0.78rem; font-weight: bold; color: #475569; cursor: pointer;
+      display: flex; align-items: center; gap: 3px;
+    }
+
+    /* 新規商品登録フォーム */
+    .form-card {
+      background: #fff; border: 1px solid var(--border); border-radius: 12px;
+      padding: 18px 16px; margin-bottom: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+      display: flex; flex-direction: column; gap: 14px;
+    }
+    .form-title {
+      font-size: 1.1rem; font-weight: bold; color: var(--primary);
+      display: flex; align-items: center; gap: 6px; border-bottom: 2px solid var(--primary-light);
+      padding-bottom: 8px;
+    }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-label { font-size: 0.82rem; font-weight: bold; color: #334155; }
+    .form-label span.req { color: var(--danger); font-size: 0.7rem; margin-left: 4px; }
+    .form-label span.desc { color: var(--text-muted); font-size: 0.72rem; font-weight: normal; margin-left: 6px; }
+    .form-input, .form-select {
+      width: 100%; padding: 11px 12px; font-size: 0.95rem; border: 1.5px solid var(--border);
+      border-radius: 8px; outline: none; background: #fff; box-sizing: border-box;
+    }
+    .form-input:focus, .form-select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(0, 91, 172, 0.12); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+    /* 画像アップロード枠 */
+    .image-drop-area {
+      border: 2px dashed #0284c7; background: #f0f9ff; border-radius: 10px;
+      padding: 20px 14px; text-align: center; cursor: pointer; transition: all 0.15s ease;
+      position: relative;
+    }
+    .image-drop-area:active, .image-drop-area.dragover { background: #e0f2fe; border-color: var(--primary); }
+    .image-preview-box {
+      width: 100%; max-height: 220px; border-radius: 8px; overflow: hidden;
+      display: none; justify-content: center; align-items: center; margin-top: 10px;
+      background: #000;
+    }
+    .image-preview-box img { max-width: 100%; max-height: 220px; object-fit: contain; }
+    .btn-remove-img {
+      position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6);
+      color: #fff; border: none; border-radius: 20px; padding: 4px 10px; font-size: 0.75rem;
+      cursor: pointer; display: none;
+    }
+
+    /* 登録ボタン */
+    .btn-submit-form {
+      padding: 14px; background: var(--primary); color: #fff; border: none;
+      border-radius: 8px; font-size: 1.05rem; font-weight: bold; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      box-shadow: 0 4px 12px rgba(0, 91, 172, 0.25);
+    }
+    .btn-submit-form:active { background: var(--primary-dark); }
+    .btn-submit-form:disabled { background: #cbd5e1; cursor: not-allowed; box-shadow: none; }
+
+    /* モーダル */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(15, 23, 42, 0.6); z-index: 1000;
+      display: flex; justify-content: center; align-items: center;
+      padding: 16px; backdrop-filter: blur(2px);
+    }
+    .modal-card {
+      background: #fff; width: 100%; max-width: 480px; border-radius: 14px;
+      max-height: 90vh; overflow-y: auto; padding: 20px 18px; display: flex;
+      flex-direction: column; gap: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    }
+    .modal-title { font-size: 1.1rem; font-weight: bold; color: var(--primary); display: flex; justify-content: space-between; align-items: center; }
+    .modal-close { background: none; border: none; font-size: 1.3rem; color: #94a3b8; cursor: pointer; }
+
+    /* 空ステータス・ローディング */
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+    .empty-icon { font-size: 2.8rem; margin-bottom: 8px; }
+
+    /* フッター */
+    footer {
+      position: fixed; bottom: 0; left: 0; right: 0; background: #fff;
+      border-top: 1px solid var(--border); padding: 8px 14px; font-size: 0.75rem;
+      text-align: center; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center;
+      z-index: 90;
+    }
+    .footer-link { color: var(--primary); text-decoration: none; font-weight: bold; }
+
+    /* トースト通知 */
+    .toast-box {
+      position: fixed; bottom: 65px; left: 50%; transform: translateX(-50%);
+      background: #1e293b; color: #fff; padding: 10px 18px; border-radius: 30px;
+      font-size: 0.85rem; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+      z-index: 2000; display: none; align-items: center; gap: 6px; animation: fadeIn 0.15s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-top">
+      <div class="header-title">
+        <span>🐠</span>
+        <span>川畑水産 在庫・生体管理</span>
+        <span class="admin-badge">社内専用</span>
+      </div>
+      <div class="header-actions">
+        <a href="picking.html" class="btn-header" title="出荷ピッキング画面へ">📦 ピッキング</a>
+        <button class="btn-header refresh-btn" id="refresh-btn" onclick="fetchStockData()">
+          <span class="spin-icon">🔄</span>
+          <span id="refresh-time-text">更新</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="nav-tabs">
+      <button class="tab-btn active" id="tab-btn-list" onclick="switchView('list')">📋 在庫一覧・増減 (<span id="total-items-badge">0</span>)</button>
+      <button class="tab-btn" id="tab-btn-add" onclick="switchView('add')">➕ 新規商品登録</button>
+    </div>
+  </header>
+
+  <!-- ======================== ビュー1: 在庫一覧・増減 ======================== -->
+  <div id="view-list">
+    <div class="filter-panel">
+      <div class="search-row">
+        <input type="text" class="search-input" id="search-input" placeholder="🔍 商品名・規格で検索..." oninput="renderStockList()">
+        <select class="status-select" id="stock-status-filter" onchange="renderStockList()">
+          <option value="all">すべて表示</option>
+          <option value="in_stock">在庫ありのみ</option>
+          <option value="out_of_stock">在庫切れのみ</option>
+        </select>
+      </div>
+
+      <div class="category-chips" id="category-chips">
+        <button class="chip-btn active" onclick="selectCategory('ALL')">すべて (<span id="cat-count-all">0</span>)</button>
+      </div>
+    </div>
+
+    <div class="container">
+      <div class="summary-card">
+        <div>
+          <div class="sum-val" id="sum-total-species">0</div>
+          <div class="sum-label">登録生体・商品数</div>
+        </div>
+        <div>
+          <div class="sum-val" id="sum-total-stock">0</div>
+          <div class="sum-label">総在庫個体数</div>
+        </div>
+        <div>
+          <div class="sum-val" id="sum-out-of-stock" style="color:var(--danger);">0</div>
+          <div class="sum-label">売り切れ品目</div>
+        </div>
+      </div>
+
+      <div id="product-list-container">
+        <div class="empty-state">
+          <div class="empty-icon">⏳</div>
+          <div>商品データを読み込んでいます...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================== ビュー2: 新規商品登録 ======================== -->
+  <div id="view-add" style="display: none;">
+    <div class="container" style="padding-top:16px;">
+      <form class="form-card" id="add-product-form" onsubmit="handleCreateProduct(event)">
+        <div class="form-title">
+          <span>➕</span>
+          <span>新しい生体・商品を登録</span>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">カテゴリ<span class="req">*</span></label>
+            <select class="form-select" id="add-category" required>
+              <option value="魚">魚</option>
+              <option value="サンゴ">サンゴ</option>
+              <option value="シャコガイ">シャコガイ</option>
+              <option value="貝">貝</option>
+              <option value="イソギンチャク">イソギンチャク</option>
+              <option value="擬岩">擬岩</option>
+              <option value="その他">その他</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">限定公開区分<span class="desc">A/B/C許可</span></label>
+            <select class="form-select" id="add-tier">
+              <option value="NONE">通常商品 (全顧客公開)</option>
+              <option value="A">【A限定】A許可顧客のみ</option>
+              <option value="B">【B限定】B許可顧客のみ</option>
+              <option value="C">【C限定】C許可顧客のみ</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">商品名・生体名<span class="req">*</span></label>
+          <input type="text" class="form-input" id="add-name" placeholder="例: カクレクマノミ (ペア), スターポリプ" required>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">サイズ / 規格</label>
+            <input type="text" class="form-input" id="add-size" placeholder="例: 4〜5cm前後, Mサイズ">
+          </div>
+          <div class="form-group">
+            <label class="form-label">初期個体数 (在庫)<span class="req">*</span></label>
+            <input type="number" class="form-input" id="add-stock" value="1" min="0" step="1" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <label class="form-label">単価 (円)<span class="req">*</span></label>
+              <label style="font-size:0.75rem; display:flex; align-items:center; gap:3px; cursor:pointer;">
+                <input type="checkbox" id="add-is-ask" onchange="toggleAddAsk(this.checked)"> ASK
+              </label>
+            </div>
+            <input type="number" class="form-input" id="add-price" placeholder="例: 1500" min="0" step="10" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">容量 (vol)<span class="desc">1000vol=1箱</span></label>
+            <input type="number" class="form-input" id="add-vol" value="100" min="0" step="10">
+          </div>
+        </div>
+
+        <!-- 画像ファイル添付エリア -->
+        <div class="form-group">
+          <label class="form-label">生体写真・画像添付<span class="desc">Google Driveへ自動保存</span></label>
+          <input type="file" id="add-image-file" accept="image/*" capture="environment" style="display:none;" onchange="handleImageFileSelected(event)">
+          
+          <div class="image-drop-area" id="image-drop-area" onclick="document.getElementById('add-image-file').click()">
+            <div id="drop-prompt">
+              <div style="font-size:2rem; margin-bottom:4px;">📷</div>
+              <div style="font-weight:bold; color:var(--primary); font-size:0.92rem;">カメラで撮影 / 画像を選択</div>
+              <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">タップで写真選択、または画像をここに貼り付け (Ctrl+V)</div>
+            </div>
+            <div class="image-preview-box" id="add-preview-box">
+              <img id="add-preview-img" src="" alt="プレビュー">
+            </div>
+            <button type="button" class="btn-remove-img" id="btn-remove-img" onclick="event.stopPropagation(); removeSelectedImage()">✕ 削除</button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-submit-form" id="btn-submit-create">
+          <span>💾 Google Driveに保存して登録する</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ======================== 編集・画像更新モーダル ======================== -->
+  <div class="modal-overlay" id="edit-modal" style="display:none;" onclick="if(event.target===this) closeEditModal()">
+    <div class="modal-card">
+      <div class="modal-title">
+        <span>✏️ 商品情報の編集</span>
+        <button type="button" class="modal-close" onclick="closeEditModal()">✕</button>
+      </div>
+
+      <input type="hidden" id="edit-category">
+      <input type="hidden" id="edit-row">
+      <input type="hidden" id="edit-id">
+
+      <div class="form-group">
+        <label class="form-label">商品名</label>
+        <input type="text" class="form-input" id="edit-name" required>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">サイズ / 規格</label>
+          <input type="text" class="form-input" id="edit-size">
+        </div>
+        <div class="form-group">
+          <label class="form-label">現在庫数</label>
+          <input type="number" class="form-input" id="edit-stock" min="0" required>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <label class="form-label">単価 (円)</label>
+            <label style="font-size:0.75rem; display:flex; align-items:center; gap:3px;">
+              <input type="checkbox" id="edit-is-ask" onchange="toggleEditAsk(this.checked)"> ASK
+            </label>
+          </div>
+          <input type="number" class="form-input" id="edit-price" min="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">容量 (vol)</label>
+          <input type="number" class="form-input" id="edit-vol" min="0">
+        </div>
+      </div>
+
+      <!-- 写真の差し替え・Drive保存 -->
+      <div class="form-group">
+        <label class="form-label">写真の差し替え / 追加</label>
+        <input type="file" id="edit-image-file" accept="image/*" capture="environment" style="display:none;" onchange="handleEditImageSelected(event)">
+        <div style="display:flex; gap:8px; align-items:center;">
+          <button type="button" class="btn-step" style="width:auto; padding:0 12px; height:40px; background:#f0f9ff; border-color:#0284c7; color:#0284c7; font-weight:bold;" onclick="document.getElementById('edit-image-file').click()">
+            📷 写真を選択 / 撮影
+          </button>
+          <span id="edit-img-status" style="font-size:0.75rem; color:#64748b;">変更なし</span>
+        </div>
+        <div id="edit-preview-box" style="margin-top:6px; display:none; max-height:140px; border-radius:6px; overflow:hidden; background:#000;">
+          <img id="edit-preview-img" style="max-height:140px; max-width:100%; object-fit:contain;" src="">
+        </div>
+      </div>
+
+      <button type="button" class="btn-submit-form" id="btn-save-edit" onclick="submitEditProduct()">
+        <span>💾 変更を保存する</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="toast-box" id="toast-box"></div>
+
+  <footer>
+    <span id="sync-label">川畑水産 在庫管理 (Google Sheets自動同期)</span>
+    <a href="https://docs.google.com/spreadsheets/d/1ZiNel8TGJ-e7JMolkRagVOSnr1UczvQzpTa-F-s4p3o/edit" target="_blank" class="footer-link">📊 スプレッドシート原本</a>
+  </footer>
+
+  <script>
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxIYsPdreUjaOFutfshhQIwOLb_Ke1JprcDZj_LAT9oZnc-l-3jZLsPAsFd_QdQJAQ4eA/exec";
+
+    let rawStockItems = [];
+    let selectedCategory = "ALL";
+    let currentSelectedImageBase64 = "";
+    let currentSelectedImageName = "";
+    let editImageBase64 = "";
+    let editImageName = "";
+
+    // 初期化
+    window.addEventListener('DOMContentLoaded', () => {
+      fetchStockData();
+
+      // クリップボードからの画像貼り付け（Ctrl+V）サポート
+      window.addEventListener('paste', handleGlobalPaste);
+    });
+
+    // ビュー切り替え
+    function switchView(viewName) {
+      document.getElementById('view-list').style.display = viewName === 'list' ? 'block' : 'none';
+      document.getElementById('view-add').style.display = viewName === 'add' ? 'block' : 'none';
+      document.getElementById('tab-btn-list').classList.toggle('active', viewName === 'list');
+      document.getElementById('tab-btn-add').classList.toggle('active', viewName === 'add');
+    }
+
+    // 在庫データ取得
+    async function fetchStockData() {
+      const btn = document.getElementById('refresh-btn');
+      btn.classList.add('spinning');
+
+      try {
+        const res = await fetch(`${GAS_API_URL}?action=getStockList`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = await res.json();
+        if (data.status === 'success') {
+          rawStockItems = data.items || [];
+          renderCategoryChips(data.categories || []);
+          renderStockList();
+
+          const now = new Date();
+          const timeStr = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+          document.getElementById('refresh-time-text').innerText = timeStr;
+        } else {
+          console.error("API Error:", data.message);
+        }
+      } catch (err) {
+        console.error("fetchStockData error:", err);
+        showToast("⚠️ 通信エラーが発生しました");
+      } finally {
+        btn.classList.remove('spinning');
+      }
+    }
+
+    // カテゴリチップ描画
+    function renderCategoryChips(categories) {
+      const container = document.getElementById('category-chips');
+      let html = `<button class="chip-btn ${selectedCategory === 'ALL' ? 'active' : ''}" onclick="selectCategory('ALL')">すべて (<span id="cat-count-all">${rawStockItems.length}</span>)</button>`;
+
+      const catCounts = {};
+      rawStockItems.forEach(it => {
+        catCounts[it.category] = (catCounts[it.category] || 0) + 1;
+      });
+
+      categories.forEach(cat => {
+        const count = catCounts[cat] || 0;
+        const isActive = selectedCategory === cat ? 'active' : '';
+        html += `<button class="chip-btn ${isActive}" onclick="selectCategory('${escapeHtml(cat)}')">${escapeHtml(cat)} (${count})</button>`;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function selectCategory(cat) {
+      selectedCategory = cat;
+      const chips = document.querySelectorAll('.chip-btn');
+      chips.forEach(btn => {
+        btn.classList.toggle('active', btn.innerText.startsWith(cat) || (cat === 'ALL' && btn.innerText.startsWith('すべて')));
+      });
+      renderStockList();
+    }
+
+    // リスト描画＆フィルター
+    function renderStockList() {
+      const container = document.getElementById('product-list-container');
+      const query = (document.getElementById('search-input').value || '').trim().toLowerCase();
+      const statusFilter = document.getElementById('stock-status-filter').value;
+
+      let filtered = rawStockItems;
+
+      // カテゴリ絞り込み
+      if (selectedCategory !== 'ALL') {
+        filtered = filtered.filter(it => it.category === selectedCategory);
+      }
+
+      // ステータス絞り込み
+      if (statusFilter === 'in_stock') {
+        filtered = filtered.filter(it => it.stock > 0);
+      } else if (statusFilter === 'out_of_stock') {
+        filtered = filtered.filter(it => it.stock <= 0);
+      }
+
+      // テキスト検索
+      if (query) {
+        filtered = filtered.filter(it => {
+          return it.name.toLowerCase().includes(query) ||
+                 (it.size || '').toLowerCase().includes(query) ||
+                 (it.id || '').toLowerCase().includes(query);
+        });
+      }
+
+      // サマリー集計
+      let totalStock = 0;
+      let outOfStockCount = 0;
+      rawStockItems.forEach(it => {
+        totalStock += it.stock;
+        if (it.stock <= 0) outOfStockCount++;
+      });
+      document.getElementById('sum-total-species').innerText = rawStockItems.length;
+      document.getElementById('sum-total-stock').innerText = totalStock.toLocaleString();
+      document.getElementById('sum-out-of-stock').innerText = outOfStockCount;
+      document.getElementById('total-items-badge').innerText = rawStockItems.length;
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">🔍</div>
+            <div>該当する商品が見つかりません</div>
+          </div>
+        `;
+        return;
+      }
+
+      let html = '';
+      filtered.forEach((it, idx) => {
+        const isOut = it.stock <= 0;
+        const priceStr = it.isAsk ? 'ASK' : `¥${(it.price || 0).toLocaleString()}`;
+        const firstChar = (it.id || '').charAt(0).toUpperCase();
+        let tierBadgeHtml = '';
+        if (firstChar === 'A') tierBadgeHtml = `<span class="badge badge-tier-a">A限定</span>`;
+        else if (firstChar === 'B') tierBadgeHtml = `<span class="badge badge-tier-b">B限定</span>`;
+        else if (firstChar === 'C') tierBadgeHtml = `<span class="badge badge-tier-c">C限定</span>`;
+
+        html += `
+          <div class="product-card ${isOut ? 'out-of-stock' : ''}" id="p-card-${idx}">
+            <div class="card-top">
+              <div class="img-box" onclick="openPhotoQuickModal(${idx})">
+                ${it.img ? `<img src="${escapeHtml(it.img)}" loading="lazy" alt="${escapeHtml(it.name)}">` : `<div class="img-placeholder">🐟</div><span class="img-add-badge">＋写真</span>`}
+              </div>
+              <div class="info-box">
+                <div class="badge-row">
+                  <span class="badge badge-cat">${escapeHtml(it.category)}</span>
+                  ${tierBadgeHtml}
+                </div>
+                <div class="prod-name">${escapeHtml(it.name)}</div>
+                <div class="prod-meta">
+                  <span>規格: ${escapeHtml(it.size || '規格なし')}</span>
+                  <span>容量: ${it.vol || 0}vol</span>
+                </div>
+                <div class="prod-price">${priceStr}</div>
+              </div>
+            </div>
+
+            <div class="stock-control-panel">
+              <div class="stock-display-wrap">
+                <span class="stock-label">在庫:</span>
+                <span class="stock-number ${isOut ? 'zero' : ''}" id="stock-num-${idx}">${it.stock}</span>
+                <span style="font-size:0.75rem; color:#64748b;">個</span>
+              </div>
+
+              <div class="stepper-actions">
+                <button type="button" class="btn-step" onclick="changeStock(${idx}, -5)">−5</button>
+                <button type="button" class="btn-step" onclick="changeStock(${idx}, -1)">−1</button>
+                <button type="button" class="btn-step" onclick="changeStock(${idx}, 1)">＋1</button>
+                <button type="button" class="btn-step" onclick="changeStock(${idx}, 5)">＋5</button>
+                ${isOut ? `<button type="button" class="btn-step quick-add" onclick="setExactStock(${idx}, 10)">補充+10</button>` : `<button type="button" class="btn-step quick-zero" onclick="setExactStock(${idx}, 0)">売切</button>`}
+                <button type="button" class="btn-edit-item" onclick="openEditModal(${idx})">✏️ 編集</button>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    // 在庫数の加減算
+    async function changeStock(index, delta) {
+      const item = rawStockItems[index];
+      if (!item) return;
+
+      const newStock = Math.max(0, item.stock + delta);
+      await applyStockUpdate(item, newStock, index);
+    }
+
+    // 在庫数の直接指定（0にする / 10補充する 等）
+    async function setExactStock(index, exactValue) {
+      const item = rawStockItems[index];
+      if (!item) return;
+
+      await applyStockUpdate(item, exactValue, index);
+    }
+
+    // 在庫更新の通信＆楽観的UI
+    async function applyStockUpdate(item, newStock, index) {
+      if (navigator.vibrate) navigator.vibrate(30);
+
+      const oldStock = item.stock;
+      item.stock = newStock;
+      
+      // 画面上の数値を即時書き換え
+      const numEl = document.getElementById(`stock-num-${index}`);
+      if (numEl) {
+        numEl.innerText = newStock;
+        numEl.classList.toggle('zero', newStock <= 0);
+      }
+      const cardEl = document.getElementById(`p-card-${index}`);
+      if (cardEl) {
+        cardEl.classList.toggle('out-of-stock', newStock <= 0);
+      }
+
+      showToast(`📦 ${item.name} の在庫を ${newStock} に更新中...`);
+
+      try {
+        const res = await fetch(GAS_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: "updateStock",
+            category: item.category,
+            id: item.id,
+            name: item.name,
+            rowNumber: item.rowNumber,
+            stock: newStock
+          })
+        });
+        const result = await res.json();
+        if (result.status === 'success') {
+          showToast(`✅ ${item.name} 在庫: ${newStock}個 に保存完了`);
+        } else {
+          item.stock = oldStock;
+          renderStockList();
+          alert('更新失敗: ' + (result.message || ''));
+        }
+      } catch (err) {
+        console.error("Stock update error:", err);
+        item.stock = oldStock;
+        renderStockList();
+        alert('通信エラーが発生しました。電波の良い場所でお試しください。');
+      }
+    }
+
+    // ======================== 新規登録の画像ハンドリング ========================
+    function handleImageFileSelected(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      processSelectedImageFile(file);
+    }
+
+    function processSelectedImageFile(file) {
+      if (!file.type.startsWith('image/')) {
+        alert('画像ファイルを選択してください');
+        return;
+      }
+      currentSelectedImageName = file.name;
+
+      // 画像をCanvasでリサイズ（長辺1200px）してBase64化
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1200;
+          let w = img.width, h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+            else { w = Math.round((w * maxDim) / h); h = maxDim; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          currentSelectedImageBase64 = canvas.toDataURL('image/jpeg', 0.85);
+
+          // プレビュー表示
+          document.getElementById('drop-prompt').style.display = 'none';
+          document.getElementById('add-preview-box').style.display = 'flex';
+          document.getElementById('add-preview-img').src = currentSelectedImageBase64;
+          document.getElementById('btn-remove-img').style.display = 'block';
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeSelectedImage() {
+      currentSelectedImageBase64 = "";
+      currentSelectedImageName = "";
+      document.getElementById('add-image-file').value = '';
+      document.getElementById('drop-prompt').style.display = 'block';
+      document.getElementById('add-preview-box').style.display = 'none';
+      document.getElementById('add-preview-img').src = '';
+      document.getElementById('btn-remove-img').style.display = 'none';
+    }
+
+    // クリップボードからの画像ペースト対応
+    function handleGlobalPaste(e) {
+      if (document.getElementById('view-add').style.display !== 'block') return;
+      const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const blob = items[i].getAsFile();
+          processSelectedImageFile(blob);
+          showToast('📋 クリップボードの画像を貼り付けました');
+          break;
+        }
+      }
+    }
+
+    function toggleAddAsk(isAsk) {
+      const priceInput = document.getElementById('add-price');
+      priceInput.disabled = isAsk;
+      if (isAsk) priceInput.value = '';
+    }
+
+    // 新規登録送信
+    async function handleCreateProduct(e) {
+      e.preventDefault();
+      const submitBtn = document.getElementById('btn-submit-create');
+      submitBtn.disabled = true;
+      submitBtn.innerText = '⏳ Google Driveに画像を保存して登録中...';
+
+      const category = document.getElementById('add-category').value;
+      const tier = document.getElementById('add-tier').value;
+      const name = document.getElementById('add-name').value.trim();
+      const size = document.getElementById('add-size').value.trim();
+      const stock = parseInt(document.getElementById('add-stock').value, 10) || 0;
+      const isAsk = document.getElementById('add-is-ask').checked;
+      const price = isAsk ? 0 : (parseFloat(document.getElementById('add-price').value) || 0);
+      const vol = parseFloat(document.getElementById('add-vol').value) || 100;
+
+      try {
+        const payload = {
+          action: "createProduct",
+          category: category,
+          tier: tier,
+          name: name,
+          size: size,
+          stock: stock,
+          isAsk: isAsk,
+          price: price,
+          vol: vol,
+          imageBase64: currentSelectedImageBase64 || "",
+          imageFileName: currentSelectedImageName || (name + ".jpg")
+        };
+
+        const res = await fetch(GAS_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+
+        if (result.status === 'success') {
+          showToast(`🎉 「${name}」を登録しました！`);
+          // フォームリセット
+          document.getElementById('add-product-form').reset();
+          removeSelectedImage();
+          // リスト再取得して一覧へ遷移
+          await fetchStockData();
+          switchView('list');
+        } else {
+          alert('登録失敗: ' + (result.message || ''));
+        }
+      } catch (err) {
+        console.error("Create product error:", err);
+        alert('通信エラーが発生しました。電波の良い場所でお試しください。');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = '💾 Google Driveに保存して登録する';
+      }
+    }
+
+    // ======================== 商品編集モーダル ========================
+    function openEditModal(index) {
+      const it = rawStockItems[index];
+      if (!it) return;
+
+      document.getElementById('edit-category').value = it.category;
+      document.getElementById('edit-row').value = it.rowNumber;
+      document.getElementById('edit-id').value = it.id;
+      document.getElementById('edit-name').value = it.name;
+      document.getElementById('edit-size').value = it.size || '';
+      document.getElementById('edit-stock').value = it.stock;
+      document.getElementById('edit-vol').value = it.vol || 100;
+
+      const askCb = document.getElementById('edit-is-ask');
+      const priceIn = document.getElementById('edit-price');
+      askCb.checked = !!it.isAsk;
+      priceIn.disabled = !!it.isAsk;
+      priceIn.value = it.isAsk ? '' : (it.price || '');
+
+      editImageBase64 = "";
+      editImageName = "";
+      document.getElementById('edit-img-status').innerText = it.img ? '既存画像あり' : '画像なし';
+      document.getElementById('edit-preview-box').style.display = it.img ? 'flex' : 'none';
+      document.getElementById('edit-preview-img').src = it.img || '';
+
+      document.getElementById('edit-modal').style.display = 'flex';
+    }
+
+    function closeEditModal() {
+      document.getElementById('edit-modal').style.display = 'none';
+    }
+
+    function toggleEditAsk(isAsk) {
+      const p = document.getElementById('edit-price');
+      p.disabled = isAsk;
+      if (isAsk) p.value = '';
+    }
+
+    function handleEditImageSelected(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1200;
+          let w = img.width, h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+            else { w = Math.round((w * maxDim) / h); h = maxDim; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          editImageBase64 = canvas.toDataURL('image/jpeg', 0.85);
+          editImageName = file.name;
+
+          document.getElementById('edit-img-status').innerText = '✅ 新規写真選択中';
+          document.getElementById('edit-preview-box').style.display = 'flex';
+          document.getElementById('edit-preview-img').src = editImageBase64;
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    async function submitEditProduct() {
+      const saveBtn = document.getElementById('btn-save-edit');
+      saveBtn.disabled = true;
+      saveBtn.innerText = '保存中...';
+
+      const cat = document.getElementById('edit-category').value;
+      const rowNum = parseInt(document.getElementById('edit-row').value, 10);
+      const id = document.getElementById('edit-id').value;
+      const name = document.getElementById('edit-name').value.trim();
+      const size = document.getElementById('edit-size').value.trim();
+      const stock = parseInt(document.getElementById('edit-stock').value, 10) || 0;
+      const vol = parseFloat(document.getElementById('edit-vol').value) || 100;
+      const isAsk = document.getElementById('edit-is-ask').checked;
+      const price = isAsk ? 0 : (parseFloat(document.getElementById('edit-price').value) || 0);
+
+      try {
+        let uploadedImageUrl = undefined;
+        // 画像の変更がある場合、Driveへアップロード
+        if (editImageBase64) {
+          saveBtn.innerText = '写真をGoogle Driveへ保存中...';
+          const upRes = await fetch(GAS_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              action: "uploadImage",
+              id: id,
+              category: cat,
+              imageBase64: editImageBase64,
+              imageFileName: editImageName || (name + ".jpg")
+            })
+          });
+          const upJson = await upRes.json();
+          if (upJson.status === 'success') {
+            uploadedImageUrl = upJson.url;
+          }
+        }
+
+        const updatePayload = {
+          action: "updateStock",
+          category: cat,
+          id: id,
+          rowNumber: rowNum,
+          name: name,
+          size: size,
+          stock: stock,
+          vol: vol,
+          isAsk: isAsk,
+          price: price
+        };
+        if (uploadedImageUrl) updatePayload.img = uploadedImageUrl;
+
+        const res = await fetch(GAS_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(updatePayload)
+        });
+        const result = await res.json();
+
+        if (result.status === 'success') {
+          closeEditModal();
+          showToast(`✅ ${name} の情報を更新しました`);
+          fetchStockData();
+        } else {
+          alert('更新失敗: ' + (result.message || ''));
+        }
+      } catch (err) {
+        console.error("Edit product error:", err);
+        alert('通信エラーが発生しました。');
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerText = '💾 変更を保存する';
+      }
+    }
+
+    // 写真クリックで拡大または写真追加
+    function openPhotoQuickModal(index) {
+      openEditModal(index);
+    }
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function showToast(msg) {
+      const box = document.getElementById('toast-box');
+      box.innerText = msg;
+      box.style.display = 'flex';
+      setTimeout(() => { box.style.display = 'none'; }, 3000);
+    }
+  </script>
+</body>
+</html>

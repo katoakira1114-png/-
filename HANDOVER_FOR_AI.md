@@ -10,25 +10,28 @@ This document is specifically formatted and structured for **LLM-based AI Coding
 [Client (Mobile Browsers / LINE LIFF)]
   ├─ index.html   (Customer Storefront / Order Form)
   ├─ request.html (Customer Specimen Catch Request Form)
-  └─ picking.html (Internal Staff Shipment & Picking Console)
+  ├─ picking.html (Internal Staff Shipment & Picking Console)
+  └─ stock.html   (Internal Staff Stock & Product Catalog Console)
         │
         │ HTTP REST (JSON / Text payloads)
         ▼
 [Backend: Google Apps Script (V8 Engine) - 無題.js]
-  ├─ doGet(e)  -> Query products, lookup customer master, get unfulfilled picking list
-  └─ doPost(e) -> Create order, generate PDF delivery note, update ship status, add manual phone items
+  ├─ doGet(e)  -> Query products, lookup customer master, get picking list, get all stock
+  └─ doPost(e) -> Create order, PDF invoice, ship status, add phone item, update stock, create product, upload image
         │
         ▼
 [Database / Drive: Google Workspace]
   ├─ Google Sheets: 「石垣島観賞魚販売管理」本番 (ID: 1ZiNel8TGJ-e7JMolkRagVOSnr1UczvQzpTa-F-s4p3o)
-  └─ Google Drive Folders: PDF納品書, 自動バックアップ
+  └─ Google Drive Folders:
+        ├─ 川畑水産_納品書PDF (Auto-generated delivery invoices)
+        └─ 川畑水産_観賞魚画像 (Auto-uploaded fish/coral photos with public thumbnail links)
 ```
 
 - **Frontend**: Vanilla HTML5, CSS3, modern ES6+ JavaScript. No build step (Babel/Webpack not needed). Single-page standalone files hosted on GitHub Pages.
 - **Backend**: Google Apps Script (GAS) running on V8 runtime. Exposed via Google Apps Script Web App Deployment.
-- **Authentication**:
+- **Authentication & Authorization**:
   - Storefront: LINE Front-end Framework (LIFF SDK v2) automatically extracts LINE User ID (`sub` / `userId`) and queries the customer master.
-  - Internal Console (`picking.html`): Completely severed from public storefront navigation (hidden URL, direct access for staff on-site).
+  - Internal Consoles (`picking.html`, `stock.html`): Completely severed from public storefront navigation (hidden URLs, direct access for staff on-site). Mutual navigation links between picking and stock consoles.
 
 ---
 
@@ -71,6 +74,7 @@ c:\Users\81909\Desktop\shop-project\
 ├── index.html           # Public customer order form (responsive mobile-first)
 ├── request.html         # Public specimen collection request form
 ├── picking.html         # Staff picking and dispatch management console
+├── stock.html           # Staff stock inventory & new product registration console
 ├── 無題.js              # GAS backend implementation (~1600+ LOC)
 ├── HANDOVER_FOR_HUMAN.md# Operational handover manual for human administrators
 └── HANDOVER_FOR_AI.md   # This specification document for AI assistants
@@ -160,6 +164,32 @@ c:\Users\81909\Desktop\shop-project\
 }
 ```
 
+#### 4. `action=getStockList`
+- **Purpose**: Retrieve full inventory across all categories for the `stock.html` management console.
+- **Query Params**: `action`: `"getStockList"`
+- **Response**:
+```json
+{
+  "status": "success",
+  "items": [
+    {
+      "category": "魚",
+      "rowNumber": 2,
+      "id": "魚_1",
+      "name": "カクレクマノミ (ペア)",
+      "size": "4-5cm",
+      "price": 3200,
+      "isAsk": false,
+      "vol": 500,
+      "stock": 4,
+      "img": "https://drive.google.com/thumbnail?id=...&sz=w1000",
+      "isSoldOut": false
+    }
+  ],
+  "categories": ["魚", "サンゴ", "シャコガイ", "貝", "イソギンチャク", "擬岩", "その他"]
+}
+```
+
 ---
 
 ### B. `doPost(e)` Endpoints
@@ -221,6 +251,64 @@ Payload is sent as `application/json` (or `text/plain` to bypass CORS preflight)
   - Appends item to `注文明細`.
   - Decrements category sheet stock (allows stock <= 0).
 - **Response**: `{ "status": "success", "message": "...", "orderId": "..." }`
+
+#### 4. `action=updateStock` (Stock Increment / Decrement / Detail Update)
+- **Payload**:
+```json
+{
+  "action": "updateStock",
+  "category": "魚",
+  "rowNumber": 2,
+  "stock": 5,
+  "isSoldOut": false,
+  "size": "4-5cm",
+  "price": 1500,
+  "vol": 100,
+  "isAsk": false,
+  "img": "https://..."
+}
+```
+- **Processing**:
+  - Updates Column F (在庫数), Column C (サイズ), Column D (単価), Column E (vol), Column G (画像URL).
+  - When stock reaches 0 or `isSoldOut === true`, stamps Column H (売り切れ日時). Clears Column H when restocked.
+- **Response**: `{ "status": "success", "updatedStock": 5, "isSoldOut": false }`
+
+#### 5. `action=createProduct` (New Specimen Registration)
+- **Payload**:
+```json
+{
+  "action": "createProduct",
+  "category": "魚",
+  "tier": "NONE",
+  "name": "カクレクマノミ (ペア)",
+  "size": "4〜5cm前後",
+  "price": 3200,
+  "isAsk": false,
+  "vol": 100,
+  "stock": 3,
+  "imageBase64": "data:image/jpeg;base64,...",
+  "imageFileName": "photo_1791730000.jpg"
+}
+```
+- **Processing**:
+  - If `imageBase64` is provided, uploads file to Google Drive folder `川畑水産_観賞魚画像` via `saveImageToDrive()`, sets public view permission, and generates direct thumbnail URL (`https://drive.google.com/thumbnail?id={ID}&sz=w1000`).
+  - Auto-generates Product ID: `{TIER}_{CATEGORY}_{TIMESTAMP}` (e.g. `A_魚_1791730000000`) if tier is A/B/C, or `{CATEGORY}_{TIMESTAMP}` if tier is NONE.
+  - Appends new row to the category sheet: `[id, name, size, price, vol, stock, imgUrl, ""]`.
+- **Response**: `{ "status": "success", "productId": "...", "imgUrl": "..." }`
+
+#### 6. `action=uploadImage` (Update Product Image)
+- **Payload**:
+```json
+{
+  "action": "uploadImage",
+  "category": "魚",
+  "rowNumber": 2,
+  "imageBase64": "data:image/jpeg;base64,...",
+  "imageFileName": "kakure.jpg"
+}
+```
+- **Processing**: Uploads image to Drive folder `川畑水産_観賞魚画像`, updates Column G (画像URL) of specified row.
+- **Response**: `{ "status": "success", "imgUrl": "https://drive.google.com/thumbnail?id=...&sz=w1000" }`
 
 ---
 
@@ -318,3 +406,17 @@ Future AI agents MUST be aware of these past pitfalls to avoid repeating known i
 5. **GAS Web App Deployment Ownership**:
    - In `appsscript.json`, `"webapp": { "executeAs": "USER_DEPLOYING", "access": "ANYONE_ANONYMOUS" }` is required.
    - When deploying through clasp, ensure the executing Google account has editor rights on the container-bound spreadsheet.
+
+6. **Google Drive Image Direct Links for Web Rendering**:
+   - Standard Google Drive file links (`https://drive.google.com/file/d/{ID}/view`) will NOT render in browser `<img>` tags due to Google Drive HTTP headers.
+   - Files MUST be made publicly readable (`DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW`), and the image source URL MUST use the direct thumbnail endpoint: `https://drive.google.com/thumbnail?id={ID}&sz=w1000`.
+
+7. **Product ID Tier Prefix Scheme**:
+   - Products with ID starting with `A_`, `B_`, or `C_` are restricted. The customer storefront checks `customer.tiers` permissions from `顧客マスタ` and hides restricted items if the customer lacks permissions.
+   - When generating new product IDs in `createProduct`:
+     - If Tier is selected (`A`, `B`, or `C`): ID = `{TIER}_{CATEGORY}_{Date.now()}`
+     - If Tier is `NONE`: ID = `{CATEGORY}_{Date.now()}`
+
+8. **GitHub Push Protection & Token Security**:
+   - NEVER commit raw GitHub personal access tokens (`ghp_...`) into any markdown, json, or js file in this repository.
+   - GitHub secret scanning triggers immediately and blocks the `git push origin main` command. Use placeholder `<GITHUB_PERSONAL_ACCESS_TOKEN>` or environment variables in documentation.
