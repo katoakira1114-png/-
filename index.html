@@ -94,8 +94,8 @@
 <body>
   <div class="loading-overlay" id="loading-overlay">
     <div class="spinner"></div>
-    <div style="font-weight:bold; color:#333;">処理中...</div>
-    <div style="font-size: 0.75rem; color:#888; margin-top: 4px;">画面を閉じずにお待ちください</div>
+    <div style="font-weight:bold; color:#333; text-align:center;" id="loading-status-text">処理中...</div>
+    <div style="font-size: 0.75rem; color:#888; margin-top: 4px; text-align:center;" id="loading-sub-text">画面を閉じずにお待ちください</div>
   </div>
 
   <div class="sticky-header-container">
@@ -209,6 +209,23 @@
 
         <!-- 合計サマリー -->
         <div class="modal-summary" id="modal-summary-box"></div>
+
+        <!-- 在庫・同時注文に関する注記（ダブルブッキング対策） -->
+        <div style="background:#fffdf0; border:1px solid #f6d899; border-radius:6px; padding:9px 10px; margin-top:10px; font-size:0.75rem; color:#7d5a00; line-height:1.45;">
+          ⚠️ <strong>在庫・受注確定に関するご案内</strong><br>
+          生体のコンディション管理および同時注文の都合上、万一欠品や状態不良が生じた場合は店舗より個別にご連絡差し上げます。<br>
+          <span style="font-size:0.72rem; color:#a04000;">※正式な受注および発送日程は、店舗からの発送確認連絡をもって確定となります。</span>
+        </div>
+
+        <!-- 混雑時・送信エラー時のセーフティ案内バナー（初期非表示） -->
+        <div id="order-error-banner" style="display:none; background:#fff3cd; border:1px solid #ffeeba; border-radius:6px; padding:10px; margin-top:10px; font-size:0.8rem; color:#856404; line-height:1.4;">
+          <div style="font-weight:bold; margin-bottom:4px;" id="order-error-title">⚠️ サーバーが大変混雑しています</div>
+          <div id="order-error-desc" style="font-size:0.75rem; margin-bottom:8px;">ご入力内容とカートの商品はそのまま保持されています。電波状況をご確認の上、もう一度お試しください。</div>
+          <div style="display:flex; gap:6px;">
+            <button type="button" class="confirm-btn" style="flex:1; padding:8px; font-size:0.8rem; background:var(--primary-color);" onclick="submitOrder()">🔄 今すぐ再送する</button>
+            <button type="button" class="confirm-btn" style="flex:1; padding:8px; font-size:0.8rem; background:#06c755;" onclick="fallbackSendToLine()">💬 LINEで直接送る</button>
+          </div>
+        </div>
       </div>
       <div class="modal-actions">
         <button class="modal-btn btn-back" id="btn-back" onclick="closeModal()">戻る</button>
@@ -416,11 +433,10 @@
         const uid = extractUserId();
         let fetchUrl = GAS_API_URL + "?";
         if (uid) fetchUrl += `userId=${encodeURIComponent(uid)}&`;
-        if (savedPhone) fetchUrl += `phone=${encodeURIComponent(savedPhone)}&`;
-        
-        console.log(`[GAS API] 送信パラメータ: userId="${uid || '(未取得)'}", phone="${savedPhone || '(未取得)'}"`);
+        // セキュリティ改善: 電話番号による認証バイパスを廃止し、LINEユーザーIDの完全一致のみで認証
+        console.log(`[GAS API] 認証パラメータ: userId="${uid || '(未取得)'}"`);
         console.log(`[GAS API] リクエストURL: ${fetchUrl}`);
-        updateDebugLog('gas', `照会中... (送信UID: ${uid ? uid.substring(0, 10) + '...' : '❌未取得(LIFFエラー)'})`);
+        updateDebugLog('gas', `照会中... (送信UID: ${uid ? uid.substring(0, 10) + '...' : '❌未取得(LIFF未認証)'})`);
 
         const res = await fetch(fetchUrl);
         if (!res.ok) throw new Error(`HTTPエラー ${res.status}`);
@@ -836,6 +852,24 @@
       document.getElementById('order-modal').classList.remove('active');
     }
 
+    let lastOrderMsgText = "";
+
+    function fallbackSendToLine() {
+      if (!lastOrderMsgText) return;
+      if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
+        try {
+          liff.sendMessages([{ type: 'text', text: lastOrderMsgText }]).then(() => {
+            alert('公式LINEに直接注文メッセージを送信しました！');
+            liff.closeWindow();
+          });
+          return;
+        } catch (e) {
+          console.warn("liff.sendMessages failed:", e);
+        }
+      }
+      window.location.href = `https://line.me/R/oaMessage/${OFFICIAL_LINE_ID}/?${encodeURIComponent(lastOrderMsgText)}`;
+    }
+
     async function submitOrder() {
       const custName = document.getElementById('cust-name').value.trim();
       const custPhone = document.getElementById('cust-phone').value.trim();
@@ -851,78 +885,131 @@
       }));
       if (orderItems.length === 0) return;
 
-      document.getElementById('loading-overlay').classList.add('active');
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 35000);
-
       const ngDatesList = Array.from(selectedNgDates);
       const uid = extractUserId();
 
-      try {
-        const payload = {
-          action: "order",
-          items: orderItems,
-          customer: { name: custName, phone: custPhone, lineUserId: uid },
-          ngDates: ngDatesList
-        };
-        const response = await fetch(GAS_API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(payload),
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-        
-        const text = await response.text();
-        let result;
+      // LINE送信用メッセージの事前生成（二重予約・欠品注記を含む）
+      let subtotalAmount = 0, totalVol = 0, hasAsk = false;
+      let msgText = `【新規ご注文】\n店舗/氏名: ${custName} 様\n`;
+      if (custPhone) msgText += `TEL: ${custPhone}\n`;
+      if (ngDatesList.length > 0) {
+        msgText += `受取不可日: ${ngDatesList.join(', ')}\n`;
+      }
+      msgText += `-------------------\n`;
+      orderItems.forEach(item => {
+        msgText += `・${item.name} × ${item.qty} ${item.isAsk ? '(ASK)' : '(¥'+(item.appliedPrice * item.qty).toLocaleString()+')'}\n`;
+        if (item.isAsk) hasAsk = true; else subtotalAmount += item.appliedPrice * item.qty;
+        totalVol += item.vol * item.qty;
+      });
+      msgText += `-------------------\n商品計: ¥${subtotalAmount.toLocaleString()}${hasAsk ? ' + ASK' : ''}\n容量: ${totalVol.toLocaleString()} vol (約${(totalVol/1000).toFixed(1)}箱)\n`;
+      msgText += `\n※正式な受注および発送日程は店舗からのご連絡をもって確定となります。\n`;
+      lastOrderMsgText = msgText;
+
+      const payload = {
+        action: "order",
+        items: orderItems,
+        customer: { name: custName, phone: custPhone, lineUserId: uid },
+        ngDates: ngDatesList
+      };
+
+      const overlay = document.getElementById('loading-overlay');
+      const statusText = document.getElementById('loading-status-text');
+      const subText = document.getElementById('loading-sub-text');
+      const errBanner = document.getElementById('order-error-banner');
+      if (errBanner) errBanner.style.display = 'none';
+
+      overlay.classList.add('active');
+      if (statusText) statusText.innerText = '注文を送信しています...';
+      if (subText) subText.innerText = '画面を閉じずにお待ちください';
+
+      let lastError = null;
+      let successResult = null;
+      const MAX_RETRIES = 2; // 混雑・一時エラー時の最大自動再送回数
+
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        if (attempt > 0) {
+          if (statusText) statusText.innerHTML = '⚠️ サーバー混雑中（順番待ち中）';
+          if (subText) subText.innerHTML = `自動で再送しています (${attempt}/${MAX_RETRIES})<br><small style="color:#27ae60;">※カートの情報は保持されています</small>`;
+          // 2.5秒待機してから再送
+          await new Promise(res => setTimeout(res, 2500));
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 35000);
+
         try {
-          result = JSON.parse(text);
-        } catch (e) {
-          throw new Error("サーバーとの通信に失敗しました。");
-        }
-
-        if (result.status === "success") {
-          let subtotalAmount = 0, totalVol = 0, hasAsk = false;
-          let msgText = `【新規ご注文】\n店舗/氏名: ${custName} 様\n`;
-          if (custPhone) msgText += `TEL: ${custPhone}\n`;
-          if (ngDatesList.length > 0) {
-            msgText += `受取不可日: ${ngDatesList.join(', ')}\n`;
-          }
-          msgText += `-------------------\n`;
-          orderItems.forEach(item => {
-            msgText += `・${item.name} × ${item.qty} ${item.isAsk ? '(ASK)' : '(¥'+(item.appliedPrice * item.qty).toLocaleString()+')'}\n`;
-            if (item.isAsk) hasAsk = true; else subtotalAmount += item.appliedPrice * item.qty;
-            totalVol += item.vol * item.qty;
+          const response = await fetch(GAS_API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify(payload),
+            signal: controller.signal
           });
-          msgText += `-------------------\n商品計: ¥${subtotalAmount.toLocaleString()}${hasAsk ? ' + ASK' : ''}\n容量: ${totalVol.toLocaleString()} vol (約${(totalVol/1000).toFixed(1)}箱)\n\n`;
-          if (result.invoiceUrl) msgText += `📄 納品書PDF:\n${result.invoiceUrl}`;
+          clearTimeout(timeoutId);
 
-          // カートと受取不可日のリセット
-          Object.keys(cart).forEach(id => { cart[id] = 0; });
-          selectedNgDates.clear();
-
-          closeModal();
-          renderProducts();
-          updateSummary();
-
-          if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
-            try {
-              await liff.sendMessages([{ type: 'text', text: msgText }]);
-              alert('ご注文が完了しました！公式LINEに控えが送信されました。');
-              liff.closeWindow();
-              return;
-            } catch (e) {}
+          if (!response.ok) {
+            throw new Error(`HTTPエラー ${response.status}`);
           }
-          alert('ご注文が完了しました！\n(LINEアプリが入っている場合は、この後メッセージ画面が立ち上がります)');
-          window.location.href = `https://line.me/R/oaMessage/${OFFICIAL_LINE_ID}/?${encodeURIComponent(msgText)}`;
-        } else {
-           alert("エラーが発生しました: " + (result.message || '不明なエラー'));
+
+          const text = await response.text();
+          let result;
+          try {
+            result = JSON.parse(text);
+          } catch (e) {
+            throw new Error("サーバー応答の解析に失敗しました");
+          }
+
+          if (result.status === "success") {
+            successResult = result;
+            break; // 送信成功
+          } else if (result.message && result.message.indexOf("混雑") !== -1) {
+            lastError = new Error(result.message);
+          } else {
+            throw new Error(result.message || '注文処理に失敗しました');
+          }
+        } catch (fetchErr) {
+          clearTimeout(timeoutId);
+          lastError = fetchErr;
+          console.warn(`[注文送信試行 ${attempt + 1}/${MAX_RETRIES + 1}] エラー:`, fetchErr);
         }
-      } catch (e) {
-        if (e.name === 'AbortError') alert('通信がタイムアウトしました。電波の良い場所で再度お試しください。');
-        else alert('注文処理中にエラーが発生しました。通信環境を確認して再度お試しください。');
-      } finally {
-        document.getElementById('loading-overlay').classList.remove('active');
+      }
+
+      overlay.classList.remove('active');
+
+      if (successResult) {
+        if (successResult.invoiceUrl) {
+          msgText += `\n📄 納品書PDF:\n${successResult.invoiceUrl}`;
+        }
+
+        // 正常完了時のみカートと受取不可日をリセット
+        Object.keys(cart).forEach(id => { cart[id] = 0; });
+        selectedNgDates.clear();
+
+        closeModal();
+        renderProducts();
+        updateSummary();
+
+        if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
+          try {
+            await liff.sendMessages([{ type: 'text', text: msgText }]);
+            alert('ご注文が完了しました！公式LINEに控えが送信されました。');
+            liff.closeWindow();
+            return;
+          } catch (e) {}
+        }
+        alert('ご注文が完了しました！\n(LINEアプリが入っている場合は、この後メッセージ画面が立ち上がります)');
+        window.location.href = `https://line.me/R/oaMessage/${OFFICIAL_LINE_ID}/?${encodeURIComponent(msgText)}`;
+      } else {
+        // 全試行が失敗した場合: カート・受取不可日・入力内容は保持したまま案内
+        console.error("注文送信の全試行が失敗:", lastError);
+        if (errBanner) {
+          errBanner.style.display = 'block';
+          const titleEl = document.getElementById('order-error-title');
+          const descEl = document.getElementById('order-error-desc');
+          if (titleEl) titleEl.innerText = '⚠️ サーバーが混雑しているか、通信が不安定です';
+          if (descEl) descEl.innerHTML = `<strong>ご入力内容とカート（${orderItems.length}点）は保持されています。</strong><br>少し時間をおいて「今すぐ再送する」を押すか、右の「LINEで直接送る」からご注文ください。`;
+        } else {
+          alert(`【注文送信エラー】\n${lastError ? lastError.message : 'サーバーが混雑しております'}\n\n※カートと入力内容は保持されています。時間をおいて再度お試しください。`);
+        }
       }
     }
   </script>

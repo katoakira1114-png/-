@@ -437,10 +437,10 @@ function doGet(e) {
         var dbPhone = String(cData[i][colPhone] || "").replace(/[^0-9]/g, "");
         if (dbPhone.length === 10 && !dbPhone.startsWith("0")) dbPhone = "0" + dbPhone;
 
+        // 顧客認証: LINEユーザーIDの完全一致のみを条件とする（電話番号による認証は廃止して安全性を最大化）
         var matchUid = (dbUserId !== "" && reqUserId !== "" && dbUserId.toLowerCase() === reqUserId.toLowerCase());
-        var matchPhone = (dbPhone !== "" && reqRawPhone !== "" && dbPhone === reqRawPhone);
 
-        if (matchUid || matchPhone) {
+        if (matchUid) {
           var rateVal = 1.0;
           if (colRate !== -1 && cData[i][colRate] !== undefined) {
             rateVal = parseFloat(String(cData[i][colRate] || "1").trim());
