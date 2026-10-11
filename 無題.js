@@ -325,6 +325,106 @@ function doGet(e) {
       }
     }
 
+    // 【ピッキングリスト取得API】出荷ピッキング画面用
+    if (action === "getPickingList") {
+      var detailSheet = ss.getSheetByName("注文明細");
+      if (!detailSheet) {
+        return ContentService.createTextOutput(JSON.stringify({
+          status: "success",
+          orders: [],
+          totalSummary: []
+        })).setMimeType(ContentService.MimeType.JSON);
+      }
+
+      var dData = detailSheet.getDataRange().getValues();
+      var orderMap = {};
+      var totalItemMap = {};
+      var showAll = (e && e.parameter && e.parameter.showAll === "1");
+
+      for (var r = 1; r < dData.length; r++) {
+        var row = dData[r];
+        var isShipped = row[10] === true || String(row[10]).toUpperCase() === "TRUE";
+
+        if (!isShipped || showAll) {
+          var dateVal = row[0];
+          var dateStr = (dateVal instanceof Date) ? Utilities.formatDate(dateVal, "JST", "yyyy/MM/dd HH:mm") : String(dateVal || "");
+          var orderId = String(row[1] || "").trim();
+          var custName = String(row[2] || "お客様").trim();
+          var phone = String(row[3] || "").trim();
+          var category = String(row[4] || "").trim();
+          var prodName = String(row[5] || "").trim();
+          var qty = Number(row[6]) || 0;
+          var price = row[7];
+          var subtotal = row[8];
+          var pdfUrl = String(row[9] || "").trim();
+          var ngDates = String(row[13] || "").trim();
+          var notes = String(row[14] || "").trim();
+
+          if (!orderId) continue;
+
+          if (!orderMap[orderId]) {
+            orderMap[orderId] = {
+              orderId: orderId,
+              orderDate: dateStr,
+              customerName: custName,
+              phone: phone,
+              pdfUrl: pdfUrl,
+              ngDates: ngDates,
+              notes: notes,
+              isShipped: isShipped,
+              items: [],
+              rowIndices: []
+            };
+          }
+
+          if (!isShipped) {
+            orderMap[orderId].isShipped = false;
+          }
+
+          orderMap[orderId].items.push({
+            rowNumber: r + 1,
+            category: category,
+            name: prodName,
+            qty: qty,
+            price: price,
+            isShipped: isShipped
+          });
+          orderMap[orderId].rowIndices.push(r + 1);
+
+          if (!isShipped && prodName) {
+            var catKey = category || "その他";
+            if (!totalItemMap[catKey]) totalItemMap[catKey] = {};
+            if (!totalItemMap[catKey][prodName]) {
+              totalItemMap[catKey][prodName] = { name: prodName, category: catKey, totalQty: 0, orderCount: 0 };
+            }
+            totalItemMap[catKey][prodName].totalQty += qty;
+            totalItemMap[catKey][prodName].orderCount += 1;
+          }
+        }
+      }
+
+      var ordersList = Object.keys(orderMap).map(function(k) { return orderMap[k]; });
+      ordersList.sort(function(a, b) { return a.orderId.localeCompare(b.orderId); });
+
+      var totalList = [];
+      Object.keys(totalItemMap).forEach(function(cat) {
+        var itemsInCat = Object.keys(totalItemMap[cat]).map(function(pName) {
+          return totalItemMap[cat][pName];
+        });
+        itemsInCat.sort(function(a, b) { return b.totalQty - a.totalQty; });
+        totalList.push({
+          category: cat,
+          items: itemsInCat
+        });
+      });
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        orders: ordersList,
+        totalSummary: totalList
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     // 【顧客情報参照API】採集リクエストフォームや注文フォームからの自動補完用
     if (action === "lookupCustomer" || action === "searchCustomer") {
       var queryPhone = (e.parameter.phone || "").replace(/[^0-9]/g, "");
@@ -703,6 +803,41 @@ function doPost(e) {
     // 生体リクエスト・採集要望の処理
     if (action === "request") {
       return handleSpecimenRequest(contents);
+    }
+
+    // 【発送ステータス更新API】ピッキング画面からタップで発送済みに切り替え
+    if (action === "updateShipStatus" || action === "toggleShipped") {
+      var ssDetail = SpreadsheetApp.openById(SPREADSHEET_ID);
+      var dSheet = ssDetail.getSheetByName("注文明細");
+      if (!dSheet) throw new Error("注文明細シートが見つかりません。");
+
+      var targetOrderId = contents.orderId;
+      var targetRowNumbers = contents.rowNumbers || [];
+      var newStatus = (contents.isShipped !== undefined) ? !!contents.isShipped : true;
+
+      if (targetRowNumbers.length > 0) {
+        for (var ri = 0; ri < targetRowNumbers.length; ri++) {
+          var rNum = targetRowNumbers[ri];
+          if (rNum >= 2 && rNum <= dSheet.getLastRow()) {
+            dSheet.getRange(rNum, 11).setValue(newStatus);
+          }
+        }
+      } else if (targetOrderId) {
+        var dVals = dSheet.getDataRange().getValues();
+        for (var rowIdx = 1; rowIdx < dVals.length; rowIdx++) {
+          if (String(dVals[rowIdx][1] || "").trim() === String(targetOrderId).trim()) {
+            dSheet.getRange(rowIdx + 1, 11).setValue(newStatus);
+          }
+        }
+      }
+
+      SpreadsheetApp.flush();
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "発送ステータスを更新しました",
+        isShipped: newStatus
+      })).setMimeType(ContentService.MimeType.JSON);
     }
 
     // --- ここから注文処理 ---

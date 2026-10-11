@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=no">
+  <title>ピッキング・出荷管理 - 川畑水産（観賞魚）</title>
+  <style>
+    :root {
+      --primary: #005bac;
+      --primary-dark: #004380;
+      --bg: #f3f5f8;
+      --card-bg: #ffffff;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --success: #16a34a;
+      --success-bg: #dcfce7;
+      --warning: #d97706;
+      --warning-bg: #fef3c7;
+      --danger: #dc2626;
+      --danger-bg: #fee2e2;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { background-color: var(--bg); color: var(--text); padding-bottom: 70px; line-height: 1.4; }
+
+    /* ヘッダー */
+    header {
+      position: sticky; top: 0; z-index: 100;
+      background-color: var(--primary);
+      color: #fff;
+      padding: 10px 14px;
+      box-shadow: 0 2px 8px rgba(0, 91, 172, 0.25);
+    }
+    .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .header-title { font-size: 1.05rem; font-weight: bold; display: flex; align-items: center; gap: 6px; }
+    .header-actions { display: flex; align-items: center; gap: 8px; }
+    .refresh-btn {
+      background: rgba(255,255,255,0.2); color: #fff; border: 1px solid rgba(255,255,255,0.3);
+      padding: 5px 10px; border-radius: 6px; font-size: 0.78rem; font-weight: bold; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 4px;
+    }
+    .refresh-btn:active { background: rgba(255,255,255,0.35); }
+    .refresh-btn.spinning .spin-icon { animation: rotate 1s linear infinite; }
+    @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    /* ナビゲーションタブ */
+    .nav-tabs {
+      display: flex; gap: 6px; background: rgba(0,0,0,0.12); padding: 4px; border-radius: 8px;
+    }
+    .tab-btn {
+      flex: 1; padding: 8px 10px; border: none; border-radius: 6px; font-size: 0.85rem; font-weight: bold;
+      color: rgba(255,255,255,0.85); background: transparent; cursor: pointer; text-align: center;
+      transition: all 0.15s ease;
+    }
+    .tab-btn.active { background: #fff; color: var(--primary); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+
+    /* 検索 & フィルターバー */
+    .filter-bar {
+      background: #fff; border-bottom: 1px solid var(--border); padding: 8px 12px;
+      display: flex; gap: 8px; align-items: center; justify-content: space-between;
+    }
+    .search-input {
+      flex: 1; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem;
+    }
+    .filter-select {
+      padding: 7px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.82rem; background: #fff;
+    }
+
+    /* メインコンテナ */
+    .container { max-width: 720px; margin: 10px auto; padding: 0 10px; }
+
+    /* サマリーカード */
+    .stats-card {
+      background: #fff; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px;
+      display: flex; justify-content: space-around; text-align: center; border: 1px solid var(--border);
+    }
+    .stat-val { font-size: 1.3rem; font-weight: bold; color: var(--primary); }
+    .stat-label { font-size: 0.72rem; color: var(--text-muted); }
+
+    /* 注文別ピッキングカード */
+    .order-card {
+      background: var(--card-bg); border-radius: 10px; border: 1px solid var(--border);
+      margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); overflow: hidden;
+      transition: border-color 0.15s ease;
+    }
+    .order-card.shipped { opacity: 0.65; border-color: #cbd5e1; background: #f8fafc; }
+    .order-card-header {
+      padding: 10px 12px; display: flex; justify-content: space-between; align-items: flex-start;
+      border-bottom: 1px solid #f1f5f9; background: #fff;
+    }
+    .order-card.shipped .order-card-header { background: #f1f5f9; }
+    .order-cust-name { font-size: 1.05rem; font-weight: bold; color: #0f172a; }
+    .order-meta-info { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+    
+    .status-badge {
+      display: inline-block; padding: 3px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: bold;
+    }
+    .status-badge.unshipped { background: var(--warning-bg); color: var(--warning); border: 1px solid #fde68a; }
+    .status-badge.shipped { background: var(--success-bg); color: var(--success); border: 1px solid #bbf7d0; }
+
+    /* 受取不可日・備考アラート */
+    .ng-alert {
+      background: var(--danger-bg); border-left: 4px solid var(--danger); color: #991b1b;
+      padding: 6px 10px; font-size: 0.78rem; font-weight: bold; margin: 8px 12px 0 12px; border-radius: 4px;
+    }
+    .notes-alert {
+      background: #f8fafc; border-left: 4px solid #64748b; color: #334155;
+      padding: 6px 10px; font-size: 0.75rem; margin: 6px 12px 0 12px; border-radius: 4px;
+    }
+
+    /* 商品チェックリスト */
+    .order-items-list { padding: 8px 12px; }
+    .item-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 9px 0; border-bottom: 1px dashed #e2e8f0; font-size: 0.92rem;
+      cursor: pointer; user-select: none;
+    }
+    .item-row:last-child { border-bottom: none; }
+    .item-left { display: flex; align-items: center; gap: 8px; flex: 1; }
+    .item-check-icon {
+      width: 22px; height: 22px; border-radius: 6px; border: 2px solid #cbd5e1;
+      display: flex; align-items: center; justify-content: center; font-size: 0.8rem; color: transparent;
+      transition: all 0.15s ease;
+    }
+    .item-row.checked .item-check-icon {
+      background: var(--success); border-color: var(--success); color: #fff;
+    }
+    .item-row.checked .item-name {
+      text-decoration: line-through; color: #94a3b8;
+    }
+    .item-category-tag {
+      font-size: 0.68rem; background: #e2e8f0; color: #475569; padding: 2px 5px; border-radius: 4px; font-weight: bold;
+    }
+    .item-name { font-weight: bold; }
+    .item-qty-badge {
+      background: #eef6ff; color: var(--primary); padding: 3px 8px; border-radius: 6px;
+      font-weight: bold; font-size: 0.9rem; border: 1px solid #bfdbfe; white-space: nowrap;
+    }
+
+    /* カードアクションボタン群 */
+    .order-actions {
+      padding: 10px 12px; background: #fafafa; border-top: 1px solid #f1f5f9;
+      display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: flex-end;
+    }
+    .btn-action {
+      padding: 7px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: bold; cursor: pointer;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 4px; border: none;
+    }
+    .btn-ship-toggle {
+      background: var(--success); color: #fff;
+    }
+    .btn-ship-toggle.is-shipped {
+      background: #e2e8f0; color: #475569;
+    }
+    .btn-pdf { background: #f0f7ff; color: var(--primary); border: 1px solid #bfdbfe; }
+    .btn-line { background: #06c755; color: #fff; }
+
+    /* 合計ピッキング用スタイル */
+    .category-section { margin-bottom: 14px; }
+    .category-title {
+      font-size: 0.95rem; font-weight: bold; color: var(--primary); padding: 6px 8px;
+      background: #e0f2fe; border-left: 4px solid var(--primary); border-radius: 4px; margin-bottom: 6px;
+    }
+    .summary-item-card {
+      background: #fff; border-radius: 8px; border: 1px solid var(--border); padding: 12px 14px;
+      margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;
+      cursor: pointer; user-select: none; transition: all 0.15s ease;
+    }
+    .summary-item-card:active { transform: scale(0.99); background: #f8fafc; }
+    .summary-item-card.picked {
+      background: #f1f5f9; opacity: 0.6; border-color: #cbd5e1;
+    }
+    .summary-item-card.picked .summary-item-name {
+      text-decoration: line-through; color: #94a3b8;
+    }
+    .summary-item-name { font-size: 1rem; font-weight: bold; }
+    .summary-item-meta { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+    .summary-qty-box {
+      background: #eff6ff; color: var(--primary); border: 2px solid #bfdbfe;
+      border-radius: 8px; padding: 6px 12px; font-size: 1.15rem; font-weight: bold; text-align: center;
+    }
+
+    /* 空ステータス・ローディング */
+    .empty-state { text-align: center; padding: 50px 20px; color: var(--text-muted); }
+    .empty-icon { font-size: 2.5rem; margin-bottom: 8px; }
+
+    /* フッター */
+    footer {
+      position: fixed; bottom: 0; left: 0; right: 0; background: #fff;
+      border-top: 1px solid var(--border); padding: 8px 12px; font-size: 0.75rem;
+      text-align: center; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center;
+    }
+    .footer-link { color: var(--primary); text-decoration: none; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-top">
+      <div class="header-title">
+        <span>📦</span>
+        <span>川畑水産 ピッキング管理</span>
+      </div>
+      <div class="header-actions">
+        <button class="refresh-btn" id="refresh-btn" onclick="fetchPickingData()">
+          <span class="spin-icon">🔄</span>
+          <span id="refresh-time-text">更新</span>
+        </button>
+      </div>
+    </div>
+    
+    <div class="nav-tabs">
+      <button class="tab-btn active" id="tab-orders" onclick="switchTab('orders')">📦 店舗・注文別 (<span id="unshipped-order-count">0</span>)</button>
+      <button class="tab-btn" id="tab-summary" onclick="switchTab('summary')">🐠 生体集約・合計 (<span id="total-specimen-count">0</span>)</button>
+    </div>
+  </header>
+
+  <div class="filter-bar">
+    <input type="text" class="search-input" id="search-input" placeholder="🔍 店舗名・商品名で絞り込み..." oninput="handleSearch()">
+    <select class="filter-select" id="status-filter" onchange="handleFilterChange()">
+      <option value="unshipped">未発送のみ</option>
+      <option value="all">すべて表示</option>
+      <option value="shipped">発送済のみ</option>
+    </select>
+  </div>
+
+  <div class="container">
+    <!-- 集計サマリー -->
+    <div class="stats-card">
+      <div>
+        <div class="stat-val" id="stat-orders-val">0</div>
+        <div class="stat-label">未出荷 注文数</div>
+      </div>
+      <div>
+        <div class="stat-val" id="stat-items-val">0</div>
+        <div class="stat-label">未出荷 合計点数</div>
+      </div>
+      <div>
+        <div class="stat-val" id="stat-species-val">0</div>
+        <div class="stat-label">対象 生体種数</div>
+      </div>
+    </div>
+
+    <!-- ビュー1: 店舗・注文別ピッキング -->
+    <div id="view-orders">
+      <div id="orders-container">
+        <div class="empty-state">
+          <div class="empty-icon">⏳</div>
+          <div>データを読み込んでいます...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ビュー2: 生体・品目合計ピッキング -->
+    <div id="view-summary" style="display: none;">
+      <div id="summary-container">
+        <div class="empty-state">
+          <div class="empty-icon">⏳</div>
+          <div>データを読み込んでいます...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <a href="index.html" class="footer-link">← 注文フォームへ</a>
+    <span id="last-sync-label">自動同期中 (60秒毎)</span>
+    <a href="https://docs.google.com/spreadsheets/d/1l5uJihoagHbMAwiCulpt9Zy9PIV6RRDneUYJ6QbiBbU/edit" target="_blank" class="footer-link">📊 スプレッドシート</a>
+  </footer>
+
+  <script>
+    const GAS_API_URL = "https://script.google.com/macros/s/AKfycbxIYsPdreUjaOFutfshhQIwOLb_Ke1JprcDZj_LAT9oZnc-l-3jZLsPAsFd_QdQJAQ4eA/exec";
+    const OFFICIAL_LINE_ID = "@721pyqfn";
+
+    let currentTab = "orders";
+    let rawOrders = [];
+    let rawTotalSummary = [];
+    let checkedItemsMap = {}; // ローカルの品目チェック状態保持 { "orderId_itemIndex": true }
+    let pickedSummaryMap = {}; // 生体集約のローカルチェック保持 { "category_species": true }
+
+    // 初期読み込み
+    window.addEventListener('DOMContentLoaded', () => {
+      // 記憶領域からチェック状態を復元
+      try {
+        checkedItemsMap = JSON.parse(localStorage.getItem('kawabata_picking_checks') || "{}");
+        pickedSummaryMap = JSON.parse(localStorage.getItem('kawabata_summary_checks') || "{}");
+      } catch (e) {}
+
+      fetchPickingData();
+
+      // 60秒ごとに自動更新
+      setInterval(fetchPickingData, 60000);
+    });
+
+    // タブ切り替え
+    function switchTab(tab) {
+      currentTab = tab;
+      document.getElementById('tab-orders').classList.toggle('active', tab === 'orders');
+      document.getElementById('tab-summary').classList.toggle('active', tab === 'summary');
+      document.getElementById('view-orders').style.display = tab === 'orders' ? 'block' : 'none';
+      document.getElementById('view-summary').style.display = tab === 'summary' ? 'block' : 'none';
+      renderCurrentView();
+    }
+
+    // データ取得
+    async function fetchPickingData() {
+      const btn = document.getElementById('refresh-btn');
+      btn.classList.add('spinning');
+
+      try {
+        const showAll = document.getElementById('status-filter').value !== 'unshipped' ? '1' : '0';
+        const res = await fetch(`${GAS_API_URL}?action=getPickingList&showAll=${showAll}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        
+        const data = await res.json();
+        if (data.status === 'success') {
+          rawOrders = data.orders || [];
+          rawTotalSummary = data.totalSummary || [];
+
+          updateStats();
+          renderCurrentView();
+
+          const now = new Date();
+          const timeStr = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+          document.getElementById('refresh-time-text').innerText = timeStr;
+        } else {
+          console.error("API error:", data.message);
+        }
+      } catch (err) {
+        console.error("fetchPickingData failed:", err);
+      } finally {
+        btn.classList.remove('spinning');
+      }
+    }
+
+    // 集計バッジ・数値の更新
+    function updateStats() {
+      const unshippedOrders = rawOrders.filter(o => !o.isShipped);
+      let unshippedItemsCount = 0;
+      let totalSpeciesCount = 0;
+
+      unshippedOrders.forEach(o => {
+        o.items.forEach(it => {
+          if (!it.isShipped) unshippedItemsCount += it.qty;
+        });
+      });
+
+      rawTotalSummary.forEach(sec => {
+        totalSpeciesCount += sec.items.length;
+      });
+
+      document.getElementById('unshipped-order-count').innerText = unshippedOrders.length;
+      document.getElementById('total-specimen-count').innerText = totalSpeciesCount;
+
+      document.getElementById('stat-orders-val').innerText = unshippedOrders.length;
+      document.getElementById('stat-items-val').innerText = unshippedItemsCount;
+      document.getElementById('stat-species-val').innerText = totalSpeciesCount;
+    }
+
+    // 検索・フィルター処理
+    function handleSearch() { renderCurrentView(); }
+    function handleFilterChange() { fetchPickingData(); }
+
+    function renderCurrentView() {
+      if (currentTab === 'orders') {
+        renderOrders();
+      } else {
+        renderSummary();
+      }
+    }
+
+    // HTMLエスケープヘルパー
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // 1. 店舗・注文別ピッキング一覧の描画
+    function renderOrders() {
+      const container = document.getElementById('orders-container');
+      const query = document.getElementById('search-input').value.trim().toLowerCase();
+      const filter = document.getElementById('status-filter').value;
+
+      let filtered = rawOrders.filter(o => {
+        if (filter === 'unshipped' && o.isShipped) return false;
+        if (filter === 'shipped' && !o.isShipped) return false;
+        if (query) {
+          const matchName = o.customerName.toLowerCase().includes(query);
+          const matchId = o.orderId.toLowerCase().includes(query);
+          const matchItem = o.items.some(it => it.name.toLowerCase().includes(query));
+          return matchName || matchId || matchItem;
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">🎉</div>
+            <div style="font-weight:bold; font-size:1.05rem;">未出荷の注文はありません</div>
+            <div style="font-size:0.8rem; margin-top:4px;">すべての注文のピッキング・発送が完了しています！</div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map(order => {
+        const isShipped = !!order.isShipped;
+        const ngAlertHtml = order.ngDates ? `
+          <div class="ng-alert">
+            🚫 受取不可日（発送日注意）: ${escapeHtml(order.ngDates)}
+          </div>
+        ` : '';
+
+        const notesAlertHtml = order.notes ? `
+          <div class="notes-alert">
+            📝 備考: ${escapeHtml(order.notes)}
+          </div>
+        ` : '';
+
+        // アイテムリスト
+        const itemsHtml = order.items.map((it, idx) => {
+          const checkKey = `${order.orderId}_${idx}`;
+          const isItemChecked = checkedItemsMap[checkKey] || isShipped;
+          return `
+            <div class="item-row ${isItemChecked ? 'checked' : ''}" onclick="toggleItemCheck('${escapeHtml(order.orderId)}', ${idx})">
+              <div class="item-left">
+                <div class="item-check-icon">✓</div>
+                <span class="item-category-tag">${escapeHtml(it.category || '生体')}</span>
+                <span class="item-name">${escapeHtml(it.name)}</span>
+              </div>
+              <div class="item-qty-badge">× ${it.qty}</div>
+            </div>
+          `;
+        }).join('');
+
+        // 発送通知LINE用リンク
+        const shipMsg = `【発送完了のお知らせ】\n${order.customerName} 様\n\nご注文いただいた商品を本日発送いたしました。\n基本的には明日の午前中到着予定となります。\n到着後の水合わせ等のご準備をお願いいたします。\n\n📄納品書PDF:\n${order.pdfUrl || ''}`;
+        const lineUrl = `https://line.me/R/oaMessage/${OFFICIAL_LINE_ID}/?${encodeURIComponent(shipMsg)}`;
+
+        return `
+          <div class="order-card ${isShipped ? 'shipped' : ''}" id="card-${escapeHtml(order.orderId)}">
+            <div class="order-card-header">
+              <div>
+                <div class="order-cust-name">🏢 ${escapeHtml(order.customerName)} 様</div>
+                <div class="order-meta-info">
+                  ${escapeHtml(order.orderId)} | 📅 ${escapeHtml(order.orderDate)}
+                  ${order.phone ? ` | 📞 <a href="tel:${escapeHtml(order.phone)}" style="color:#0284c7; text-decoration:none;">${escapeHtml(order.phone)}</a>` : ''}
+                </div>
+              </div>
+              <div>
+                <span class="status-badge ${isShipped ? 'shipped' : 'unshipped'}">
+                  ${isShipped ? '✅ 発送済' : '⏳ 未発送'}
+                </span>
+              </div>
+            </div>
+
+            ${ngAlertHtml}
+            ${notesAlertHtml}
+
+            <div class="order-items-list">
+              ${itemsHtml}
+            </div>
+
+            <div class="order-actions">
+              ${order.pdfUrl ? `<a href="${escapeHtml(order.pdfUrl)}" target="_blank" class="btn-action btn-pdf">📄 納品書</a>` : ''}
+              <a href="${lineUrl}" class="btn-action btn-line">📤 発送LINE</a>
+              <button class="btn-action btn-ship-toggle ${isShipped ? 'is-shipped' : ''}" onclick="toggleOrderStatus('${escapeHtml(order.orderId)}', ${!isShipped})">
+                ${isShipped ? '↩ 未発送に戻す' : '📦 発送完了にする'}
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 2. 生体・品目合計ピッキング一覧の描画
+    function renderSummary() {
+      const container = document.getElementById('summary-container');
+      const query = document.getElementById('search-input').value.trim().toLowerCase();
+
+      if (rawTotalSummary.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">🐠✨</div>
+            <div style="font-weight:bold; font-size:1.05rem;">未出荷の生体はありません</div>
+          </div>
+        `;
+        return;
+      }
+
+      let html = '';
+      rawTotalSummary.forEach(sec => {
+        let items = sec.items;
+        if (query) {
+          items = items.filter(it => it.name.toLowerCase().includes(query));
+        }
+        if (items.length === 0) return;
+
+        html += `
+          <div class="category-section">
+            <div class="category-title">📂 ${escapeHtml(sec.category)} (${items.length}種)</div>
+            ${items.map(it => {
+              const pickKey = `${sec.category}_${it.name}`;
+              const isPicked = !!pickedSummaryMap[pickKey];
+              return `
+                <div class="summary-item-card ${isPicked ? 'picked' : ''}" onclick="toggleSummaryPick('${escapeHtml(sec.category)}', '${escapeHtml(it.name)}')">
+                  <div>
+                    <div class="summary-item-name">${isPicked ? '✓ ' : ''}${escapeHtml(it.name)}</div>
+                    <div class="summary-item-meta">${it.orderCount} 件の注文で必要</div>
+                  </div>
+                  <div class="summary-qty-box">
+                    計 ${it.totalQty} 点
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        `;
+      });
+
+      container.innerHTML = html || '<div class="empty-state">検索に一致する商品はありません</div>';
+    }
+
+    // 各商品のタップ（チェック切り替え）
+    function toggleItemCheck(orderId, itemIdx) {
+      if (navigator.vibrate) navigator.vibrate(25);
+      const key = `${orderId}_${itemIdx}`;
+      checkedItemsMap[key] = !checkedItemsMap[key];
+      try {
+        localStorage.setItem('kawabata_picking_checks', JSON.stringify(checkedItemsMap));
+      } catch (e) {}
+      renderOrders();
+    }
+
+    // 生体集約のタップ（採取済み切り替え）
+    function toggleSummaryPick(category, name) {
+      if (navigator.vibrate) navigator.vibrate(25);
+      const key = `${category}_${name}`;
+      pickedSummaryMap[key] = !pickedSummaryMap[key];
+      try {
+        localStorage.setItem('kawabata_summary_checks', JSON.stringify(pickedSummaryMap));
+      } catch (e) {}
+      renderSummary();
+    }
+
+    // 注文単位の「発送完了にする / 未発送に戻す」
+    async function toggleOrderStatus(orderId, setShipped) {
+      if (navigator.vibrate) navigator.vibrate(40);
+      
+      const targetOrder = rawOrders.find(o => o.orderId === orderId);
+      if (!targetOrder) return;
+
+      // 楽観的UI更新（先に画面を更新して体感を高速化）
+      targetOrder.isShipped = setShipped;
+      targetOrder.items.forEach((it, idx) => {
+        checkedItemsMap[`${orderId}_${idx}`] = setShipped;
+      });
+      renderOrders();
+      updateStats();
+
+      // GASバックエンドへ通信してスプレッドシートの発送済チェックを同期
+      try {
+        const res = await fetch(GAS_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: "updateShipStatus",
+            orderId: orderId,
+            isShipped: setShipped
+          })
+        });
+        const result = await res.json();
+        if (result.status !== 'success') {
+          alert('ステータス更新でエラーが発生しました: ' + (result.message || ''));
+          fetchPickingData(); // ロールバック
+        }
+      } catch (err) {
+        console.error("toggleOrderStatus error:", err);
+        alert('通信エラーが発生しました。電波の良い場所で再度お試しください。');
+        fetchPickingData();
+      }
+    }
+  </script>
+</body>
+</html>
