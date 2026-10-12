@@ -194,7 +194,7 @@ c:\Users\81909\Desktop\shop-project\
 ```
 
 #### 5. `action=getSpecimenRequests`
-- **Purpose**: Retrieve customer specimen collection requests from sheet `採集リクエスト一覧` for offshore collection board (`collect.html`).
+- **Purpose**: Retrieve customer specimen collection requests from sheet `採集リクエスト一覧` (e.g. スカシテンジクダイ, ネオンテンジク) for offshore order & request aggregation dashboard (`boat.html`) and collection board (`collect.html`).
 - **Query Params**: `action`: `"getSpecimenRequests"` (or `"getCollectRequests"`)
 - **Response**:
 ```json
