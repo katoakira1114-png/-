@@ -561,6 +561,89 @@ function doGet(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
+    // 【採集リクエスト一覧取得API】船上・洋上採集管理ボード(collect.html)用
+    if (action === "getSpecimenRequests" || action === "getCollectRequests") {
+      var ssTargetReq = getRequestSpreadsheet_();
+      var rSheet = ssTargetReq.getSheetByName("採集リクエスト一覧");
+      var requests = [];
+
+      if (rSheet && rSheet.getLastRow() >= 2) {
+        var rVals = rSheet.getDataRange().getValues();
+        for (var rIdx = 1; rIdx < rVals.length; rIdx++) {
+          var row = rVals[rIdx];
+          var reqDate = row[0] ? Utilities.formatDate(new Date(row[0]), "JST", "MM/dd HH:mm") : "";
+          var reqId = String(row[1] || "").trim();
+          var custName = String(row[2] || "名称未設定店").trim();
+          var phone = String(row[3] || "").trim();
+          var rawItems = String(row[7] || "").trim();
+          var status = String(row[13] || "未対応").trim();
+          var notes = String(row[12] || "").trim();
+
+          // アイテムごとの展開
+          var lines = rawItems.split("\n").filter(Boolean);
+          if (lines.length === 0) {
+            requests.push({
+              id: reqId + "-1",
+              requestId: reqId,
+              rowNumber: rIdx + 1,
+              date: reqDate,
+              storeName: custName,
+              phone: phone,
+              species: "生体リクエスト",
+              category: "魚",
+              size: "規格未指定",
+              qty: 1,
+              unit: "匹",
+              status: status,
+              notes: notes
+            });
+          } else {
+            for (var lIdx = 0; lIdx < lines.length; lIdx++) {
+              var line = lines[lIdx].replace(/^・/, "").trim();
+              var catMatch = line.match(/^\[(.*?)\]/);
+              var cat = catMatch ? catMatch[1] : "魚";
+              var rest = catMatch ? line.substring(catMatch[0].length).trim() : line;
+              
+              var qtyMatch = rest.match(/×\s*(\d+)/);
+              var qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 1;
+              
+              var sizeMatch = rest.match(/\((.*?)\)/);
+              var size = sizeMatch ? sizeMatch[1] : "";
+
+              var species = rest;
+              if (qtyMatch) {
+                species = species.substring(0, species.indexOf(qtyMatch[0])).trim();
+              } else if (sizeMatch) {
+                species = species.substring(0, species.indexOf(sizeMatch[0])).trim();
+              }
+
+              requests.push({
+                id: reqId + "-" + (lIdx + 1),
+                requestId: reqId,
+                rowNumber: rIdx + 1,
+                date: reqDate,
+                storeName: custName,
+                phone: phone,
+                species: species || "生体リクエスト",
+                category: cat,
+                size: size || "規格未指定",
+                qty: qty,
+                unit: "匹",
+                status: status,
+                notes: notes
+              });
+            }
+          }
+        }
+      }
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        count: requests.length,
+        requests: requests
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     // 【顧客情報参照API】採集リクエストフォームや注文フォームからの自動補完用
     if (action === "lookupCustomer" || action === "searchCustomer") {
       var queryPhone = (e.parameter.phone || "").replace(/[^0-9]/g, "");
@@ -944,6 +1027,41 @@ function doPost(e) {
     // 生体リクエスト・採集要望の処理
     if (action === "request") {
       return handleSpecimenRequest(contents);
+    }
+
+    // 【採集リクエストステータス更新API】船上・洋上採集管理ボード(collect.html)用
+    if (action === "updateRequestStatus" || action === "updateSpecimenStatus") {
+      var ssTargetReq = getRequestSpreadsheet_();
+      var rSheet = ssTargetReq.getSheetByName("採集リクエスト一覧");
+      if (!rSheet) throw new Error("採集リクエスト一覧シートが見つかりません。");
+
+      var targetReqId = contents.requestId || contents.id;
+      var newStatus = contents.status || "採集完了";
+      var targetRow = contents.rowNumber;
+      var updated = false;
+
+      if (targetRow && targetRow >= 2 && targetRow <= rSheet.getLastRow()) {
+        rSheet.getRange(targetRow, 14).setValue(newStatus); // 14列目 = 対応ステータス (Column N)
+        updated = true;
+      } else if (targetReqId) {
+        var baseReqId = String(targetReqId).split("-")[0] + "-" + String(targetReqId).split("-")[1]; // REQ-YYYYMMDD-HHmmss
+        var rVals = rSheet.getDataRange().getValues();
+        for (var rIdx = 1; rIdx < rVals.length; rIdx++) {
+          var curId = String(rVals[rIdx][1] || "").trim();
+          if (curId === targetReqId || curId.indexOf(baseReqId) === 0 || targetReqId.indexOf(curId) === 0) {
+            rSheet.getRange(rIdx + 1, 14).setValue(newStatus);
+            updated = true;
+            break;
+          }
+        }
+      }
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: updated ? "success" : "not_found",
+        message: updated ? "ステータスを更新しました。" : "対象リクエストが見つかりませんでした。",
+        id: targetReqId,
+        newStatus: newStatus
+      })).setMimeType(ContentService.MimeType.JSON);
     }
 
     // 【発送ステータス更新API】ピッキング画面からタップで発送済みに切り替え
@@ -2078,5 +2196,19 @@ function testSendLineNotification() {
 
   return result;
 }
+
+// -----------------------------------------------------------------------------
+// 【採集リクエスト スプレッドシート解決ヘルパー】
+// -----------------------------------------------------------------------------
+function getRequestSpreadsheet_() {
+  var reqSsId = PropertiesService.getScriptProperties().getProperty("REQUEST_SPREADSHEET_ID");
+  if (reqSsId && reqSsId !== "") {
+    try {
+      return SpreadsheetApp.openById(reqSsId);
+    } catch (e) {}
+  }
+  return SpreadsheetApp.openById(SPREADSHEET_ID);
+}
+
 
 

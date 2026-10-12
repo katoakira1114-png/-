@@ -76,6 +76,7 @@ c:\Users\81909\Desktop\shop-project\
 ├── picking.html         # Staff picking and dispatch management console
 ├── stock.html           # Staff stock inventory & new product registration console
 ├── boat.html            # Maritime / offshore order & request aggregation dashboard (sunlight mode, offline-first)
+├── collect.html         # Maritime specimen collection request board & status updater (optimistic UI, offline queue)
 ├── slides.html          # Executive presentation slide deck for stakeholder review
 ├── 無題.js              # GAS backend implementation (~1600+ LOC)
 ├── HANDOVER_FOR_HUMAN.md# Operational handover manual for human administrators
@@ -189,6 +190,34 @@ c:\Users\81909\Desktop\shop-project\
     }
   ],
   "categories": ["魚", "サンゴ", "シャコガイ", "貝", "イソギンチャク", "擬岩", "その他"]
+}
+```
+
+#### 5. `action=getSpecimenRequests`
+- **Purpose**: Retrieve customer specimen collection requests from sheet `採集リクエスト一覧` for offshore collection board (`collect.html`).
+- **Query Params**: `action`: `"getSpecimenRequests"` (or `"getCollectRequests"`)
+- **Response**:
+```json
+{
+  "status": "success",
+  "count": 12,
+  "requests": [
+    {
+      "id": "REQ-20261012-001-1",
+      "requestId": "REQ-20261012-001",
+      "rowNumber": 2,
+      "date": "10/12 06:30",
+      "storeName": "八重山アクア",
+      "phone": "090-1234-5678",
+      "species": "カクレクマノミ (ペア)",
+      "category": "魚",
+      "size": "4-5cm (ペア揃い)",
+      "qty": 3,
+      "unit": "ペア",
+      "status": "未対応",
+      "notes": "バンド乱れなし"
+    }
+  ]
 }
 ```
 
@@ -316,6 +345,20 @@ Payload is sent as `application/json` (or `text/plain` to bypass CORS preflight)
 ```
 - **Processing**: Uploads all images to Drive folder `川畑水産_観賞魚画像`, joins URLs with comma, and updates Column G (画像URL) of specified row.
 - **Response**: `{ "status": "success", "imgUrl": "url1,url2", "imgUrls": ["url1", "url2"] }`
+
+#### 7. `action=updateRequestStatus`
+- **Payload**:
+```json
+{
+  "action": "updateRequestStatus",
+  "id": "REQ-20261012-001-1",
+  "requestId": "REQ-20261012-001",
+  "status": "採集完了",
+  "rowNumber": 2
+}
+```
+- **Processing**: Updates Column N (対応ステータス) of matching row in sheet `採集リクエスト一覧`.
+- **Response**: `{ "status": "success", "id": "REQ-...", "newStatus": "採集完了" }`
 
 ---
 
@@ -457,4 +500,16 @@ Future AI agents MUST be aware of these past pitfalls to avoid repeating known i
       - `kawabata_boat_orders_v1`: Offline order cache.
       - `kawabata_boat_completed_stores_v1`: Persistent set of completed store names.
       - `kawabata_boat_data_mode`: Allows toggling between built-in realistic mock data (`mock`) and live GAS production orders (`live`).
+
+11. **Offshore Specimen Request Collection Board (`collect.html`)**:
+    - **Purpose**: Field application connecting to Google Spreadsheet sheet `採集リクエスト一覧` allowing crew to verify request status and update status to "採集完了" with a single tap.
+    - **Optimistic UI Update (0ms)**: Instant UI re-render, vibration feedback, status badge toggle, and count subtraction without waiting for network response.
+    - **Offline Queueing & Auto-Sync**:
+      - Storage key `kawabata_collect_sync_queue_v1`: Stores pending actions when offline or network fails.
+      - Auto-drains queue and posts to GAS (`action=updateRequestStatus`) when `window.addEventListener('online')` triggers or via manual retry button.
+    - **Dual Tab Views**:
+      - `【魚種別集計タブ】`: Aggregates uncollected counts per specimen, sorted descending, accordion expansion with individual store completion action.
+      - `【店舗別リクエストタブ】`: Store-based cards, list of items with requested sizes and notes, per-item status toggles, and automatic dimming/collapse when all items for a store are fulfilled.
+    - **Sunlight Mode**: One-tap toggle for extreme contrast (white `#ffffff` / black `#000000`).
+
 

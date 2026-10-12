@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>採集リクエスト管理（洋上・船上仕様）- 川畑水産</title>
+  <meta name="description" content="船上・洋上の屋外現場からGoogleスプレッドシートと連動し、採集リクエストの確認と完了更新を片手でワンタップ処理できるWebアプリ">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            marine: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+              800: '#0c4a6e',
+              900: '#082f49',
+              950: '#031726'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* ========================================================
+       船上・洋上特別仕様スタイル
+       ======================================================== */
+    :root {
+      --app-bg: #09131f;
+      --card-bg: #132235;
+      --card-border: #1e3a5f;
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+      --primary: #38bdf8;
+      --primary-dark: #0284c7;
+      --success: #10b981;
+      --success-dark: #059669;
+      --accent: #f59e0b;
+      --danger: #ef4444;
+    }
+
+    /* ☀️ 直射日光・屋外ハイコントラストモード */
+    body.sunlight-mode {
+      --app-bg: #ffffff !important;
+      --card-bg: #ffffff !important;
+      --card-border: #000000 !important;
+      --text-main: #000000 !important;
+      --text-sub: #1e293b !important;
+      --primary: #0044cc !important;
+      --primary-dark: #002288 !important;
+      --success: #047857 !important;
+      --success-dark: #065f46 !important;
+      --accent: #b45309 !important;
+    }
+
+    body {
+      background-color: var(--app-bg);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: manipulation;
+    }
+
+    input, textarea, select {
+      user-select: auto;
+      -webkit-user-select: auto;
+    }
+
+    /* 最小タッチターゲット 48px〜54px 保証 */
+    .touch-target {
+      min-height: 48px;
+    }
+
+    /* 屋外モード適用時の強制コントラスト強化 */
+    body.sunlight-mode .contrast-border {
+      border-color: #000000 !important;
+      border-width: 2.5px !important;
+    }
+
+    body.sunlight-mode .contrast-text {
+      color: #000000 !important;
+    }
+
+    body.sunlight-mode .contrast-subtext {
+      color: #334155 !important;
+    }
+
+    body.sunlight-mode .contrast-card {
+      background-color: #ffffff !important;
+      border-color: #000000 !important;
+      border-width: 2.5px !important;
+      box-shadow: 0 4px 0 #000000 !important;
+    }
+
+    body.sunlight-mode .contrast-bg-muted {
+      background-color: #f1f5f9 !important;
+      border-color: #000000 !important;
+    }
+
+    body.sunlight-mode .contrast-badge-primary {
+      background-color: #000000 !important;
+      color: #ffffff !important;
+      border: 1px solid #000000 !important;
+    }
+
+    /* アニメーション */
+    .spin {
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    /* 完了時の打ち消しアニメーション */
+    .completed-item {
+      opacity: 0.55;
+      background-color: rgba(16, 185, 129, 0.08) !important;
+      border-color: var(--success) !important;
+    }
+    body.sunlight-mode .completed-item {
+      background-color: #f0fdf4 !important;
+      border-color: #047857 !important;
+      opacity: 0.85;
+    }
+
+    /* トーストメッセージ */
+    .toast-popup {
+      transform: translateY(-20px);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      opacity: 0;
+      pointer-events: none;
+    }
+    .toast-popup.show {
+      transform: translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+  </style>
+</head>
+<body class="pb-28 min-h-screen">
+
+  <!-- ========================================================
+       固定トップヘッダー
+       ======================================================== -->
+  <header class="sticky top-0 z-50 bg-[#0e1c2e] border-b-2 border-[#1e3a5f] shadow-lg contrast-border">
+    <div class="max-w-xl mx-auto px-3 py-2.5 flex items-center justify-between gap-2">
+      <!-- タイトル -->
+      <div class="flex items-center gap-2">
+        <span class="text-2xl leading-none">🎣</span>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <h1 class="text-lg font-black tracking-wide text-white contrast-text">採集リクエスト</h1>
+            <span class="text-[10px] font-extrabold bg-amber-500 text-black px-1.5 py-0.5 rounded shadow-sm">洋上・船上仕様</span>
+          </div>
+          <div class="flex items-center gap-2 text-[11px] text-slate-400 contrast-subtext mt-0.5 font-bold">
+            <span id="net-status-pill" class="inline-flex items-center gap-1">
+              <span class="w-2 h-2 rounded-full bg-emerald-500" id="net-dot"></span>
+              <span id="net-text">オンライン</span>
+            </span>
+            <span>•</span>
+            <span id="data-source-badge" class="cursor-pointer text-sky-400 hover:underline" onclick="toggleDataSource()">
+              🧪 モックデータ
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ヘッダー右側アクションボタン -->
+      <div class="flex items-center gap-1.5">
+        <!-- ☀️ 直射日光モード切替 -->
+        <button id="sunlight-toggle-btn" onclick="toggleSunlightMode()" class="px-2.5 py-2 rounded-lg font-black text-xs border border-slate-600 bg-slate-800 text-slate-100 flex items-center gap-1 active:scale-95 transition-all shadow touch-target" title="屋外・直射日光モード切替">
+          <span id="sunlight-icon">☀️</span>
+          <span id="sunlight-label" class="hidden sm:inline">屋外モード</span>
+        </button>
+
+        <!-- 🔄 更新ボタン -->
+        <button id="refresh-btn" onclick="fetchRequests(false)" class="p-2.5 rounded-lg font-black text-sm border border-sky-600 bg-sky-700 text-white flex items-center justify-center active:scale-95 transition-all shadow touch-target" title="最新データを取得">
+          <span id="refresh-icon">🔄</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- オフライン未送信キュー通知バー（未送信がある場合のみ表示） -->
+    <div id="offline-queue-banner" class="hidden bg-amber-600 text-white px-3 py-1.5 text-xs font-black flex items-center justify-between border-t border-amber-400">
+      <div class="flex items-center gap-1.5">
+        <span>⚠️</span>
+        <span id="offline-queue-text">未送信の更新: 0件（電波復帰時に自動送信）</span>
+      </div>
+      <button onclick="processSyncQueue()" class="bg-black/30 hover:bg-black/50 px-2 py-0.5 rounded text-[11px] font-bold underline">
+        今すぐ再送
+      </button>
+    </div>
+  </header>
+
+  <!-- ========================================================
+       メインコンテナ
+       ======================================================== -->
+  <main class="max-w-xl mx-auto px-3 pt-3">
+
+    <!-- 📊 サマリー統計カード -->
+    <div class="grid grid-cols-3 gap-2 mb-3">
+      <div class="bg-[#132235] border-2 border-sky-500/50 rounded-xl p-2.5 text-center shadow-md contrast-card">
+        <div class="text-[11px] font-extrabold text-slate-400 contrast-subtext mb-0.5">未対応 魚種</div>
+        <div class="text-2xl font-black text-sky-400 contrast-text leading-none" id="stat-unhandled-species">
+          0<span class="text-xs font-bold text-slate-400 contrast-subtext ml-0.5">種</span>
+        </div>
+      </div>
+      <div class="bg-[#132235] border-2 border-[#1e3a5f] rounded-xl p-2.5 text-center shadow-md contrast-card">
+        <div class="text-[11px] font-extrabold text-slate-400 contrast-subtext mb-0.5">未対応 匹数</div>
+        <div class="text-2xl font-black text-amber-400 contrast-text leading-none" id="stat-unhandled-qty">
+          0<span class="text-xs font-bold text-slate-400 contrast-subtext ml-0.5">匹</span>
+        </div>
+      </div>
+      <div class="bg-[#132235] border-2 border-[#1e3a5f] rounded-xl p-2.5 text-center shadow-md contrast-card">
+        <div class="text-[11px] font-extrabold text-slate-400 contrast-subtext mb-0.5">依頼 店舗数</div>
+        <div class="text-2xl font-black text-emerald-400 contrast-text leading-none" id="stat-unhandled-stores">
+          0<span class="text-xs font-bold text-slate-400 contrast-subtext ml-0.5">店</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 📑 タブナビゲーション（魚種別 ⇄ 店舗別） -->
+    <div class="flex gap-2 mb-3 bg-[#0a1523] p-1.5 rounded-xl border border-slate-800 contrast-card">
+      <button id="tab-btn-species" onclick="switchTab('species')" class="flex-1 py-3 px-2 rounded-lg font-black text-base flex items-center justify-center gap-1.5 transition-all shadow touch-target bg-sky-600 text-white border-2 border-sky-400">
+        <span>🐟 魚種別集計</span>
+        <span id="tab-badge-species" class="text-xs font-extrabold bg-black/40 text-white px-2 py-0.5 rounded-full">0</span>
+      </button>
+      <button id="tab-btn-store" onclick="switchTab('store')" class="flex-1 py-3 px-2 rounded-lg font-black text-base flex items-center justify-center gap-1.5 transition-all shadow touch-target bg-[#16273c] text-slate-300 border-2 border-transparent">
+        <span>🏢 店舗別リクエスト</span>
+        <span id="tab-badge-store" class="text-xs font-extrabold bg-black/40 text-white px-2 py-0.5 rounded-full">0</span>
+      </button>
+    </div>
+
+    <!-- 🔍 検索 ＆ 絞り込みバー -->
+    <div class="mb-3 space-y-2">
+      <!-- 検索入力 -->
+      <div class="relative">
+        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none text-base">🔍</span>
+        <input type="text" id="search-input" oninput="handleSearch()" placeholder="魚種名・店舗名・サイズで検索..." class="w-full bg-[#132235] border-2 border-[#1e3a5f] text-white text-base font-bold rounded-xl pl-10 pr-10 py-3 outline-none focus:border-sky-500 contrast-card transition-all touch-target placeholder:text-slate-500">
+        <button id="search-clear-btn" onclick="clearSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-slate-700 text-slate-300 font-black text-sm flex items-center justify-center">✕</button>
+      </div>
+
+      <!-- フィルターチップス -->
+      <div class="flex gap-1.5 overflow-x-auto pb-1 text-xs font-black no-scrollbar" id="category-filter-chips">
+        <!-- 動的生成 -->
+      </div>
+    </div>
+
+    <!-- ========================================================
+         タブ1：【魚種別（商品名別）集計タブ】
+         ======================================================== -->
+    <section id="view-species" class="space-y-3">
+      <div id="species-list-container" class="space-y-2.5">
+        <!-- 魚種カードリストが動的生成される -->
+      </div>
+    </section>
+
+    <!-- ========================================================
+         タブ2：【店舗別リクエストタブ】
+         ======================================================== -->
+    <section id="view-store" class="space-y-3 hidden">
+      <div id="store-list-container" class="space-y-3">
+        <!-- 店舗カードリストが動的生成される -->
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ========================================================
+       固定ボトムバー（片手操作・一括アクション）
+       ======================================================== -->
+  <footer class="fixed bottom-0 left-0 right-0 z-40 bg-[#0e1c2e] border-t-2 border-[#1e3a5f] py-2 px-3 shadow-2xl contrast-border">
+    <div class="max-w-xl mx-auto flex items-center justify-between gap-2">
+      <!-- タブ切替ショートカット -->
+      <div class="flex gap-1.5 flex-1">
+        <button id="bottom-btn-species" onclick="switchTab('species')" class="flex-1 py-2.5 px-1 rounded-lg font-black text-sm bg-sky-600 text-white border border-sky-400 touch-target flex items-center justify-center gap-1 shadow">
+          🐟 魚種別
+        </button>
+        <button id="bottom-btn-store" onclick="switchTab('store')" class="flex-1 py-2.5 px-1 rounded-lg font-black text-sm bg-[#1e334d] text-slate-200 border border-slate-700 touch-target flex items-center justify-center gap-1 shadow">
+          🏢 店舗別
+        </button>
+      </div>
+
+      <!-- トップスクロールボタン -->
+      <button onclick="window.scrollTo({top:0, behavior:'smooth'})" class="px-3 py-2.5 rounded-lg font-black text-xs bg-slate-800 text-slate-200 border border-slate-600 touch-target flex items-center gap-1 shadow active:scale-95">
+        ⬆ 上部
+      </button>
+
+      <!-- 完了リセットボタン -->
+      <button onclick="resetCompletedStatus()" class="px-3 py-2.5 rounded-lg font-black text-xs bg-rose-950/80 text-rose-300 border border-rose-800 touch-target flex items-center gap-1 shadow active:scale-95" title="検証用：全件を未対応に戻す">
+        🔄 リセット
+      </button>
+    </div>
+  </footer>
+
+  <!-- ========================================================
+       トースト通知ポップアップ
+       ======================================================== -->
+  <div id="toast" class="toast-popup fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white font-black text-sm px-4 py-2.5 rounded-xl border-2 border-sky-400 shadow-2xl flex items-center gap-2 max-w-[90vw] text-center">
+    <span id="toast-icon">✅</span>
+    <span id="toast-message">メッセージ</span>
+  </div>
+
+  <!-- ========================================================
+       JavaScript アプリケーションロジック
+       ======================================================== -->
+  <script>
+    // ==========================================
+    // 1. 環境設定・GAS APIエンドポイント
+    // ==========================================
+    // ※スプレッドシート「石垣島観賞魚販売管理」と通信するGAS Web Appの公開URL
+    const API_URL = "https://script.google.com/macros/s/AKfycbxIYsPdreUjaOFutfshhQIwOLb_Ke1JprcDZj_LAT9oZnc-l-3jZLsPAsFd_QdQJAQ4eA/exec";
+
+    // ローカルストレージキー
+    const STORAGE_KEY_REQUESTS = "kawabata_collect_requests_cache_v1";
+    const STORAGE_KEY_QUEUE = "kawabata_collect_sync_queue_v1";
+    const STORAGE_KEY_SUNLIGHT = "kawabata_collect_sunlight_mode";
+    const STORAGE_KEY_DATASOURCE = "kawabata_collect_datasource_mode"; // 'mock' or 'live'
+
+    // ==========================================
+    // 2. 動作確認用初期モックデータ（石垣島・八重山生体採集仕様）
+    // ==========================================
+    const DEFAULT_MOCK_REQUESTS = [
+      {
+        id: "REQ-001-1",
+        requestId: "REQ-20261012-001",
+        date: "10/12 06:30",
+        storeName: "八重山アクア",
+        phone: "090-1234-5678",
+        species: "カクレクマノミ (ペア)",
+        category: "魚",
+        size: "4-5cm (ペア揃い)",
+        qty: 3,
+        unit: "ペア",
+        status: "未対応",
+        notes: "バンド乱れなし・濃いオレンジ個体希望"
+      },
+      {
+        id: "REQ-001-2",
+        requestId: "REQ-20261012-001",
+        date: "10/12 06:30",
+        storeName: "八重山アクア",
+        phone: "090-1234-5678",
+        species: "ハタゴイソギンチャク",
+        category: "イソギンチャク",
+        size: "M (15-20cm)",
+        qty: 2,
+        unit: "個",
+        status: "未対応",
+        notes: "口閉じ良好・活着確認後の発送希望"
+      },
+      {
+        id: "REQ-002-1",
+        requestId: "REQ-20261012-002",
+        date: "10/12 07:15",
+        storeName: "美ら海マリンショップ",
+        phone: "0980-82-9999",
+        species: "ニシキヤッコ (幼魚)",
+        category: "魚",
+        size: "3-4cm (極小)",
+        qty: 2,
+        unit: "匹",
+        status: "未対応",
+        notes: "幼魚斑が綺麗に残っている個体最優先"
+      },
+      {
+        id: "REQ-002-2",
+        requestId: "REQ-20261012-002",
+        date: "10/12 07:15",
+        storeName: "美ら海マリンショップ",
+        phone: "0980-82-9999",
+        species: "スミレナガハナダイ (オス)",
+        category: "魚",
+        size: "7-8cm (発色良)",
+        qty: 4,
+        unit: "匹",
+        status: "未対応",
+        notes: "サロンパス模様鮮明なオス個体"
+      },
+      {
+        id: "REQ-002-3",
+        requestId: "REQ-20261012-002",
+        date: "10/12 07:15",
+        storeName: "美ら海マリンショップ",
+        phone: "0980-82-9999",
+        species: "シャコガイ (ヒメシャコ特美)",
+        category: "シャコガイ",
+        size: "8-10cm",
+        qty: 3,
+        unit: "個",
+        status: "未対応",
+        notes: "メタリックブルー／グリーン柄"
+      },
+      {
+        id: "REQ-003-1",
+        requestId: "REQ-20261012-003",
+        date: "10/12 08:00",
+        storeName: "東京アクアワールド 築地店",
+        phone: "03-3541-0000",
+        species: "スミレナガハナダイ (オス)",
+        category: "魚",
+        size: "7-8cm",
+        qty: 5,
+        unit: "匹",
+        status: "未対応",
+        notes: "航空便パッキング・減圧注意"
+      },
+      {
+        id: "REQ-003-2",
+        requestId: "REQ-20261012-003",
+        date: "10/12 08:00",
+        storeName: "東京アクアワールド 築地店",
+        phone: "03-3541-0000",
+        species: "カクレクマノミ (ペア)",
+        category: "魚",
+        size: "4-5cm",
+        qty: 4,
+        unit: "ペア",
+        status: "未対応",
+        notes: "大型水槽展示用"
+      },
+      {
+        id: "REQ-003-3",
+        requestId: "REQ-20261012-003",
+        date: "10/12 08:00",
+        storeName: "東京アクアワールド 築地店",
+        phone: "03-3541-0000",
+        species: "ヒレナガハギ",
+        category: "魚",
+        size: "S (5-6cm)",
+        qty: 3,
+        unit: "匹",
+        status: "未対応",
+        notes: "ヒレ裂けなし個体"
+      },
+      {
+        id: "REQ-004-1",
+        requestId: "REQ-20261012-004",
+        date: "10/12 08:40",
+        storeName: "オーシャンブルー南風",
+        phone: "090-8888-2222",
+        species: "マガキガイ (掃除用)",
+        category: "貝",
+        size: "3-4cm",
+        qty: 30,
+        unit: "個",
+        status: "未対応",
+        notes: "底砂清掃用・サイズ無選別可"
+      },
+      {
+        id: "REQ-004-2",
+        requestId: "REQ-20261012-004",
+        date: "10/12 08:40",
+        storeName: "オーシャンブルー南風",
+        phone: "090-8888-2222",
+        species: "ハマサンゴ (グリーン)",
+        category: "サンゴ",
+        size: "握り拳大",
+        qty: 2,
+        unit: "個",
+        status: "未対応",
+        notes: "共肉ふっくら個体"
+      },
+      {
+        id: "REQ-005-1",
+        requestId: "REQ-20261012-005",
+        date: "10/12 09:15",
+        storeName: "アクアプロRYUKYU",
+        phone: "090-7777-3333",
+        species: "ニシキヤッコ (幼魚)",
+        category: "魚",
+        size: "3-4cm",
+        qty: 1,
+        unit: "匹",
+        status: "未対応",
+        notes: "最優先でお願いします！"
+      },
+      {
+        id: "REQ-005-2",
+        requestId: "REQ-20261012-005",
+        date: "10/12 09:15",
+        storeName: "アクアプロRYUKYU",
+        phone: "090-7777-3333",
+        species: "シャコガイ (ヒメシャコ特美)",
+        category: "シャコガイ",
+        size: "10cm前後",
+        qty: 2,
+        unit: "個",
+        status: "未対応",
+        notes: "金粉模様または蛍光ブルー"
+      }
+    ];
+
+    // ==========================================
+    // 3. アプリケーション状態変数
+    // ==========================================
+    let requestsData = [];
+    let activeTab = 'species'; // 'species' | 'store'
+    let isSunlight = false;
+    let dataSource = 'mock'; // 'mock' | 'live'
+    let searchQuery = '';
+    let selectedCategory = 'all';
+    let expandedSpecies = new Set(); // 展開中の魚種名
+    let collapsedStores = new Set(); // 手動折りたたみ中の店舗名
+
+    // ==========================================
+    // 4. 初期化ライフサイクル
+    // ==========================================
+    window.addEventListener('DOMContentLoaded', () => {
+      // 1. 直射日光モードの復元
+      try {
+        isSunlight = localStorage.getItem(STORAGE_KEY_SUNLIGHT) === 'true';
+        if (isSunlight) {
+          document.body.classList.add('sunlight-mode');
+          updateSunlightUI();
+        }
+      } catch (e) {}
+
+      // 2. データソースモードの復元
+      try {
+        dataSource = localStorage.getItem(STORAGE_KEY_DATASOURCE) || 'mock';
+      } catch (e) {}
+      updateDataSourceUI();
+
+      // 3. キャッシュデータの読み込みまたは初期化
+      loadRequestsFromCache();
+
+      // 4. ネットワーク監視 & 未送信キューの確認
+      setupNetworkMonitor();
+      updateQueueBanner();
+
+      // 5. 初回描画
+      renderCategoryFilters();
+      renderAll();
+
+      // 本番接続モードなら自動で最新取得を試行
+      if (dataSource === 'live' && navigator.onLine) {
+        fetchRequests(true);
+      }
+    });
+
+    // ==========================================
+    // 5. データロード＆キャッシュ管理
+    // ==========================================
+    function loadRequestsFromCache() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_REQUESTS);
+        if (raw) {
+          requestsData = JSON.parse(raw);
+        } else {
+          requestsData = JSON.parse(JSON.stringify(DEFAULT_MOCK_REQUESTS));
+          saveRequestsToCache();
+        }
+      } catch (e) {
+        requestsData = JSON.parse(JSON.stringify(DEFAULT_MOCK_REQUESTS));
+      }
+    }
+
+    function saveRequestsToCache() {
+      try {
+        localStorage.setItem(STORAGE_KEY_REQUESTS, JSON.stringify(requestsData));
+      } catch (e) {
+        console.warn('Failed to save requests cache:', e);
+      }
+    }
+
+    // ==========================================
+    // 6. オフライン＆ネットワーク監視ロジック
+    // ==========================================
+    function setupNetworkMonitor() {
+      const netDot = document.getElementById('net-dot');
+      const netText = document.getElementById('net-text');
+
+      function updateStatus() {
+        if (navigator.onLine) {
+          netDot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+          netText.innerText = 'オンライン';
+          // 電波復帰時にキューがあれば自動送信
+          processSyncQueue();
+        } else {
+          netDot.className = 'w-2 h-2 rounded-full bg-amber-500';
+          netText.innerText = 'オフライン(圏外キャッシュ)';
+          showToast('📡 電波圏外：オフラインで作業を継続できます', '⚠️');
+        }
+      }
+
+      window.addEventListener('online', updateStatus);
+      window.addEventListener('offline', updateStatus);
+      updateStatus();
+    }
+
+    // オフライン送信キューの管理
+    function getSyncQueue() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY_QUEUE) || '[]');
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function addToSyncQueue(actionItem) {
+      const queue = getSyncQueue();
+      // 同一IDの最新アクションに上書き
+      const filtered = queue.filter(q => q.id !== actionItem.id);
+      filtered.push(actionItem);
+      localStorage.setItem(STORAGE_KEY_QUEUE, JSON.stringify(filtered));
+      updateQueueBanner();
+    }
+
+    function updateQueueBanner() {
+      const banner = document.getElementById('offline-queue-banner');
+      const text = document.getElementById('offline-queue-text');
+      const queue = getSyncQueue();
+      if (queue.length > 0) {
+        banner.classList.remove('hidden');
+        text.innerText = `未送信の更新: ${queue.length}件（電波復帰時に自動送信）`;
+      } else {
+        banner.classList.add('hidden');
+      }
+    }
+
+    // キューの自動／手動同期送信
+    async function processSyncQueue() {
+      if (!navigator.onLine || dataSource === 'mock') return;
+      const queue = getSyncQueue();
+      if (queue.length === 0) return;
+
+      console.log(`[SyncQueue] 未送信キュー ${queue.length}件を同期開始...`);
+      showToast(`🔄 電波復帰：未送信 ${queue.length}件を同期中...`, '📡');
+
+      const remainingQueue = [];
+      for (const item of queue) {
+        try {
+          const res = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              action: 'updateRequestStatus',
+              id: item.id,
+              requestId: item.requestId,
+              status: item.status,
+              updatedAt: item.timestamp
+            })
+          });
+          const result = await res.json();
+          if (result.status !== 'success') {
+            remainingQueue.push(item);
+          }
+        } catch (err) {
+          remainingQueue.push(item);
+        }
+      }
+
+      localStorage.setItem(STORAGE_KEY_QUEUE, JSON.stringify(remainingQueue));
+      updateQueueBanner();
+
+      if (remainingQueue.length === 0) {
+        showToast('✅ 全ての採集完了ステータスをスプレッドシートへ同期完了！', '✨');
+      } else {
+        showToast(`一部の送信が保留されました (残り ${remainingQueue.length}件)`, '⚠️');
+      }
+    }
+
+    // ==========================================
+    // 7. ステータス変更処理（楽観的UI更新）
+    // ==========================================
+    async function toggleCollectStatus(itemId) {
+      const target = requestsData.find(r => r.id === itemId);
+      if (!target) return;
+
+      const previousStatus = target.status;
+      const newStatus = (previousStatus === '採集完了') ? '未対応' : '採集完了';
+      const nowTimestamp = new Date().toISOString();
+
+      // 1. 【楽観的UI更新】即座にローカル状態と画面を更新（待ち時間0ms）
+      target.status = newStatus;
+      target.completedAt = (newStatus === '採集完了') ? nowTimestamp : null;
+      saveRequestsToCache();
+      renderAll();
+
+      // 触覚フィードバック
+      if (navigator.vibrate) navigator.vibrate(newStatus === '採集完了' ? [25, 40, 25] : 15);
+
+      if (newStatus === '採集完了') {
+        showToast(`🐟「${target.species}」を採集完了にしました！`, '✅');
+      } else {
+        showToast(`↩️「${target.species}」を未対応に戻しました`, 'ℹ️');
+      }
+
+      // 2. モックモードの場合は通信をスキップ
+      if (dataSource === 'mock') return;
+
+      // 3. 【非同期同期】電波がある場合はGASへPOST、ない場合はキュー蓄積
+      const payload = {
+        id: target.id,
+        requestId: target.requestId,
+        status: newStatus,
+        species: target.species,
+        storeName: target.storeName,
+        timestamp: nowTimestamp
+      };
+
+      if (!navigator.onLine) {
+        addToSyncQueue(payload);
+        return;
+      }
+
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'updateRequestStatus',
+            ...payload
+          })
+        });
+        const result = await res.json();
+        if (result.status !== 'success') {
+          throw new Error(result.message || '更新エラー');
+        }
+      } catch (err) {
+        console.warn('[Sync Failed] オフラインキューに蓄積:', err);
+        addToSyncQueue(payload);
+      }
+    }
+
+    // ==========================================
+    // 8. データ取得処理（GAS API 連携）
+    // ==========================================
+    async function fetchRequests(silent = false) {
+      const refreshIcon = document.getElementById('refresh-icon');
+      refreshIcon.classList.add('spin');
+
+      if (dataSource === 'mock') {
+        // モック更新のシミュレーション
+        setTimeout(() => {
+          refreshIcon.classList.remove('spin');
+          renderAll();
+          if (!silent) showToast('モックデータを再読み込みしました', '🧪');
+        }, 400);
+        return;
+      }
+
+      if (!navigator.onLine) {
+        refreshIcon.classList.remove('spin');
+        showToast('電波が圏外です。キャッシュデータを表示しています', '📡');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_URL}?action=getSpecimenRequests&timestamp=${Date.now()}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        if (data && data.requests && Array.isArray(data.requests)) {
+          // スプレッドシートからの受信データを反映
+          // 既存の未送信ローカルステータスがあれば上書き保護
+          const queue = getSyncQueue();
+          const queuedMap = new Map(queue.map(q => [q.id, q.status]));
+
+          requestsData = data.requests.map(item => ({
+            id: item.id || `REQ-${Math.random().toString(36).substr(2, 9)}`,
+            requestId: item.requestId || '',
+            date: item.date || '本日',
+            storeName: item.storeName || item.customerName || '名称未設定店',
+            phone: item.phone || '',
+            species: item.species || item.name || '生体',
+            category: item.category || '魚',
+            size: item.size || '指定規格なし',
+            qty: Number(item.qty || item.quantity) || 1,
+            unit: item.unit || '匹',
+            status: queuedMap.has(item.id) ? queuedMap.get(item.id) : (item.status || '未対応'),
+            notes: item.notes || ''
+          }));
+
+          saveRequestsToCache();
+          renderCategoryFilters();
+          renderAll();
+          if (!silent) showToast(`スプレッドシートから${requestsData.length}件を取得しました`, '✅');
+        } else {
+          if (!silent) showToast('データ形式が異なります。キャッシュを表示します', '⚠️');
+        }
+      } catch (err) {
+        console.warn('GAS fetch error:', err);
+        if (!silent) showToast('通信エラー：端末内のキャッシュデータを表示中', '⚠️');
+      } finally {
+        refreshIcon.classList.remove('spin');
+      }
+    }
+
+    // ==========================================
+    // 9. タブ切り替え（魚種別 ⇄ 店舗別）
+    // ==========================================
+    function switchTab(tabName) {
+      activeTab = tabName;
+
+      const isSpecies = tabName === 'species';
+      document.getElementById('view-species').classList.toggle('hidden', !isSpecies);
+      document.getElementById('view-store').classList.toggle('hidden', isSpecies);
+
+      // 上部タブUI
+      const tabSpecies = document.getElementById('tab-btn-species');
+      const tabStore = document.getElementById('tab-btn-store');
+      if (isSpecies) {
+        tabSpecies.className = 'flex-1 py-3 px-2 rounded-lg font-black text-base flex items-center justify-center gap-1.5 transition-all shadow touch-target bg-sky-600 text-white border-2 border-sky-400';
+        tabStore.className = 'flex-1 py-3 px-2 rounded-lg font-black text-base flex items-center justify-center gap-1.5 transition-all shadow touch-target bg-[#16273c] text-slate-300 border-2 border-transparent';
+      } else {
+        tabStore.className = 'flex-1 py-3 px-2 rounded-lg font-black text-base flex items-center justify-center gap-1.5 transition-all shadow touch-target bg-sky-600 text-white border-2 border-sky-400';
+        tabSpecies.className = 'flex-1 py-3 px-2 rounded-lg font-black text-base flex items-center justify-center gap-1.5 transition-all shadow touch-target bg-[#16273c] text-slate-300 border-2 border-transparent';
+      }
+
+      // 下部ショートカットUI
+      document.getElementById('bottom-btn-species').className = isSpecies
+        ? 'flex-1 py-2.5 px-1 rounded-lg font-black text-sm bg-sky-600 text-white border border-sky-400 touch-target flex items-center justify-center gap-1 shadow'
+        : 'flex-1 py-2.5 px-1 rounded-lg font-black text-sm bg-[#1e334d] text-slate-200 border border-slate-700 touch-target flex items-center justify-center gap-1 shadow';
+      document.getElementById('bottom-btn-store').className = !isSpecies
+        ? 'flex-1 py-2.5 px-1 rounded-lg font-black text-sm bg-sky-600 text-white border border-sky-400 touch-target flex items-center justify-center gap-1 shadow'
+        : 'flex-1 py-2.5 px-1 rounded-lg font-black text-sm bg-[#1e334d] text-slate-200 border border-slate-700 touch-target flex items-center justify-center gap-1 shadow';
+
+      renderAll();
+      if (navigator.vibrate) navigator.vibrate(10);
+    }
+
+    // ==========================================
+    // 10. フィルタリング＆検索処理
+    // ==========================================
+    function handleSearch() {
+      const box = document.getElementById('search-input');
+      searchQuery = box.value.trim().toLowerCase();
+      document.getElementById('search-clear-btn').classList.toggle('hidden', searchQuery.length === 0);
+      renderAll();
+    }
+
+    function clearSearch() {
+      const box = document.getElementById('search-input');
+      box.value = '';
+      searchQuery = '';
+      document.getElementById('search-clear-btn').classList.add('hidden');
+      renderAll();
+      box.focus();
+    }
+
+    function renderCategoryFilters() {
+      const container = document.getElementById('category-filter-chips');
+      const cats = new Set();
+      requestsData.forEach(r => { if (r.category) cats.add(r.category); });
+      const list = ['all', ...Array.from(cats)];
+
+      container.innerHTML = list.map(cat => {
+        const isSel = selectedCategory === cat;
+        const label = cat === 'all' ? '全カテゴリ' : cat;
+        return `
+          <button onclick="setCategoryFilter('${cat}')" class="px-3 py-1.5 rounded-full border ${isSel ? 'bg-sky-600 text-white border-sky-400 shadow' : 'bg-[#132235] text-slate-300 border-slate-700 contrast-card'} whitespace-nowrap active:scale-95 transition-all">
+            ${label}
+          </button>
+        `;
+      }).join('');
+    }
+
+    function setCategoryFilter(cat) {
+      selectedCategory = cat;
+      renderCategoryFilters();
+      renderAll();
+      if (navigator.vibrate) navigator.vibrate(10);
+    }
+
+    function getFilteredRequests() {
+      return requestsData.filter(r => {
+        // カテゴリ一致
+        if (selectedCategory !== 'all' && r.category !== selectedCategory) return false;
+        // 検索ワード一致
+        if (searchQuery) {
+          const match = r.species.toLowerCase().includes(searchQuery) ||
+                        r.storeName.toLowerCase().includes(searchQuery) ||
+                        (r.size && r.size.toLowerCase().includes(searchQuery)) ||
+                        (r.notes && r.notes.toLowerCase().includes(searchQuery));
+          if (!match) return false;
+        }
+        return true;
+      });
+    }
+
+    // ==========================================
+    // 11. 描画：【魚種別集計タブ】
+    // ==========================================
+    function renderSpeciesView() {
+      const container = document.getElementById('species-list-container');
+      const filtered = getFilteredRequests();
+
+      // 魚種ごとに集計
+      const speciesMap = new Map();
+      filtered.forEach(item => {
+        const key = item.species;
+        if (!speciesMap.has(key)) {
+          speciesMap.set(key, {
+            species: item.species,
+            category: item.category,
+            unit: item.unit || '匹',
+            totalQty: 0,
+            unhandledQty: 0,
+            items: []
+          });
+        }
+        const record = speciesMap.get(key);
+        record.totalQty += item.qty;
+        if (item.status !== '採集完了') {
+          record.unhandledQty += item.qty;
+        }
+        record.items.push(item);
+      });
+
+      // 依頼数（未対応数優先）が多い順にソート
+      const sortedSpecies = Array.from(speciesMap.values()).sort((a, b) => {
+        if (b.unhandledQty !== a.unhandledQty) {
+          return b.unhandledQty - a.unhandledQty; // 未対応数降順
+        }
+        return b.totalQty - a.totalQty;
+      });
+
+      // タブバッジ更新
+      document.getElementById('tab-badge-species').innerText = sortedSpecies.length;
+
+      if (sortedSpecies.length === 0) {
+        container.innerHTML = `
+          <div class="bg-[#132235] border-2 border-dashed border-[#1e3a5f] rounded-2xl p-8 text-center text-slate-400 contrast-card">
+            <div class="text-3xl mb-2">🐟</div>
+            <div class="text-base font-black text-white contrast-text">該当する採集リクエストがありません</div>
+            <div class="text-xs text-slate-400 contrast-subtext mt-1">検索条件を変更するか更新ボタンを押してください。</div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = sortedSpecies.map(sp => {
+        const isExpanded = expandedSpecies.has(sp.species);
+        const unhandledItemsCount = sp.items.filter(i => i.status !== '採集完了').length;
+        const allCompleted = sp.unhandledQty === 0;
+
+        return `
+          <div class="bg-[#132235] border-2 ${allCompleted ? 'border-emerald-600/60 bg-emerald-950/10' : 'border-[#1e3a5f]'} rounded-xl shadow-md overflow-hidden contrast-card transition-all">
+            <!-- 魚種カードヘッダー（タップでアコーディオン開閉） -->
+            <div onclick="toggleSpeciesExpand('${escapeJs(sp.species)}')" class="p-3.5 flex items-center justify-between gap-3 cursor-pointer touch-target select-none active:bg-slate-800/40">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5 mb-1">
+                  <span class="text-[10px] font-black px-2 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-800 contrast-badge-primary">
+                    ${escapeHtml(sp.category)}
+                  </span>
+                  ${allCompleted ? '<span class="text-[10px] font-black px-1.5 py-0.5 rounded bg-emerald-600 text-white">全件採集完了</span>' : ''}
+                </div>
+                <div class="text-lg font-black text-white contrast-text truncate leading-tight ${allCompleted ? 'line-through text-slate-400' : ''}">
+                  ${escapeHtml(sp.species)}
+                </div>
+                <div class="text-xs font-bold text-slate-400 contrast-subtext mt-1 flex items-center gap-2">
+                  <span>🏢 依頼店舗: <strong class="text-white contrast-text">${sp.items.length}店</strong></span>
+                  ${unhandledItemsCount > 0 
+                    ? `<span class="text-amber-400 font-black">⏳ 残り: ${unhandledItemsCount}件</span>` 
+                    : '<span class="text-emerald-400 font-black">✓ 完了済</span>'}
+                </div>
+              </div>
+
+              <!-- 右側：特大数量バッジ -->
+              <div class="flex flex-col items-end justify-center text-right pl-2">
+                <div class="text-2xl font-black ${allCompleted ? 'text-emerald-400' : 'text-sky-400'} contrast-text leading-none flex items-baseline gap-0.5">
+                  ${sp.unhandledQty}
+                  <span class="text-xs font-bold text-slate-400 contrast-subtext">${escapeHtml(sp.unit)}</span>
+                </div>
+                <div class="text-[11px] font-bold text-slate-500 contrast-subtext mt-0.5">
+                  全計 ${sp.totalQty}${escapeHtml(sp.unit)}
+                </div>
+                <div class="text-xs text-slate-400 transform transition-transform duration-200 mt-1 ${isExpanded ? 'rotate-180 text-sky-400' : ''}">
+                  ▼
+                </div>
+              </div>
+            </div>
+
+            <!-- アコーディオン展開：店舗内訳リスト -->
+            <div class="${isExpanded ? 'block' : 'hidden'} border-t-2 border-slate-700/60 bg-[#0b1624] p-2.5 space-y-2 contrast-bg-muted">
+              <div class="text-[11px] font-black text-slate-400 contrast-subtext px-1 flex items-center justify-between">
+                <span>📋 依頼店舗の内訳明細:</span>
+                <span class="text-[10px] text-sky-400">ワンタップで完了更新</span>
+              </div>
+              ${sp.items.map(item => {
+                const isDone = item.status === '採集完了';
+                return `
+                  <div class="p-2.5 rounded-lg border ${isDone ? 'completed-item' : 'bg-[#132235] border-slate-700'} flex items-center justify-between gap-2.5 transition-all shadow-sm">
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-1.5">
+                        <span class="text-sm font-black ${isDone ? 'line-through text-slate-400' : 'text-white'} contrast-text">
+                          ${isDone ? '✅' : '🏢'} ${escapeHtml(item.storeName)}
+                        </span>
+                      </div>
+                      <div class="text-xs font-bold text-slate-300 contrast-subtext mt-0.5 flex flex-wrap gap-x-2">
+                        <span>規格: <strong>${escapeHtml(item.size || '無選別')}</strong></span>
+                        <span class="text-sky-400 font-black">数量: ${item.qty}${escapeHtml(item.unit)}</span>
+                      </div>
+                      ${item.notes ? `<div class="text-[11px] text-amber-300 contrast-subtext font-bold mt-1 bg-amber-950/30 px-1.5 py-0.5 rounded border border-amber-800/40">💬 ${escapeHtml(item.notes)}</div>` : ''}
+                    </div>
+
+                    <!-- 採集完了ボタン -->
+                    <button onclick="toggleCollectStatus('${item.id}')" class="px-3.5 py-2.5 rounded-lg font-black text-xs flex items-center gap-1 touch-target shadow-md active:scale-95 transition-all whitespace-nowrap ${isDone ? 'bg-emerald-600 text-white border border-emerald-400' : 'bg-sky-600 text-white border border-sky-400'}">
+                      <span>${isDone ? '✓ 採集完了' : '○ 完了にする'}</span>
+                    </button>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function toggleSpeciesExpand(speciesName) {
+      if (expandedSpecies.has(speciesName)) {
+        expandedSpecies.delete(speciesName);
+      } else {
+        expandedSpecies.add(speciesName);
+      }
+      renderSpeciesView();
+      if (navigator.vibrate) navigator.vibrate(10);
+    }
+
+    // ==========================================
+    // 12. 描画：【店舗別リクエストタブ】
+    // ==========================================
+    function renderStoreView() {
+      const container = document.getElementById('store-list-container');
+      const filtered = getFilteredRequests();
+
+      // 店舗ごとにグルーピング
+      const storeMap = new Map();
+      filtered.forEach(item => {
+        const key = item.storeName;
+        if (!storeMap.has(key)) {
+          storeMap.set(key, {
+            storeName: item.storeName,
+            phone: item.phone,
+            date: item.date,
+            items: []
+          });
+        }
+        storeMap.get(key).items.push(item);
+      });
+
+      const storeList = Array.from(storeMap.values());
+
+      // タブバッジ更新
+      document.getElementById('tab-badge-store').innerText = storeList.length;
+
+      if (storeList.length === 0) {
+        container.innerHTML = `
+          <div class="bg-[#132235] border-2 border-dashed border-[#1e3a5f] rounded-2xl p-8 text-center text-slate-400 contrast-card">
+            <div class="text-3xl mb-2">🏢</div>
+            <div class="text-base font-black text-white contrast-text">該当する店舗がありません</div>
+            <div class="text-xs text-slate-400 contrast-subtext mt-1">検索条件を変更してください。</div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = storeList.map(st => {
+        const unhandledCount = st.items.filter(i => i.status !== '採集完了').length;
+        const allCompleted = unhandledCount === 0;
+        const isCollapsed = collapsedStores.has(st.storeName);
+
+        return `
+          <div class="bg-[#132235] border-2 ${allCompleted ? 'border-emerald-600/70 bg-emerald-950/10' : 'border-[#1e3a5f]'} rounded-xl shadow-md p-3.5 contrast-card transition-all">
+            <!-- 店舗ヘッダー情報 -->
+            <div class="flex items-start justify-between gap-2 border-b-2 border-slate-700/60 pb-2.5 mb-2.5">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <h3 class="text-lg font-black text-white contrast-text leading-tight ${allCompleted ? 'line-through text-slate-400' : ''}">
+                    ${allCompleted ? '✅' : '🏢'} ${escapeHtml(st.storeName)}
+                  </h3>
+                  ${allCompleted ? '<span class="text-[10px] font-black px-1.5 py-0.5 rounded bg-emerald-600 text-white">全件完了</span>' : ''}
+                </div>
+                <div class="text-xs font-bold text-slate-400 contrast-subtext mt-1 flex items-center gap-2 flex-wrap">
+                  ${st.phone ? `<a href="tel:${escapeHtml(st.phone)}" class="text-sky-400 hover:underline font-black inline-flex items-center gap-0.5">📞 ${escapeHtml(st.phone)}</a>` : ''}
+                  <span>⏱ ${escapeHtml(st.date)}</span>
+                  <span>依頼: <strong class="text-white contrast-text">${st.items.length}品目</strong></span>
+                </div>
+              </div>
+
+              <!-- 全件完了時の折りたたみボタン -->
+              <button onclick="toggleStoreCollapse('${escapeJs(st.storeName)}')" class="text-xs font-bold px-2 py-1 rounded bg-slate-800 text-slate-300 border border-slate-600 active:scale-95">
+                ${isCollapsed ? '展開 ▼' : '折畳 ▲'}
+              </button>
+            </div>
+
+            <!-- リクエスト魚種リスト（折りたたみ対応） -->
+            <div class="${isCollapsed ? 'hidden' : 'space-y-2'}">
+              ${st.items.map(item => {
+                const isDone = item.status === '採集完了';
+                return `
+                  <div class="p-2.5 rounded-lg border ${isDone ? 'completed-item' : 'bg-[#0f1c2d] border-slate-700/80'} flex items-center justify-between gap-2.5 transition-all shadow-sm">
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-1.5">
+                        <span class="text-xs font-black px-1.5 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-800 contrast-badge-primary">
+                          ${escapeHtml(item.category)}
+                        </span>
+                        <span class="text-sm font-black ${isDone ? 'line-through text-slate-400' : 'text-white'} contrast-text">
+                          ${escapeHtml(item.species)}
+                        </span>
+                      </div>
+                      <div class="text-xs font-bold text-slate-300 contrast-subtext mt-1 flex items-center gap-3">
+                        <span>サイズ: <strong>${escapeHtml(item.size || '無選別')}</strong></span>
+                        <span class="text-amber-400 font-black text-sm">数量: ${item.qty}${escapeHtml(item.unit)}</span>
+                      </div>
+                      ${item.notes ? `<div class="text-[11px] text-amber-300 contrast-subtext font-bold mt-1 bg-amber-950/30 px-1.5 py-0.5 rounded border border-amber-800/40">💬 ${escapeHtml(item.notes)}</div>` : ''}
+                    </div>
+
+                    <!-- 採集完了切り替えボタン -->
+                    <button onclick="toggleCollectStatus('${item.id}')" class="px-3.5 py-2.5 rounded-lg font-black text-xs flex items-center gap-1 touch-target shadow-md active:scale-95 transition-all whitespace-nowrap ${isDone ? 'bg-emerald-600 text-white border border-emerald-400' : 'bg-sky-600 text-white border border-sky-400'}">
+                      <span>${isDone ? '✓ 採集完了' : '○ 完了にする'}</span>
+                    </button>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function toggleStoreCollapse(storeName) {
+      if (collapsedStores.has(storeName)) {
+        collapsedStores.delete(storeName);
+      } else {
+        collapsedStores.add(storeName);
+      }
+      renderStoreView();
+      if (navigator.vibrate) navigator.vibrate(10);
+    }
+
+    // ==========================================
+    // 13. サマリー集計値の更新
+    // ==========================================
+    function updateMetrics() {
+      const filtered = getFilteredRequests();
+      let unhandledQty = 0;
+      const unhandledSpeciesSet = new Set();
+      const unhandledStoresSet = new Set();
+
+      filtered.forEach(r => {
+        if (r.status !== '採集完了') {
+          unhandledQty += r.qty;
+          unhandledSpeciesSet.add(r.species);
+          unhandledStoresSet.add(r.storeName);
+        }
+      });
+
+      document.getElementById('stat-unhandled-species').innerHTML = `${unhandledSpeciesSet.size}<span class="text-xs font-bold text-slate-400 contrast-subtext ml-0.5">種</span>`;
+      document.getElementById('stat-unhandled-qty').innerHTML = `${unhandledQty}<span class="text-xs font-bold text-slate-400 contrast-subtext ml-0.5">匹</span>`;
+      document.getElementById('stat-unhandled-stores').innerHTML = `${unhandledStoresSet.size}<span class="text-xs font-bold text-slate-400 contrast-subtext ml-0.5">店</span>`;
+    }
+
+    // ==========================================
+    // 14. 全体再描画
+    // ==========================================
+    function renderAll() {
+      updateMetrics();
+      if (activeTab === 'species') {
+        renderSpeciesView();
+      } else {
+        renderStoreView();
+      }
+    }
+
+    // ==========================================
+    // 15. 直射日光・屋外ハイコントラストモード切替
+    // ==========================================
+    function toggleSunlightMode() {
+      isSunlight = !isSunlight;
+      document.body.classList.toggle('sunlight-mode', isSunlight);
+      localStorage.setItem(STORAGE_KEY_SUNLIGHT, String(isSunlight));
+      updateSunlightUI();
+      showToast(isSunlight ? '☀️ 屋外・直射日光モードON' : '🌙 標準モードに戻しました', '☀️');
+      if (navigator.vibrate) navigator.vibrate(20);
+    }
+
+    function updateSunlightUI() {
+      const btn = document.getElementById('sunlight-toggle-btn');
+      const icon = document.getElementById('sunlight-icon');
+      const label = document.getElementById('sunlight-label');
+      if (isSunlight) {
+        btn.className = 'px-2.5 py-2 rounded-lg font-black text-xs border-2 border-black bg-amber-400 text-black flex items-center gap-1 active:scale-95 transition-all shadow touch-target';
+        icon.innerText = '🌙';
+        label.innerText = '標準モード';
+      } else {
+        btn.className = 'px-2.5 py-2 rounded-lg font-black text-xs border border-slate-600 bg-slate-800 text-slate-100 flex items-center gap-1 active:scale-95 transition-all shadow touch-target';
+        icon.innerText = '☀️';
+        label.innerText = '屋外モード';
+      }
+    }
+
+    // ==========================================
+    // 16. データソース切り替え（モック ⇄ 本番GAS）
+    // ==========================================
+    function toggleDataSource() {
+      if (dataSource === 'mock') {
+        if (confirm('【データソースの切り替え】\n現在「動作確認用モックデータ」を表示しています。\n本番のGoogleスプレッドシート（石垣島観賞魚販売管理）と通信接続しますか？')) {
+          dataSource = 'live';
+          localStorage.setItem(STORAGE_KEY_DATASOURCE, 'live');
+          updateDataSourceUI();
+          fetchRequests(false);
+        }
+      } else {
+        if (confirm('【データソースの切り替え】\n本番接続から「動作確認用モックデータ」に戻しますか？')) {
+          dataSource = 'mock';
+          localStorage.setItem(STORAGE_KEY_DATASOURCE, 'mock');
+          requestsData = JSON.parse(JSON.stringify(DEFAULT_MOCK_REQUESTS));
+          saveRequestsToCache();
+          updateDataSourceUI();
+          renderCategoryFilters();
+          renderAll();
+          showToast('モックデータモードに切り替えました', '🧪');
+        }
+      }
+    }
+
+    function updateDataSourceUI() {
+      const badge = document.getElementById('data-source-badge');
+      if (dataSource === 'live') {
+        badge.innerText = '🌐 本番スプレッドシート連携中';
+        badge.className = 'cursor-pointer text-emerald-400 font-black hover:underline';
+      } else {
+        badge.innerText = '🧪 モックデータ（切替可）';
+        badge.className = 'cursor-pointer text-amber-400 font-black hover:underline';
+      }
+    }
+
+    // ==========================================
+    // 17. テスト用：ステータス全リセット
+    // ==========================================
+    function resetCompletedStatus() {
+      if (confirm('検証用：すべての採集リクエストを「未対応」に戻しますか？')) {
+        requestsData.forEach(r => {
+          r.status = '未対応';
+          r.completedAt = null;
+        });
+        saveRequestsToCache();
+        localStorage.removeItem(STORAGE_KEY_QUEUE);
+        updateQueueBanner();
+        renderAll();
+        showToast('全てのステータスを未対応にリセットしました', '🔄');
+      }
+    }
+
+    // ==========================================
+    // 18. トースト通知ヘルパー
+    // ==========================================
+    let toastTimeout = null;
+    function showToast(msg, icon = '✅') {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-icon').innerText = icon;
+      document.getElementById('toast-message').innerText = msg;
+      toast.classList.add('show');
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2500);
+    }
+
+    // XSS / エスケープユーティリティ
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function escapeJs(str) {
+      if (!str) return '';
+      return String(str).replace(/'/g, "\\'").replace(/"/g, '\\"');
+    }
+  </script>
+</body>
+</html>

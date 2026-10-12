@@ -50,7 +50,8 @@
 | **生体リクエスト** | [https://kawabatasuisanyaeyama.github.io/request.html](https://kawabatasuisanyaeyama.github.io/request.html) | 一般顧客 | 未入荷生体や特定種の採集リクエスト受付 |
 | **出荷ピッキング管理** | [https://kawabatasuisanyaeyama.github.io/picking.html](https://kawabatasuisanyaeyama.github.io/picking.html) | **社内専用** | 現場での出荷ピッキング、未発送管理、電話追加登録 |
 | **在庫・生体管理** | [https://kawabatasuisanyaeyama.github.io/stock.html](https://kawabatasuisanyaeyama.github.io/stock.html) | **社内専用** | 在庫数ワンタップ増減、カメラ写真/ファイル添付(Drive自動連携)、新規商品登録 |
-| **洋上・船上注文集計** | [https://kawabatasuisanyaeyama.github.io/boat.html](https://kawabatasuisanyaeyama.github.io/boat.html) | **社内専用** | 船上・洋上環境での注文・採集リクエスト確認、直射日光高コントラストモード、オフライン対応 |
+| **洋上・船上注文集計** | [https://kawabatasuisanyaeyama.github.io/boat.html](https://kawabatasuisanyaeyama.github.io/boat.html) | **社内専用** | 船上・洋上環境での注文・リクエスト確認、直射日光高コントラストモード、オフライン対応 |
+| **採集リクエスト管理** | [https://kawabatasuisanyaeyama.github.io/collect.html](https://kawabatasuisanyaeyama.github.io/collect.html) | **社内専用** | 洋上での採集リクエスト状況把握・ワンタップ「採集完了」更新（楽観的UI更新・圏外キュー同期） |
 | **社内説明・引き継ぎスライド** | [https://kawabatasuisanyaeyama.github.io/slides.html](https://kawabatasuisanyaeyama.github.io/slides.html) | **社内専用** | 社長への概要説明（第1部）＆ 管理者・後任者向け仕様・保守運用マニュアル（第2部・全25スライド、全画面・PDF印刷対応） |
 | **スプレッドシート(本番)** | [スプレッドシートを開く](https://docs.google.com/spreadsheets/d/1ZiNel8TGJ-e7JMolkRagVOSnr1UczvQzpTa-F-s4p3o/edit) | 管理者 | 在庫マスタ、顧客マスタ、全注文履歴・明細の原本 |
 | **Google Drive(画像)** | `川畑水産_観賞魚画像` (Google Driveフォルダ) | 管理者 | 新規生体登録時にアップロードされた写真の自動格納庫 |
@@ -159,6 +160,23 @@
    - **☀️ 直射日光・屋外ハイコントラストモード**: 屋外の強い直射日光下でも反射や白飛びせず文字が読めるよう、ワンタップで超高コントラスト（純白背景×漆黒極太枠線×極太文字）に切り替え可能です。
    - **電波圏外・通信不良対策（オフライン完全動作）**: 洋上に出て電波が途切れても、直近のデータや完了チェック状態が端末（localStorage）に安全に保持されます。
    - **モック ⇄ 本番GAS切替**: 電波のない環境でのシミュレーション・デモ用の「モックデータ」と、本番スプレッドシートのリアルタイム注文取得を画面上部から1タップで切り替え可能です。
+
+### D. 洋上・船上採集リクエスト管理アプリの運用フロー（collect.html）
+出港中や洋上採集現場において、Googleスプレッドシート「採集リクエスト一覧」と連携し、顧客からの未対応リクエストの確認および「採集完了」ステータスの更新をワンタップで行う専用アプリです。
+
+1. **魚種別（商品名別）集計タブ**
+   - 魚種ごとに未対応の合計依頼匹数が集約され、**依頼数が多い順に自動ソート**されます。
+   - 魚種カードをタップするとアコーディオンが展開し、依頼店舗の内訳（店舗名・指定サイズ・匹数・備考）が確認できます。
+   - 各内訳行の **「完了にする」ボタンをワンタップ** すると、即座に「採集完了」へステータスが切り替わります。
+
+2. **店舗別リクエストタブ**
+   - 発注元の店舗ごとにカード形式でグループ化され、各店舗の依頼魚種・サイズ・匹数・備考を一覧確認できます。
+   - 各行の「採集完了」ボタンで個別にステータスを変更可能。店舗単位で全件完了した場合は緑枠・薄色でわかりやすく表示され、折りたたみも可能です。
+
+3. **洋上オフライン＆楽観的UI更新（通信詰まりゼロ設計）**
+   - **楽観的UI更新（0msレスポンス）**: ボタンを押した瞬間に画面のステータスが更新され、洋上の電波遅延による操作の引っ掛かりが一切ありません。
+   - **電波圏外キュー（待ち行列自動同期）**: 洋上で完全に電波が途切れた状態で「採集完了」を押しても、更新内容が端末（localStorage）に安全に蓄積され、電波復帰時にGoogleスプレッドシートへ自動で一括同期されます。
+   - **☀️ 直射日光・屋外ハイコントラストモード**: 強い太陽光や水面の反射がある甲板上でも文字を見失わないよう、ワンタップで超高コントラスト配色（純白背景×黒極太枠線×極太文字）に切り替え可能です。
 
 ---
 
