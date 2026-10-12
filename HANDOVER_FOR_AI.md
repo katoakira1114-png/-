@@ -75,6 +75,7 @@ c:\Users\81909\Desktop\shop-project\
 ├── request.html         # Public specimen collection request form
 ├── picking.html         # Staff picking and dispatch management console
 ├── stock.html           # Staff stock inventory & new product registration console
+├── boat.html            # Maritime / offshore order & request aggregation dashboard (sunlight mode, offline-first)
 ├── slides.html          # Executive presentation slide deck for stakeholder review
 ├── 無題.js              # GAS backend implementation (~1600+ LOC)
 ├── HANDOVER_FOR_HUMAN.md# Operational handover manual for human administrators
@@ -443,4 +444,17 @@ Future AI agents MUST be aware of these past pitfalls to avoid repeating known i
      3. Concurrently, `initLiff()` and `fetchProducts(uid, isBackgroundSync = true)` query fresh inventory in background (SWR pattern).
      4. When background sync arrives: updates local cache, smooths inventory numbers into UI, maintains scroll offset (`window.scrollTo(0, prevScrollY)`), and clamps any cart item quantity exceeding updated stock without discarding the rest of the cart.
      5. On order success: clears `kawabata_cart_cache_v1` and `kawabata_ng_dates_v1`.
+
+10. **Offshore / Maritime Dashboard Architecture (`boat.html`)**:
+    - **Purpose**: Field dashboard for boat crews to rapidly inspect live specimen requests & customer order statuses offshore.
+    - **Dual Views via Tab Switching**:
+      - `【商品別集計画面】`: Aggregates requests per specimen name across all unfulfilled orders, defaults to count-descending sort, and provides interactive accordion expansion detailing which stores placed orders and their respective quantities.
+      - `【店舗別集計画面】`: Card-based layout per ordering customer/store, itemized breakdowns, direct phone click-to-call link, and a large single-tap `[対応済み]` toggle button.
+    - **Sunlight & Outdoor Optimization**:
+      - One-tap toggle for `☀️ 屋外モード` (Super High-Contrast Mode: pure white canvas `#ffffff`, deep black borders `#000000`, 900-weight typography).
+    - **Offline & Storage Strategy**:
+      - Standalone zero-external-dependency HTML/CSS/JS (runs without cellular signal).
+      - `kawabata_boat_orders_v1`: Offline order cache.
+      - `kawabata_boat_completed_stores_v1`: Persistent set of completed store names.
+      - `kawabata_boat_data_mode`: Allows toggling between built-in realistic mock data (`mock`) and live GAS production orders (`live`).
 
