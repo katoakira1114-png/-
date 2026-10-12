@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>船上・洋上注文集計ボード - 川畑水産</title>
-  <meta name="description" content="船上・屋外の直射日光下でも素早く注文・リクエスト状況を把握できる片手操作対応Webアプリ">
+  <title>船上注文集計（採集リクエスト連動）- 川畑水産</title>
+  <meta name="description" content="船上・洋上の屋外直射日光下でも採集リクエストシートのデータを素早く確認し、ワンタップで完了更新できる洋上現場仕様Webアプリ">
   <style>
     /* ========================================================
        カラーパレット・テーマ変数
        ※標準モードと直射日光・屋外ハイコントラストモードの2系統
        ======================================================== */
     :root {
-      --bg: #0f172a;
-      --surface: #1e293b;
-      --surface-card: #243247;
-      --border: #334155;
+      --bg: #09131f;
+      --surface: #101f33;
+      --surface-card: #162842;
+      --border: #1e3a5f;
       --text-main: #f8fafc;
       --text-sub: #94a3b8;
       --primary: #38bdf8;
@@ -26,14 +26,15 @@
       --danger: #ef4444;
       --highlight: #38bdf8;
       --font-scale: 1;
-      --card-radius: 12px;
-      --shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      --card-radius: 14px;
+      --shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+      --touch-min: 48px;
     }
 
-    /* ☀️ 屋外・直射日光モード（超高コントラスト・白背景・太字） */
+    /* ☀️ 屋外・直射日光モード（超高コントラスト・白背景・黒枠・極太フォント） */
     body.sunlight-mode {
       --bg: #ffffff;
-      --surface: #f1f5f9;
+      --surface: #f8fafc;
       --surface-card: #ffffff;
       --border: #000000;
       --text-main: #000000;
@@ -70,6 +71,7 @@
       padding-bottom: 95px;
       line-height: 1.4;
       min-height: 100vh;
+      touch-action: manipulation;
       transition: background-color 0.15s ease, color 0.15s ease;
     }
 
@@ -83,6 +85,11 @@
       background: var(--surface);
       border-bottom: 2px solid var(--border);
       box-shadow: var(--shadow);
+    }
+
+    body.sunlight-mode .sticky-top-bar {
+      background: #ffffff;
+      border-bottom: 2.5px solid #000000;
     }
 
     .header-main {
@@ -100,7 +107,7 @@
     }
 
     .brand-icon {
-      font-size: 1.4rem;
+      font-size: 1.5rem;
       line-height: 1;
     }
 
@@ -111,6 +118,10 @@
       display: flex;
       align-items: center;
       gap: 6px;
+    }
+
+    body.sunlight-mode .brand-title {
+      color: #000000;
     }
 
     .tag-outdoor {
@@ -134,55 +145,63 @@
       background: var(--surface-card);
       border: 1.5px solid var(--border);
       color: var(--text-main);
-      padding: 6px 10px;
+      padding: 8px 12px;
       border-radius: 8px;
-      font-size: 0.82rem;
+      font-size: 0.85rem;
       font-weight: 800;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
+      min-height: 40px;
       transition: all 0.15s ease;
       touch-action: manipulation;
     }
 
+    body.sunlight-mode .btn-header-action {
+      border: 2px solid #000;
+      color: #000;
+      background: #fff;
+    }
+
     .btn-header-action:active {
       transform: scale(0.95);
-      background: var(--primary-bg);
-      color: #fff;
     }
 
     .btn-sunlight.active {
-      background: #fbbf24;
+      background: var(--accent);
       color: #000;
-      border-color: #000;
-      font-weight: 900;
+      border-color: var(--accent);
     }
 
-    /* ネットワーク＆データモードバナー */
+    body.sunlight-mode .btn-sunlight {
+      background: #f59e0b;
+      color: #000000;
+      border-color: #000000;
+    }
+
+    /* ネットワーク状態＆最終更新時刻サブバー */
     .status-sub-bar {
-      background: rgba(0, 0, 0, 0.25);
-      padding: 4px 14px;
+      padding: 4px 14px 6px;
+      font-size: 0.74rem;
+      color: var(--text-sub);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      font-size: 0.72rem;
-      color: var(--text-sub);
       border-top: 1px solid rgba(255, 255, 255, 0.05);
+      font-weight: 700;
     }
 
     body.sunlight-mode .status-sub-bar {
-      background: #e2e8f0;
-      color: #0f172a;
-      border-top: 1px solid #000;
-      font-weight: 700;
+      color: #1e293b;
+      border-top: 1px solid #e2e8f0;
+      font-weight: 800;
     }
 
     .net-pill {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
-      font-weight: 700;
+      gap: 5px;
     }
 
     .net-dot {
@@ -190,10 +209,29 @@
       height: 8px;
       border-radius: 50%;
       background: var(--success);
+      display: inline-block;
     }
 
     .net-dot.offline {
       background: var(--accent);
+    }
+
+    /* 未送信キューバナー */
+    .offline-queue-bar {
+      display: none;
+      background: #b45309;
+      color: #ffffff;
+      padding: 6px 14px;
+      font-size: 0.75rem;
+      font-weight: 900;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #f59e0b;
+    }
+
+    .offline-queue-bar.hidden {
+      display: none !important;
     }
 
     /* ========================================================
@@ -216,8 +254,18 @@
       box-shadow: var(--shadow);
     }
 
+    body.sunlight-mode .metric-card {
+      background: #ffffff;
+      border: 2px solid #000000;
+      box-shadow: 0 2px 0 #000000;
+    }
+
     .metric-card.accent {
       border-color: var(--primary);
+    }
+
+    body.sunlight-mode .metric-card.accent {
+      border-color: #000000;
     }
 
     .metric-label {
@@ -228,7 +276,8 @@
     }
 
     body.sunlight-mode .metric-label {
-      color: #000;
+      color: #000000;
+      font-weight: 900;
     }
 
     .metric-value {
@@ -238,99 +287,90 @@
       line-height: 1.1;
     }
 
+    body.sunlight-mode .metric-value {
+      color: #000000;
+    }
+
     .metric-value.accent {
       color: var(--primary);
     }
 
     body.sunlight-mode .metric-value.accent {
-      color: var(--primary);
+      color: #000000;
     }
 
     .metric-unit {
       font-size: 0.75rem;
       font-weight: 700;
-      margin-left: 2px;
       color: var(--text-sub);
+      margin-left: 2px;
     }
 
     body.sunlight-mode .metric-unit {
-      color: #000;
+      color: #334155;
     }
 
     /* ========================================================
-       タブナビゲーション（2画面切り替え）
+       タブ切り替え＆コントロールエリア
        ======================================================== */
-    .view-switch-tabs {
-      display: flex;
-      gap: 8px;
-      padding: 0 12px 10px 12px;
+    .control-panel {
+      padding: 0 12px 10px;
       background: var(--bg);
+    }
+
+    .view-tabs-container {
+      display: flex;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 3px;
+      gap: 4px;
+      margin-bottom: 10px;
+    }
+
+    body.sunlight-mode .view-tabs-container {
+      background: #e2e8f0;
+      border-color: #000000;
     }
 
     .view-tab-btn {
       flex: 1;
-      padding: 12px 8px;
-      background: var(--surface);
-      border: 2px solid var(--border);
+      padding: 10px 8px;
+      border: none;
+      background: transparent;
       color: var(--text-sub);
-      border-radius: 10px;
-      font-size: 1rem;
+      font-size: 0.92rem;
       font-weight: 900;
+      border-radius: 8px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 6px;
-      transition: all 0.15s ease;
       touch-action: manipulation;
+      min-height: var(--touch-min);
+      transition: all 0.15s ease;
     }
 
     .view-tab-btn.active {
-      background: var(--primary);
+      background: var(--primary-bg);
       color: #ffffff;
-      border-color: var(--primary);
-      box-shadow: 0 4px 10px rgba(56, 189, 248, 0.35);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
     }
 
     body.sunlight-mode .view-tab-btn {
-      border-width: 2px;
-      border-color: #000;
-      color: #000;
+      color: #334155;
     }
 
     body.sunlight-mode .view-tab-btn.active {
       background: #000000;
       color: #ffffff;
-      border-color: #000000;
     }
 
-    .tab-badge {
-      background: rgba(0, 0, 0, 0.35);
-      color: #fff;
-      font-size: 0.8rem;
-      font-weight: 800;
-      padding: 2px 7px;
-      border-radius: 12px;
-    }
-
-    body.sunlight-mode .view-tab-btn.active .tab-badge {
-      background: #ffffff;
-      color: #000000;
-    }
-
-    /* ========================================================
-       検索＆フィルタリングバー
-       ======================================================== */
-    .filter-bar {
-      padding: 0 12px 10px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .search-input-wrapper {
+    /* 検索バー */
+    .search-row {
       position: relative;
-      width: 100%;
+      margin-bottom: 8px;
     }
 
     .search-icon {
@@ -390,7 +430,15 @@
       display: flex;
     }
 
-    /* クイックフィルタチップス */
+    /* フィルタ＆ソートツールバー */
+    .sub-tools-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      flex-wrap: nowrap;
+    }
+
     .filter-chips-row {
       display: flex;
       gap: 6px;
@@ -398,6 +446,7 @@
       padding-bottom: 2px;
       scrollbar-width: none;
       -ms-overflow-style: none;
+      flex: 1;
     }
 
     .filter-chips-row::-webkit-scrollbar {
@@ -430,6 +479,7 @@
     body.sunlight-mode .chip-btn {
       border-color: #000;
       color: #000;
+      background: #ffffff;
     }
 
     body.sunlight-mode .chip-btn.active {
@@ -437,11 +487,39 @@
       color: #fff;
     }
 
-    .sort-toggle-btn {
-      margin-left: auto;
+    .tool-btn {
+      padding: 6px 10px;
       background: var(--surface-card);
+      border: 1.5px solid var(--border);
       color: var(--text-main);
-      border-color: var(--border);
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      touch-action: manipulation;
+      shrink: 0;
+    }
+
+    body.sunlight-mode .tool-btn {
+      border-color: #000;
+      color: #000;
+      background: #fff;
+    }
+
+    .tool-btn.active {
+      background: var(--accent);
+      color: #000;
+      border-color: var(--accent);
+    }
+
+    body.sunlight-mode .tool-btn.active {
+      background: #f59e0b;
+      color: #000;
+      border-color: #000;
     }
 
     /* ========================================================
@@ -462,6 +540,12 @@
       margin-top: 10px;
     }
 
+    body.sunlight-mode .empty-state {
+      background: #ffffff;
+      border-color: #000000;
+      color: #000000;
+    }
+
     .empty-state-icon {
       font-size: 2.5rem;
       margin-bottom: 8px;
@@ -474,8 +558,12 @@
       margin-bottom: 4px;
     }
 
+    body.sunlight-mode .empty-state-title {
+      color: #000000;
+    }
+
     /* --------------------------------------------------------
-       1. 【商品別集計画面】カード
+       1. 【商品（生体）別カードスタイル】
        -------------------------------------------------------- */
     .product-group-card {
       background: var(--surface);
@@ -484,16 +572,25 @@
       margin-bottom: 10px;
       box-shadow: var(--shadow);
       overflow: hidden;
-      transition: transform 0.1s ease, border-color 0.15s ease;
-    }
-
-    .product-group-card:active {
-      transform: scale(0.99);
+      transition: all 0.15s ease;
     }
 
     body.sunlight-mode .product-group-card {
       border: 2.5px solid #000000;
       background: #ffffff;
+      box-shadow: 0 3px 0 #000000;
+    }
+
+    .product-group-card.completed {
+      opacity: 0.65;
+      border-color: var(--success);
+      background: rgba(16, 185, 129, 0.05);
+    }
+
+    body.sunlight-mode .product-group-card.completed {
+      opacity: 0.88;
+      background: #f0fdf4;
+      border-color: #047857;
     }
 
     .product-card-header {
@@ -520,6 +617,7 @@
       padding: 2px 8px;
       border-radius: 4px;
       margin-bottom: 4px;
+      border: 1px solid rgba(56, 189, 248, 0.3);
     }
 
     body.sunlight-mode .prod-category-tag {
@@ -536,6 +634,15 @@
       line-height: 1.25;
     }
 
+    body.sunlight-mode .prod-name {
+      color: #000000;
+    }
+
+    .product-group-card.completed .prod-name {
+      text-decoration: line-through;
+      color: var(--text-sub);
+    }
+
     .prod-sub-meta {
       font-size: 0.78rem;
       font-weight: 700;
@@ -549,6 +656,7 @@
 
     body.sunlight-mode .prod-sub-meta {
       color: #334155;
+      font-weight: 800;
     }
 
     /* 合計数量の特大バッジ */
@@ -559,6 +667,7 @@
       justify-content: center;
       text-align: right;
       padding-left: 8px;
+      shrink: 0;
     }
 
     .prod-total-count {
@@ -573,6 +682,10 @@
 
     body.sunlight-mode .prod-total-count {
       color: #000;
+    }
+
+    .product-group-card.completed .prod-total-count {
+      color: var(--text-sub);
     }
 
     .prod-total-unit {
@@ -632,84 +745,108 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 8px 10px;
+      padding: 10px 12px;
       background: var(--surface-card);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      margin-bottom: 6px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 7px;
       gap: 8px;
     }
 
     body.sunlight-mode .breakdown-store-row {
       background: #ffffff;
-      border: 1.5px solid #000;
+      border: 2px solid #000;
+    }
+
+    .breakdown-store-row.completed {
+      opacity: 0.6;
+      border-color: var(--success);
+      background: rgba(16, 185, 129, 0.08);
+    }
+
+    body.sunlight-mode .breakdown-store-row.completed {
+      background: #f0fdf4;
+      border-color: #047857;
+      opacity: 0.9;
     }
 
     .breakdown-store-row:last-child {
       margin-bottom: 0;
     }
 
-    .breakdown-store-row.completed {
-      opacity: 0.6;
-      background: rgba(16, 185, 129, 0.08);
-      border-color: var(--success);
+    .breakdown-store-info {
+      flex: 1;
+      min-width: 0;
     }
 
     .breakdown-store-name {
+      font-weight: 900;
       font-size: 0.95rem;
-      font-weight: 800;
       color: var(--text-main);
       display: flex;
       align-items: center;
       gap: 6px;
     }
 
+    body.sunlight-mode .breakdown-store-name {
+      color: #000;
+    }
+
     .breakdown-store-row.completed .breakdown-store-name {
       text-decoration: line-through;
     }
 
-    .breakdown-store-qty {
-      font-size: 1.15rem;
+    .breakdown-store-meta {
+      font-size: 0.76rem;
+      color: var(--text-sub);
+      margin-top: 2px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-weight: 700;
+    }
+
+    body.sunlight-mode .breakdown-store-meta {
+      color: #334155;
+    }
+
+    /* 個別採集完了ボタン */
+    .btn-item-toggle {
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 0.8rem;
       font-weight: 900;
-      color: var(--primary);
-    }
-
-    body.sunlight-mode .breakdown-store-qty {
-      color: #000;
-    }
-
-    .btn-quick-toggle {
-      padding: 5px 10px;
-      border-radius: 6px;
-      font-size: 0.75rem;
-      font-weight: 800;
-      border: 1.5px solid var(--border);
-      background: var(--surface);
-      color: var(--text-main);
       cursor: pointer;
+      border: 1.5px solid var(--border);
+      background: var(--primary-bg);
+      color: #ffffff;
       display: flex;
       align-items: center;
       gap: 4px;
       touch-action: manipulation;
+      white-space: nowrap;
+      min-height: 40px;
+      transition: all 0.15s ease;
     }
 
-    .btn-quick-toggle.done {
-      background: var(--success);
+    body.sunlight-mode .btn-item-toggle {
+      border: 2px solid #000;
+      background: #0044cc;
       color: #fff;
+    }
+
+    .btn-item-toggle.done {
+      background: var(--success);
       border-color: var(--success);
     }
 
-    body.sunlight-mode .btn-quick-toggle {
+    body.sunlight-mode .btn-item-toggle.done {
+      background: #047857;
       border-color: #000;
     }
 
-    body.sunlight-mode .btn-quick-toggle.done {
-      background: #000;
-      color: #fff;
-    }
-
     /* --------------------------------------------------------
-       2. 【店舗別集計画面】カード
+       2. 【店舗別カードスタイル】
        -------------------------------------------------------- */
     .store-order-card {
       background: var(--surface);
@@ -718,26 +855,28 @@
       margin-bottom: 12px;
       box-shadow: var(--shadow);
       padding: 14px;
-      position: relative;
       transition: all 0.15s ease;
     }
 
     body.sunlight-mode .store-order-card {
       border: 2.5px solid #000000;
       background: #ffffff;
+      box-shadow: 0 3px 0 #000000;
     }
 
     .store-order-card.completed {
+      opacity: 0.65;
       border-color: var(--success);
       background: rgba(16, 185, 129, 0.05);
     }
 
     body.sunlight-mode .store-order-card.completed {
+      opacity: 0.9;
       background: #f0fdf4;
       border-color: #047857;
     }
 
-    .store-card-top {
+    .store-header-row {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
@@ -747,55 +886,53 @@
       border-bottom: 1.5px solid var(--border);
     }
 
-    body.sunlight-mode .store-card-top {
-      border-bottom-color: #000;
+    body.sunlight-mode .store-header-row {
+      border-bottom: 2px solid #000;
     }
 
-    .store-info-box {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .store-name-title {
-      font-size: 1.25rem;
+    .store-main-title {
+      font-size: 1.15rem;
       font-weight: 900;
       color: var(--text-main);
       display: flex;
       align-items: center;
       gap: 6px;
-      line-height: 1.25;
-      margin-bottom: 4px;
+      word-break: break-word;
     }
 
-    .store-order-card.completed .store-name-title {
+    body.sunlight-mode .store-main-title {
+      color: #000;
+    }
+
+    .store-order-card.completed .store-main-title {
       text-decoration: line-through;
-      color: var(--text-sub);
     }
 
     .store-meta-line {
       font-size: 0.78rem;
-      font-weight: 700;
       color: var(--text-sub);
+      margin-top: 3px;
       display: flex;
       align-items: center;
       gap: 8px;
       flex-wrap: wrap;
+      font-weight: 700;
     }
 
     body.sunlight-mode .store-meta-line {
-      color: #1e293b;
+      color: #334155;
     }
 
-    .phone-link {
+    .store-phone-link {
       color: var(--primary);
       text-decoration: none;
       font-weight: 800;
       display: inline-flex;
       align-items: center;
-      gap: 3px;
+      gap: 2px;
     }
 
-    body.sunlight-mode .phone-link {
+    body.sunlight-mode .store-phone-link {
       color: #0044cc;
       text-decoration: underline;
     }
@@ -804,7 +941,7 @@
     .store-complete-toggle-btn {
       padding: 10px 14px;
       border-radius: 10px;
-      font-size: 0.95rem;
+      font-size: 0.92rem;
       font-weight: 900;
       cursor: pointer;
       display: flex;
@@ -816,6 +953,8 @@
       transition: all 0.15s ease;
       touch-action: manipulation;
       white-space: nowrap;
+      min-height: var(--touch-min);
+      shrink: 0;
     }
 
     body.sunlight-mode .store-complete-toggle-btn {
@@ -852,28 +991,37 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 7px 0;
-      border-bottom: 1px dashed var(--border);
-      font-size: 0.95rem;
+      padding: 8px 10px;
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 6px;
+      gap: 8px;
     }
 
     body.sunlight-mode .store-item-row {
-      border-bottom-color: #cbd5e1;
+      background: #ffffff;
+      border: 1.5px solid #000;
     }
 
-    .store-item-row:last-child {
-      border-bottom: none;
+    .store-item-row.completed {
+      opacity: 0.6;
+      border-color: var(--success);
     }
 
     .store-item-name {
       font-weight: 800;
       color: var(--text-main);
       flex: 1;
-      padding-right: 8px;
+      font-size: 0.92rem;
     }
 
-    .store-order-card.completed .store-item-name {
-      color: var(--text-sub);
+    body.sunlight-mode .store-item-name {
+      color: #000;
+    }
+
+    .store-item-row.completed .store-item-name {
+      text-decoration: line-through;
     }
 
     .store-item-qty {
@@ -887,7 +1035,7 @@
       color: #000;
     }
 
-    /* 備考・受取不可日バナー */
+    /* 備考バナー */
     .store-note-badge {
       background: var(--accent-bg);
       border: 1px solid var(--accent);
@@ -943,7 +1091,7 @@
       background: var(--surface-card);
       border: 1.5px solid var(--border);
       color: var(--text-main);
-      border-radius: 8px;
+      border-radius: 10px;
       font-size: 0.95rem;
       font-weight: 900;
       cursor: pointer;
@@ -953,10 +1101,11 @@
       justify-content: center;
       gap: 5px;
       touch-action: manipulation;
+      min-height: var(--touch-min);
     }
 
     .bottom-tab-btn.active {
-      background: var(--primary);
+      background: var(--primary-bg);
       color: #ffffff;
       border-color: var(--primary);
     }
@@ -978,14 +1127,15 @@
       background: var(--surface-card);
       border: 1.5px solid var(--border);
       color: var(--text-main);
-      border-radius: 8px;
-      font-size: 0.9rem;
+      border-radius: 10px;
+      font-size: 0.88rem;
       font-weight: 900;
       cursor: pointer;
       display: flex;
       align-items: center;
       gap: 4px;
       touch-action: manipulation;
+      min-height: var(--touch-min);
     }
 
     body.sunlight-mode .bottom-action-btn {
@@ -1051,22 +1201,22 @@
   <div class="sticky-top-bar">
     <div class="header-main">
       <div class="brand-box">
-        <span class="brand-icon">⚓</span>
+        <span class="brand-icon">🎣</span>
         <div>
           <div class="brand-title">
             船上注文集計
-            <span class="tag-outdoor">洋上・屋外仕様</span>
+            <span class="tag-outdoor">採集リクエスト連動</span>
           </div>
         </div>
       </div>
       <div class="header-actions">
         <!-- ☀️ 直射日光・高コントラスト切替ボタン -->
-        <button type="button" class="btn-header-action btn-sunlight" id="sunlight-btn" onclick="toggleSunlightMode()">
+        <button type="button" class="btn-header-action btn-sunlight" id="sunlight-btn" onclick="toggleSunlightMode()" title="直射日光・屋外高コントラスト表示切替">
           <span id="sunlight-icon">☀️</span>
           <span id="sunlight-label">屋外モード</span>
         </button>
         <!-- 🔄 更新ボタン -->
-        <button type="button" class="btn-header-action" id="refresh-btn" onclick="refreshData()">
+        <button type="button" class="btn-header-action" id="refresh-btn" onclick="fetchRequests(false)" title="最新スプレッドシートデータ取得">
           <span id="refresh-icon">🔄</span>
         </button>
       </div>
@@ -1078,9 +1228,15 @@
         <span class="net-dot" id="net-dot"></span>
         <span id="net-text">オンライン</span>
         <span style="opacity:0.6; margin:0 4px;">|</span>
-        <span id="data-source-pill" style="cursor:pointer;" onclick="toggleDataSourceModal()">🧪 モックデータ中</span>
+        <span id="data-source-pill" style="cursor:pointer;" onclick="toggleDataSourceModal()">🌐 本番シート連動中</span>
       </div>
       <div id="last-updated-text">最終更新: 取得中...</div>
+    </div>
+
+    <!-- オフライン未送信キュー通知バー -->
+    <div id="offline-queue-banner" class="offline-queue-bar hidden">
+      <span id="offline-queue-text">⚠️ 未送信の更新: 0件（電波復帰時に自動送信）</span>
+      <button onclick="processSyncQueue()" style="background:rgba(0,0,0,0.3); color:#fff; border:none; padding:2px 8px; border-radius:4px; font-weight:bold; cursor:pointer;">今すぐ再送</button>
     </div>
   </div>
 
@@ -1089,78 +1245,91 @@
        ======================================================== -->
   <div class="summary-metrics-bar">
     <div class="metric-card accent">
-      <div class="metric-label">未対応 品目</div>
+      <div class="metric-label">未対応 魚種数</div>
       <div class="metric-value accent" id="metric-unhandled-products">0<span class="metric-unit">品</span></div>
     </div>
     <div class="metric-card">
       <div class="metric-label">未対応 合計匹数</div>
-      <div class="metric-value" id="metric-unhandled-qty">0<span class="metric-unit">個</span></div>
+      <div class="metric-value" id="metric-unhandled-qty">0<span class="metric-unit">匹</span></div>
     </div>
     <div class="metric-card">
-      <div class="metric-label">未完了 店舗</div>
+      <div class="metric-label">未完了 店舗数</div>
       <div class="metric-value" id="metric-unhandled-stores">0<span class="metric-unit">店</span></div>
     </div>
   </div>
 
   <!-- ========================================================
-       タブ切り替え（商品別 ⇄ 店舗別）
+       コントロールパネル（タブ・検索・フィルタ）
        ======================================================== -->
-  <div class="view-switch-tabs">
-    <button type="button" class="view-tab-btn active" id="tab-btn-product" onclick="switchView('product')">
-      <span>🐟 商品別集計</span>
-      <span class="tab-badge" id="badge-product-count">0</span>
-    </button>
-    <button type="button" class="view-tab-btn" id="tab-btn-store" onclick="switchView('store')">
-      <span>🏢 店舗別集計</span>
-      <span class="tab-badge" id="badge-store-count">0</span>
-    </button>
-  </div>
+  <div class="control-panel">
+    <!-- ビュー切り替えタブ（商品別 ⇄ 店舗別） -->
+    <div class="view-tabs-container">
+      <button type="button" class="view-tab-btn active" id="tab-btn-product" onclick="switchView('product')">
+        🐟 魚種（商品）別集計 (<span id="badge-product-count">0</span>)
+      </button>
+      <button type="button" class="view-tab-btn" id="tab-btn-store" onclick="switchView('store')">
+        🏢 店舗別リクエスト (<span id="badge-store-count">0</span>)
+      </button>
+    </div>
 
-  <!-- ========================================================
-       検索＆フィルタリングバー
-       ======================================================== -->
-  <div class="filter-bar">
-    <div class="search-input-wrapper">
+    <!-- 検索バー -->
+    <div class="search-row">
       <span class="search-icon">🔍</span>
-      <input type="text" id="search-box" class="search-input" placeholder="商品名・店舗名・魚種で検索..." oninput="handleSearchInput()">
+      <input type="text" class="search-input" id="search-input" placeholder="魚種名・店舗名・サイズ・備考で絞り込み..." oninput="handleSearchInput()">
       <button type="button" class="search-clear-btn" id="search-clear-btn" onclick="clearSearch()">✕</button>
     </div>
 
-    <!-- クイックフィルタチップス -->
-    <div class="filter-chips-row" id="filter-chips-container">
-      <!-- JSで動的生成 -->
+    <!-- カテゴリチップ＆ソートツールバー -->
+    <div class="sub-tools-row">
+      <div class="filter-chips-row" id="category-chips-container">
+        <!-- 動的生成 -->
+      </div>
+      <button type="button" class="tool-btn" id="sort-toggle-btn" onclick="toggleSortOrder()">
+        <span id="sort-icon">⬇</span>
+        <span id="sort-label">多い順</span>
+      </button>
+      <button type="button" class="tool-btn" id="completed-toggle-btn" onclick="toggleCompletedFilter()">
+        <span id="completed-filter-label">未完了のみ</span>
+      </button>
     </div>
   </div>
 
   <!-- ========================================================
-       メインリスト表示領域
+       メインコンテンツエリア
        ======================================================== -->
-  <div class="main-container">
-    <!-- 1. 商品別集計リスト -->
-    <div id="view-product" style="display: block;">
-      <div id="product-list-container"></div>
+  <main class="main-container">
+    <!-- ビュー1：【商品（生体）別集計リスト】 -->
+    <div id="view-product">
+      <div id="product-list-container">
+        <!-- JS動的レンダリング -->
+      </div>
     </div>
 
-    <!-- 2. 店舗別集計リスト -->
+    <!-- ビュー2：【店舗別集計リスト】 -->
     <div id="view-store" style="display: none;">
-      <div id="store-list-container"></div>
+      <div id="store-list-container">
+        <!-- JS動的レンダリング -->
+      </div>
     </div>
-  </div>
+  </main>
 
   <!-- ========================================================
-       片手操作用固定ボトムバー
+       固定ボトムバー
        ======================================================== -->
   <div class="fixed-bottom-bar">
     <div class="bottom-tab-switch">
       <button type="button" class="bottom-tab-btn active" id="bottom-tab-prod" onclick="switchView('product')">
-        🐟 商品別
+        🐟 魚種別
       </button>
       <button type="button" class="bottom-tab-btn" id="bottom-tab-store" onclick="switchView('store')">
         🏢 店舗別
       </button>
     </div>
-    <button type="button" class="bottom-action-btn" onclick="scrollToTop()">
-      ⬆ 上部へ
+    <button type="button" class="bottom-action-btn" onclick="window.scrollTo({top:0, behavior:'smooth'})">
+      ⬆ 上部
+    </button>
+    <button type="button" class="bottom-action-btn" onclick="resetAllStatusForTest()" style="color:#f87171; border-color:#991b1b;" title="検証用：全件を未対応に戻す">
+      🔄 リセット
     </button>
   </div>
 
@@ -1168,140 +1337,167 @@
   <div class="toast-msg" id="toast-msg"></div>
 
   <!-- ========================================================
-       JavaScript ロジック
+       JavaScript アプリケーションロジック
        ======================================================== -->
   <script>
     // ==========================================
-    // 定数・ストレージキー・API設定
+    // 1. 環境設定・GAS APIエンドポイント
     // ==========================================
-    const STORAGE_KEY_ORDERS = 'kawabata_boat_orders_v1';
-    const STORAGE_KEY_COMPLETED = 'kawabata_boat_completed_stores_v1';
-    const STORAGE_KEY_SUNLIGHT = 'kawabata_boat_sunlight_mode';
-    const STORAGE_KEY_LAST_SYNC = 'kawabata_boat_last_sync_time';
-    const STORAGE_KEY_DATA_MODE = 'kawabata_boat_data_mode'; // 'mock' or 'live'
+    // ※スプレッドシート「採集リクエスト一覧」と連携するGAS Web App
+    const API_URL = "https://script.google.com/macros/s/AKfycbxIYsPdreUjaOFutfshhQIwOLb_Ke1JprcDZj_LAT9oZnc-l-3jZLsPAsFd_QdQJAQ4eA/exec";
 
-    const LIVE_GAS_API_URL = "https://script.google.com/macros/s/AKfycbxIYsPdreUjaOFutfshhQIwOLb_Ke1JprcDZj_LAT9oZnc-l-3jZLsPAsFd_QdQJAQ4eA/exec";
+    // ローカルストレージキー
+    const STORAGE_KEY_REQUESTS = "kawabata_boat_requests_data_v3";
+    const STORAGE_KEY_QUEUE = "kawabata_boat_sync_queue_v3";
+    const STORAGE_KEY_SUNLIGHT = "kawabata_boat_sunlight_mode";
+    const STORAGE_KEY_DATASOURCE = "kawabata_boat_datasource_mode_v3"; // 'live' or 'mock'
+    const STORAGE_KEY_SHOW_COMPLETED = "kawabata_boat_show_completed";
+    const STORAGE_KEY_LAST_SYNC = "kawabata_boat_last_sync_time";
 
-    // 動作確認用初期モックデータ（鮮魚・観賞魚生体・資材・リクエスト品）
-    const DEFAULT_MOCK_ORDERS = [
+    // ==========================================
+    // 2. 実シートに基づく動作確認用初期モックデータ（採集リクエスト仕様）
+    // ==========================================
+    const DEFAULT_MOCK_REQUESTS = [
       {
-        orderId: "ORD-20261012-01",
-        customerName: "八重山アクアリウム",
-        phone: "090-1234-5678",
-        orderDate: "10/12 06:30",
-        ngDates: "10/14(水)不可",
-        notes: "午前中便希望。状態の良いペア優先でお願いします。",
-        items: [
-          { name: "カクレクマノミ (ペア)", category: "魚", qty: 4, unit: "匹" },
-          { name: "ハタゴイソギンチャク (M)", category: "イソギンチャク", qty: 2, unit: "個" },
-          { name: "ヒレナガハギ (S)", category: "魚", qty: 3, unit: "匹" },
-          { name: "シャコガイ (ブルー特美)", category: "シャコガイ", qty: 1, unit: "個" }
-        ]
+        id: "REQ-20261005-035408-1",
+        requestId: "REQ-20261005-035408",
+        rowNumber: 2,
+        date: "10/05 03:54",
+        storeName: "加藤晃",
+        phone: "090-9971-9013",
+        species: "スカシテンジク",
+        category: "海水魚",
+        size: "3-4cm",
+        qty: 50,
+        unit: "匹",
+        status: "新規受付",
+        notes: ""
       },
       {
-        orderId: "ORD-20261012-02",
-        customerName: "美ら海マリンショップ",
-        phone: "0980-82-9999",
-        orderDate: "10/12 07:15",
-        ngDates: "なし",
-        notes: "採集でき次第即連絡ください。",
-        items: [
-          { name: "カクレクマノミ (ペア)", category: "魚", qty: 6, unit: "匹" },
-          { name: "アカモンガラ (成魚)", category: "魚", qty: 2, unit: "匹" },
-          { name: "マガキガイ (掃除用)", category: "貝", qty: 20, unit: "個" },
-          { name: "ライブロック (擬岩/特選)", category: "擬岩", qty: 5, unit: "kg" }
-        ]
+        id: "REQ-20261005-035408-2",
+        requestId: "REQ-20261005-035408",
+        rowNumber: 2,
+        date: "10/05 03:54",
+        storeName: "加藤晃",
+        phone: "090-9971-9013",
+        species: "ネオンテンジク",
+        category: "海水魚",
+        size: "5-7cm",
+        qty: 100,
+        unit: "匹",
+        status: "新規受付",
+        notes: ""
       },
       {
-        orderId: "ORD-20261012-03",
-        customerName: "東京アクアワールド 築地店",
-        phone: "03-3541-0000",
-        orderDate: "10/12 08:00",
-        ngDates: "10/15(木)午後不可",
-        notes: "航空便パッキング。酸素多めで手配願います。",
-        items: [
-          { name: "スミレナガハナダイ (オス)", category: "魚", qty: 5, unit: "匹" },
-          { name: "スミレナガハナダイ (メス)", category: "魚", qty: 8, unit: "匹" },
-          { name: "カクレクマノミ (ペア)", category: "魚", qty: 3, unit: "匹" },
-          { name: "ハタゴイソギンチャク (M)", category: "イソギンチャク", qty: 1, unit: "個" }
-        ]
+        id: "REQ-20261005-035408-3",
+        requestId: "REQ-20261005-035408",
+        rowNumber: 2,
+        date: "10/05 03:54",
+        storeName: "加藤晃",
+        phone: "090-9971-9013",
+        species: "ウミキノコ",
+        category: "ソフトコーラル",
+        size: "小さめ",
+        qty: 20,
+        unit: "匹",
+        status: "新規受付",
+        notes: ""
       },
       {
-        orderId: "ORD-20261012-04",
-        customerName: "オーシャンブルー南風",
-        phone: "090-8888-2222",
-        orderDate: "10/12 08:45",
-        ngDates: "なし",
-        notes: "船着き場直接引き取り希望（16時頃）。",
-        items: [
-          { name: "マガキガイ (掃除用)", category: "貝", qty: 30, unit: "個" },
-          { name: "ヒレナガハギ (S)", category: "魚", qty: 2, unit: "匹" },
-          { name: "ハマサンゴ (グリーン)", category: "サンゴ", qty: 3, unit: "個" }
-        ]
+        id: "REQ-20261005-040858-1",
+        requestId: "REQ-20261005-040858",
+        rowNumber: 3,
+        date: "10/05 04:08",
+        storeName: "加藤晃",
+        phone: "090-9971-9013",
+        species: "スカシテンジクダイ",
+        category: "海水魚",
+        size: "規格未指定",
+        qty: 1,
+        unit: "匹",
+        status: "新規受付",
+        notes: ""
       },
       {
-        orderId: "ORD-20261012-05",
-        customerName: "アクアプロRYUKYU",
-        phone: "090-7777-3333",
-        orderDate: "10/12 09:20",
-        ngDates: "10/16(金)不可",
-        notes: "【採集リクエスト】ニシキヤッコ幼魚見つけたら必ず確保してください！",
-        items: [
-          { name: "ニシキヤッコ (幼魚リクエスト)", category: "生体リクエスト", qty: 2, unit: "匹" },
-          { name: "スミレナガハナダイ (オス)", category: "魚", qty: 3, unit: "匹" },
-          { name: "シャコガイ (ブルー特美)", category: "シャコガイ", qty: 2, unit: "個" }
-        ]
+        id: "REQ-20261005-043412-1",
+        requestId: "REQ-20261005-043412",
+        rowNumber: 4,
+        date: "10/05 04:34",
+        storeName: "加藤晃",
+        phone: "090-9971-9013",
+        species: "ネオンテンジク",
+        category: "海水魚",
+        size: "規格未指定",
+        qty: 1,
+        unit: "匹",
+        status: "新規受付",
+        notes: ""
       }
     ];
 
     // ==========================================
-    // アプリケーション状態
+    // 3. アプリケーション状態変数
     // ==========================================
+    let requestsData = [];
     let currentView = 'product'; // 'product' or 'store'
-    let currentOrders = [];
-    let completedStoreSet = new Set(); // 完了済み店舗のIDまたは店舗名
-    let expandedProductMap = new Set(); // 展開中の商品名
-    let searchQuery = '';
-    let selectedCategoryFilter = 'all'; // 'all', '魚', 'サンゴ', etc.
-    let currentSortOrder = 'count_desc'; // 'count_desc', 'name_asc'
-    let currentStoreFilter = 'all'; // 'all', 'uncompleted', 'completed'
     let isSunlightMode = false;
-    let dataMode = 'mock'; // 'mock' or 'live'
+    let dataSource = 'live'; // デフォルトは本番スプレッドシート連動
+    let showCompleted = false; // 完了済みも含めるか
+    let searchQuery = '';
+    let selectedCategoryFilter = 'all';
+    let currentSortOrder = 'count_desc'; // 'count_desc' or 'name_asc'
+    let expandedProductMap = new Set(); // 展開中の商品名（正規化キー）
 
     // ==========================================
-    // 起動・初期化処理
+    // 4. 生体名正規化エンジン（表記揺れの吸収）
+    // ==========================================
+    function normalizeSpeciesName(name) {
+      if (!name) return "未指定生体";
+      let n = name.trim();
+      // スカシテンジクダイ ⇄ スカシテンジク
+      if (n === "スカシテンジクダイ" || n === "スカシテンジク") return "スカシテンジク";
+      // ネオンテンジクダイ ⇄ ネオンテンジク
+      if (n === "ネオンテンジクダイ" || n === "ネオンテンジク") return "ネオンテンジク";
+      // ヒメシャコ ⇄ ヒメシャコガイ
+      if (n === "ヒメシャコ") return "ヒメシャコガイ";
+      // マンジュウイシモチ
+      if (n === "マンジュウイシモチ" || n === "マンジュウ") return "マンジュウイシモチ";
+      return n;
+    }
+
+    // ==========================================
+    // 5. 初期化ライフサイクル
     // ==========================================
     window.addEventListener('DOMContentLoaded', () => {
-      // 1. 直射日光モードの復元
+      // 1. 直射日光モード復元
       try {
         isSunlightMode = localStorage.getItem(STORAGE_KEY_SUNLIGHT) === 'true';
         if (isSunlightMode) {
           document.body.classList.add('sunlight-mode');
           updateSunlightButtonUI(true);
         }
-      } catch(e) {}
+      } catch (e) {}
 
-      // 2. データモードの復元
+      // 2. データソースモード復元（デフォルト本番live）
       try {
-        dataMode = localStorage.getItem(STORAGE_KEY_DATA_MODE) || 'mock';
-      } catch(e) {}
-      updateDataSourcePill();
+        dataSource = localStorage.getItem(STORAGE_KEY_DATASOURCE) || 'live';
+      } catch (e) {}
+      updateDataSourceUI();
 
-      // 3. 対応済み店舗セットの復元
+      // 3. 完了表示フラグ復元
       try {
-        const rawCompleted = localStorage.getItem(STORAGE_KEY_COMPLETED);
-        if (rawCompleted) {
-          completedStoreSet = new Set(JSON.parse(rawCompleted));
-        }
-      } catch(e) {}
+        showCompleted = localStorage.getItem(STORAGE_KEY_SHOW_COMPLETED) === 'true';
+        updateCompletedFilterUI();
+      } catch (e) {}
 
-      // 4. キャッシュされた注文データの読み込み
-      loadOrdersFromCache();
+      // 4. キャッシュデータ読み込み
+      loadRequestsFromCache();
 
-      // 5. ネットワーク監視
-      setupNetworkWatcher();
+      // 5. ネットワーク監視＆オフライン送信キュー
+      setupNetworkMonitor();
+      updateQueueBanner();
 
-      // 6. UIの初期描画
+      // 6. UI描画
       renderCategoryChips();
       renderAll();
 
@@ -1309,62 +1505,37 @@
       const lastSync = localStorage.getItem(STORAGE_KEY_LAST_SYNC);
       if (lastSync) {
         document.getElementById('last-updated-text').innerText = `最終更新: ${lastSync}`;
-      } else {
-        updateLastSyncTime();
+      }
+
+      // 本番モードかつオンラインなら自動で最新スプレッドシート取得
+      if (dataSource === 'live' && navigator.onLine) {
+        fetchRequests(true);
       }
     });
 
-    // ネットワーク監視（オンライン・オフライン自動検知）
-    function setupNetworkWatcher() {
-      const netDot = document.getElementById('net-dot');
-      const netText = document.getElementById('net-text');
-
-      function updateStatus() {
-        if (navigator.onLine) {
-          netDot.className = 'net-dot';
-          netText.innerText = 'オンライン';
-        } else {
-          netDot.className = 'net-dot offline';
-          netText.innerText = 'オフライン(キャッシュ)';
-          showToast('📡 電波圏外：保存済みデータを維持しています');
-        }
-      }
-
-      window.addEventListener('online', updateStatus);
-      window.addEventListener('offline', updateStatus);
-      updateStatus();
-    }
-
     // ==========================================
-    // データ管理・ローカルストレージ
+    // 6. キャッシュ＆ローカルストレージ管理
     // ==========================================
-    function loadOrdersFromCache() {
+    function loadRequestsFromCache() {
       try {
-        const raw = localStorage.getItem(STORAGE_KEY_ORDERS);
+        const raw = localStorage.getItem(STORAGE_KEY_REQUESTS);
         if (raw) {
-          currentOrders = JSON.parse(raw);
+          requestsData = JSON.parse(raw);
         } else {
-          // 初回はモックデータで初期化
-          currentOrders = JSON.parse(JSON.stringify(DEFAULT_MOCK_ORDERS));
-          saveOrdersToCache();
+          requestsData = JSON.parse(JSON.stringify(DEFAULT_MOCK_REQUESTS));
+          saveRequestsToCache();
         }
-      } catch(e) {
-        currentOrders = JSON.parse(JSON.stringify(DEFAULT_MOCK_ORDERS));
+      } catch (e) {
+        requestsData = JSON.parse(JSON.stringify(DEFAULT_MOCK_REQUESTS));
       }
     }
 
-    function saveOrdersToCache() {
+    function saveRequestsToCache() {
       try {
-        localStorage.setItem(STORAGE_KEY_ORDERS, JSON.stringify(currentOrders));
-      } catch(e) {
-        console.warn('Failed to save orders to localStorage:', e);
+        localStorage.setItem(STORAGE_KEY_REQUESTS, JSON.stringify(requestsData));
+      } catch (e) {
+        console.warn('Failed to save requests to cache:', e);
       }
-    }
-
-    function saveCompletedStores() {
-      try {
-        localStorage.setItem(STORAGE_KEY_COMPLETED, JSON.stringify(Array.from(completedStoreSet)));
-      } catch(e) {}
     }
 
     function updateLastSyncTime() {
@@ -1375,7 +1546,685 @@
     }
 
     // ==========================================
-    // 画面切り替え（商品別 ⇄ 店舗別）
+    // 7. オフライン＆ネットワーク監視ロジック
+    // ==========================================
+    function setupNetworkMonitor() {
+      const netDot = document.getElementById('net-dot');
+      const netText = document.getElementById('net-text');
+
+      function updateStatus() {
+        if (navigator.onLine) {
+          netDot.className = 'net-dot';
+          netText.innerText = 'オンライン';
+          processSyncQueue();
+        } else {
+          netDot.className = 'net-dot offline';
+          netText.innerText = 'オフライン(圏外キャッシュ)';
+          showToast('📡 電波圏外：保存済みキャッシュで作業継続できます');
+        }
+      }
+
+      window.addEventListener('online', updateStatus);
+      window.addEventListener('offline', updateStatus);
+      updateStatus();
+    }
+
+    function getSyncQueue() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY_QUEUE) || '[]');
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function addToSyncQueue(item) {
+      const queue = getSyncQueue();
+      const filtered = queue.filter(q => q.id !== item.id);
+      filtered.push(item);
+      localStorage.setItem(STORAGE_KEY_QUEUE, JSON.stringify(filtered));
+      updateQueueBanner();
+    }
+
+    function updateQueueBanner() {
+      const banner = document.getElementById('offline-queue-banner');
+      const text = document.getElementById('offline-queue-text');
+      const queue = getSyncQueue();
+      if (queue.length > 0) {
+        banner.classList.remove('hidden');
+        text.innerText = `⚠️ 未送信の更新: ${queue.length}件（電波復帰時に自動送信）`;
+      } else {
+        banner.classList.add('hidden');
+      }
+    }
+
+    async function processSyncQueue() {
+      if (!navigator.onLine || dataSource === 'mock') return;
+      const queue = getSyncQueue();
+      if (queue.length === 0) return;
+
+      console.log(`[SyncQueue] 未送信キュー ${queue.length}件を同期開始...`);
+      showToast(`🔄 電波復帰：未送信 ${queue.length}件をGASへ送信中...`);
+
+      const remaining = [];
+      for (const item of queue) {
+        try {
+          const res = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              action: 'updateRequestStatus',
+              id: item.id,
+              requestId: item.requestId,
+              rowNumber: item.rowNumber,
+              status: item.status,
+              updatedAt: item.timestamp
+            })
+          });
+          const result = await res.json();
+          if (result.status !== 'success' && result.status !== 'not_found') {
+            remaining.push(item);
+          }
+        } catch (err) {
+          remaining.push(item);
+        }
+      }
+
+      localStorage.setItem(STORAGE_KEY_QUEUE, JSON.stringify(remaining));
+      updateQueueBanner();
+
+      if (remaining.length === 0) {
+        showToast('✅ 全てのステータス更新をスプレッドシートへ同期完了！');
+      } else {
+        showToast(`一部の送信が保留されました (残り ${remaining.length}件)`);
+      }
+    }
+
+    // ==========================================
+    // 8. データ取得処理（採集リクエストシート連携）
+    // ==========================================
+    async function fetchRequests(silent = false) {
+      const refreshIcon = document.getElementById('refresh-icon');
+      refreshIcon.classList.add('spin');
+
+      if (dataSource === 'mock') {
+        setTimeout(() => {
+          refreshIcon.classList.remove('spin');
+          updateLastSyncTime();
+          renderAll();
+          if (!silent) showToast('モックデータを再読み込みしました', '🧪');
+        }, 400);
+        return;
+      }
+
+      if (!navigator.onLine) {
+        refreshIcon.classList.remove('spin');
+        showToast('📡 電波が圏外です。キャッシュデータを表示しています');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_URL}?action=getSpecimenRequests&timestamp=${Date.now()}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        if (data && data.requests && Array.isArray(data.requests)) {
+          // 未送信キューの状態を保持して上書き防止
+          const queue = getSyncQueue();
+          const queuedMap = new Map(queue.map(q => [q.id, q.status]));
+
+          requestsData = data.requests.map((item, idx) => ({
+            id: item.id || `REQ-${item.requestId || idx}-${idx}`,
+            requestId: item.requestId || '',
+            rowNumber: item.rowNumber || 0,
+            date: item.date || '本日',
+            storeName: item.storeName || item.customerName || '名称未設定店',
+            phone: item.phone ? String(item.phone).replace(/^\*/, '') : '',
+            species: item.species || item.name || '生体',
+            category: item.category || '海水魚',
+            size: item.size || '規格なし',
+            qty: Number(item.qty || item.quantity) || 1,
+            unit: item.unit || '匹',
+            status: queuedMap.has(item.id) ? queuedMap.get(item.id) : (item.status || '新規受付'),
+            notes: item.notes || ''
+          }));
+
+          saveRequestsToCache();
+          updateLastSyncTime();
+          renderCategoryChips();
+          renderAll();
+          if (!silent) showToast(`✅ 採集リクエストシートから${requestsData.length}件を受信しました`);
+        } else {
+          if (!silent) showToast('データ形式が異なります。キャッシュを表示します');
+        }
+      } catch (err) {
+        console.warn('Live fetch error:', err);
+        if (!silent) showToast('⚠️ 取得エラー。保存済みキャッシュを表示中');
+      } finally {
+        refreshIcon.classList.remove('spin');
+      }
+    }
+
+    // ==========================================
+    // 9. ワンタップステータス更新処理（楽観的UI）
+    // ==========================================
+    async function toggleItemStatus(itemId) {
+      const target = requestsData.find(r => r.id === itemId);
+      if (!target) return;
+
+      const prevStatus = target.status;
+      const newStatus = (prevStatus === '採集完了') ? '新規受付' : '採集完了';
+      target.status = newStatus;
+
+      // 1. 【楽観的UI更新】待ち時間0msで即時画面更新
+      saveRequestsToCache();
+      renderAll();
+
+      // 触覚フィードバック（波揺れでも手応えを実感）
+      if (navigator.vibrate) {
+        navigator.vibrate(newStatus === '採集完了' ? [25, 40, 25] : 15);
+      }
+
+      if (newStatus === '採集完了') {
+        showToast(`🐟「${target.species}」を採集完了にしました！`);
+      } else {
+        showToast(`↩️「${target.species}」を未対応に戻しました`);
+      }
+
+      if (dataSource === 'mock') return;
+
+      // 2. GAS Web APIへPOST同期
+      const payload = {
+        id: target.id,
+        requestId: target.requestId,
+        rowNumber: target.rowNumber,
+        species: target.species,
+        status: newStatus,
+        timestamp: new Date().toISOString()
+      };
+
+      if (!navigator.onLine) {
+        addToSyncQueue(payload);
+        return;
+      }
+
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'updateRequestStatus',
+            ...payload
+          })
+        });
+        const result = await res.json();
+        if (result.status !== 'success' && result.status !== 'not_found') {
+          throw new Error(result.message || '更新エラー');
+        }
+      } catch (err) {
+        console.warn('[Sync Failed] オフラインキューに退避:', err);
+        addToSyncQueue(payload);
+      }
+    }
+
+    // 店舗全体の全生体を一括「採集完了」または「未完了に戻す」
+    async function toggleStoreAllStatus(storeName) {
+      const storeItems = requestsData.filter(r => r.storeName === storeName);
+      if (storeItems.length === 0) return;
+
+      const allCompleted = storeItems.every(r => r.status === '採集完了');
+      const targetNewStatus = allCompleted ? '新規受付' : '採集完了';
+
+      storeItems.forEach(it => {
+        it.status = targetNewStatus;
+      });
+
+      saveRequestsToCache();
+      renderAll();
+
+      if (navigator.vibrate) navigator.vibrate(targetNewStatus === '採集完了' ? [30, 50, 30] : 20);
+      showToast(targetNewStatus === '採集完了' ? `🏢「${storeName}」の全生体を採集完了にしました` : `↩️「${storeName}」を未対応に戻しました`);
+
+      if (dataSource === 'mock') return;
+
+      // 各アイテムのステータス更新をPOSTまたはキューに格納
+      storeItems.forEach(it => {
+        const payload = {
+          id: it.id,
+          requestId: it.requestId,
+          rowNumber: it.rowNumber,
+          species: it.species,
+          status: targetNewStatus,
+          timestamp: new Date().toISOString()
+        };
+        if (!navigator.onLine) {
+          addToSyncQueue(payload);
+        } else {
+          fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              action: 'updateRequestStatus',
+              ...payload
+            })
+          }).catch(err => {
+            addToSyncQueue(payload);
+          });
+        }
+      });
+    }
+
+    // ==========================================
+    // 10. 集計ロジック（商品別・店舗別）
+    // ==========================================
+    /**
+     * 商品（魚種）別集計リストの生成
+     */
+    function aggregateProducts() {
+      const map = {};
+
+      const activeItems = requestsData.filter(item => {
+        if (!showCompleted && item.status === '採集完了') return false;
+        return true;
+      });
+
+      activeItems.forEach(item => {
+        const normKey = normalizeSpeciesName(item.species);
+        if (!map[normKey]) {
+          map[normKey] = {
+            name: normKey,
+            originalNames: new Set([item.species]),
+            category: item.category || '海水魚',
+            unit: item.unit || '匹',
+            totalQty: 0,
+            unhandledQty: 0,
+            breakdown: []
+          };
+        } else {
+          map[normKey].originalNames.add(item.species);
+        }
+
+        const isDone = (item.status === '採集完了');
+        map[normKey].totalQty += item.qty;
+        if (!isDone) {
+          map[normKey].unhandledQty += item.qty;
+        }
+
+        map[normKey].breakdown.push({
+          id: item.id,
+          requestId: item.requestId,
+          rowNumber: item.rowNumber,
+          customerName: item.storeName,
+          phone: item.phone,
+          species: item.species,
+          size: item.size,
+          qty: item.qty,
+          unit: item.unit,
+          date: item.date,
+          notes: item.notes,
+          isCompleted: isDone
+        });
+      });
+
+      let list = Object.values(map);
+
+      // カテゴリ絞り込み
+      if (selectedCategoryFilter !== 'all') {
+        list = list.filter(p => p.category === selectedCategoryFilter);
+      }
+
+      // 検索ワード絞り込み
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        list = list.filter(p => {
+          return p.name.toLowerCase().includes(q) ||
+                 Array.from(p.originalNames).some(on => on.toLowerCase().includes(q)) ||
+                 p.category.toLowerCase().includes(q) ||
+                 p.breakdown.some(b => 
+                   b.customerName.toLowerCase().includes(q) ||
+                   b.size.toLowerCase().includes(q) ||
+                   b.species.toLowerCase().includes(q) ||
+                   (b.notes && b.notes.toLowerCase().includes(q))
+                 );
+        });
+      }
+
+      // ソート
+      if (currentSortOrder === 'count_desc') {
+        list.sort((a, b) => (b.unhandledQty - a.unhandledQty) || (b.totalQty - a.totalQty));
+      } else {
+        list.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+      }
+
+      return list;
+    }
+
+    /**
+     * 店舗別リクエスト集計リストの生成
+     */
+    function aggregateStores() {
+      const map = {};
+
+      requestsData.forEach(item => {
+        const sName = item.storeName || '名称未設定店';
+        if (!map[sName]) {
+          map[sName] = {
+            storeName: sName,
+            phone: item.phone,
+            date: item.date,
+            items: []
+          };
+        }
+        if (!map[sName].phone && item.phone) map[sName].phone = item.phone;
+        map[sName].items.push(item);
+      });
+
+      let list = Object.values(map);
+
+      // 店舗ごとの完了判定
+      list.forEach(store => {
+        store.totalQty = store.items.reduce((sum, it) => sum + it.qty, 0);
+        store.unhandledQty = store.items.filter(it => it.status !== '採集完了').reduce((sum, it) => sum + it.qty, 0);
+        store.isAllCompleted = (store.unhandledQty === 0 && store.items.length > 0);
+      });
+
+      // 完了済みフィルタ
+      if (!showCompleted) {
+        list = list.filter(s => !s.isAllCompleted);
+      }
+
+      // カテゴリ絞り込み
+      if (selectedCategoryFilter !== 'all') {
+        list = list.filter(s => s.items.some(it => it.category === selectedCategoryFilter));
+      }
+
+      // 検索ワード絞り込み
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        list = list.filter(s => {
+          return s.storeName.toLowerCase().includes(q) ||
+                 (s.phone && s.phone.includes(q)) ||
+                 s.items.some(it => 
+                   it.species.toLowerCase().includes(q) ||
+                   it.size.toLowerCase().includes(q) ||
+                   (it.notes && it.notes.toLowerCase().includes(q))
+                 );
+        });
+      }
+
+      // 未対応匹数が多い店舗順にソート
+      list.sort((a, b) => (b.unhandledQty - a.unhandledQty) || (b.totalQty - a.totalQty));
+
+      return list;
+    }
+
+    // ==========================================
+    // 11. 描画：商品（魚種）別集計ビュー
+    // ==========================================
+    function renderProductView() {
+      const container = document.getElementById('product-list-container');
+      const products = aggregateProducts();
+
+      document.getElementById('badge-product-count').innerText = products.length;
+
+      if (products.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">🐟</div>
+            <div class="empty-state-title">該当する生体リクエストがありません</div>
+            <div style="font-size:0.85rem;">検索条件を変更するか、右上の更新ボタンを押してください。</div>
+          </div>
+        `;
+        return;
+      }
+
+      let html = '';
+      products.forEach(p => {
+        const isExpanded = expandedProductMap.has(p.name);
+        const unhandledStoreCount = p.breakdown.filter(b => !b.isCompleted).length;
+        const totalStoreCount = p.breakdown.length;
+        const isAllDone = (p.unhandledQty === 0 && p.totalQty > 0);
+
+        // 表記揺れ（別名）注記
+        const otherNames = Array.from(p.originalNames).filter(on => on !== p.name);
+        const nameNote = otherNames.length > 0 ? `(${otherNames.join(', ')}含む)` : '';
+
+        html += `
+          <div class="product-group-card ${isExpanded ? 'expanded' : ''} ${isAllDone ? 'completed' : ''}" id="prod-card-${encodeURIComponent(p.name)}">
+            <div class="product-card-header" onclick="toggleProductExpand('${escapeJs(p.name)}')">
+              <div class="prod-main-info">
+                <span class="prod-category-tag">${escapeHtml(p.category)}</span>
+                <div class="prod-name">
+                  ${escapeHtml(p.name)}
+                  ${nameNote ? `<span style="font-size:0.8rem; font-weight:normal; color:var(--text-sub); margin-left:4px;">${escapeHtml(nameNote)}</span>` : ''}
+                </div>
+                <div class="prod-sub-meta">
+                  <span>🏢 依頼店舗: <strong>${totalStoreCount}店</strong></span>
+                  ${unhandledStoreCount > 0 
+                    ? `<span style="color:var(--accent);">⏳ 未対応: <strong>${unhandledStoreCount}店</strong></span>`
+                    : `<span style="color:var(--success);">✅ 全て完了</span>`
+                  }
+                </div>
+              </div>
+              <div class="prod-total-badge">
+                <div class="prod-total-count">
+                  ${p.unhandledQty}
+                  <span class="prod-total-unit">${escapeHtml(p.unit)}</span>
+                </div>
+                ${p.totalQty !== p.unhandledQty ? `<span style="font-size:0.72rem; color:var(--text-sub); margin-top:2px;">全計 ${p.totalQty}${escapeHtml(p.unit)}</span>` : ''}
+                <span class="expand-chevron">▼</span>
+              </div>
+            </div>
+
+            <!-- 店舗内訳アコーディオン展開 -->
+            <div class="product-breakdown-drawer">
+              <div class="breakdown-header-title">📋 注文元店舗の内訳（ワンタップで採集完了更新）:</div>
+              ${p.breakdown.map(b => `
+                <div class="breakdown-store-row ${b.isCompleted ? 'completed' : ''}">
+                  <div class="breakdown-store-info">
+                    <div class="breakdown-store-name">
+                      <span>${b.isCompleted ? '✅' : '🏢'}</span>
+                      <span>${escapeHtml(b.customerName)}</span>
+                      ${b.species !== p.name ? `<span style="font-size:0.75rem; color:var(--text-sub);">[${escapeHtml(b.species)}]</span>` : ''}
+                    </div>
+                    <div class="breakdown-store-meta">
+                      ${b.phone ? `<span>📞 ${escapeHtml(b.phone)}</span>` : ''}
+                      <span>📏 規格: <strong>${escapeHtml(b.size)}</strong></span>
+                      <span>⏱ ${escapeHtml(b.date)}</span>
+                    </div>
+                    ${b.notes ? `<div style="font-size:0.75rem; color:var(--accent); font-weight:800; margin-top:2px;">💬 ${escapeHtml(b.notes)}</div>` : ''}
+                  </div>
+                  <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px; shrink:0;">
+                    <div style="font-size:1.1rem; font-weight:900; color:${b.isCompleted ? 'var(--text-sub)' : 'var(--primary)'};">
+                      ${b.qty} <span style="font-size:0.75rem;">${escapeHtml(b.unit)}</span>
+                    </div>
+                    <button type="button" class="btn-item-toggle ${b.isCompleted ? 'done' : ''}" onclick="toggleItemStatus('${escapeJs(b.id)}')">
+                      ${b.isCompleted ? '✓ 完了済' : '採集完了'}
+                    </button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function toggleProductExpand(normName) {
+      if (expandedProductMap.has(normName)) {
+        expandedProductMap.delete(normName);
+      } else {
+        expandedProductMap.add(normName);
+      }
+      renderProductView();
+      if (navigator.vibrate) navigator.vibrate(10);
+    }
+
+    // ==========================================
+    // 12. 描画：店舗別リクエストビュー
+    // ==========================================
+    function renderStoreView() {
+      const container = document.getElementById('store-list-container');
+      const stores = aggregateStores();
+
+      document.getElementById('badge-store-count').innerText = stores.length;
+
+      if (stores.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">🏢</div>
+            <div class="empty-state-title">該当する店舗リクエストがありません</div>
+            <div style="font-size:0.85rem;">検索条件を変更するか、右上の更新ボタンを押してください。</div>
+          </div>
+        `;
+        return;
+      }
+
+      let html = '';
+      stores.forEach(s => {
+        const isDone = s.isAllCompleted;
+
+        html += `
+          <div class="store-order-card ${isDone ? 'completed' : ''}">
+            <div class="store-header-row">
+              <div style="flex:1; min-width:0;">
+                <div class="store-main-title">
+                  <span>${isDone ? '✅' : '🏢'}</span>
+                  <span>${escapeHtml(s.storeName)}</span>
+                </div>
+                <div class="store-meta-line">
+                  ${s.phone ? `<a href="tel:${escapeHtml(s.phone)}" class="store-phone-link">📞 ${escapeHtml(s.phone)}</a>` : ''}
+                  <span>⏱ ${escapeHtml(s.date || '本日')}</span>
+                  <span>📦 計 ${s.items.length}品目 (${s.totalQty}匹)</span>
+                </div>
+              </div>
+
+              <!-- 店舗単位の一括採集完了トグル -->
+              <button type="button" class="store-complete-toggle-btn ${isDone ? 'done' : ''}" onclick="toggleStoreAllStatus('${escapeJs(s.storeName)}')">
+                ${isDone ? '✓ 全て完了済' : '○ 店舗全件完了'}
+              </button>
+            </div>
+
+            <!-- リクエスト魚種リスト -->
+            <div class="store-items-table">
+              ${s.items.map(it => {
+                const itDone = (it.status === '採集完了');
+                return `
+                  <div class="store-item-row ${itDone ? 'completed' : ''}">
+                    <div style="flex:1; min-width:0;">
+                      <div class="store-item-name">
+                        <span style="font-size:0.75rem; background:rgba(56,189,248,0.15); color:var(--primary); padding:1px 6px; border-radius:4px; margin-right:4px;">${escapeHtml(it.category)}</span>
+                        ${escapeHtml(it.species)}
+                      </div>
+                      <div style="font-size:0.75rem; color:var(--text-sub); font-weight:700; margin-top:2px;">
+                        規格: <strong>${escapeHtml(it.size)}</strong>
+                        ${it.notes ? ` / 💬 ${escapeHtml(it.notes)}` : ''}
+                      </div>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px; shrink:0;">
+                      <div class="store-item-qty">
+                        ${it.qty} <span style="font-size:0.75rem;">${escapeHtml(it.unit)}</span>
+                      </div>
+                      <button type="button" class="btn-item-toggle ${itDone ? 'done' : ''}" style="padding:6px 10px; font-size:0.75rem; min-height:36px;" onclick="toggleItemStatus('${escapeJs(it.id)}')">
+                        ${itDone ? '✓ 済' : '完了'}
+                      </button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    // ==========================================
+    // 13. サマリーメトリクス計算
+    // ==========================================
+    function updateMetrics() {
+      let unhandledQty = 0;
+      const unhandledSpeciesSet = new Set();
+      const unhandledStoresSet = new Set();
+
+      requestsData.forEach(r => {
+        if (r.status !== '採集完了') {
+          unhandledStoresSet.add(r.storeName);
+          unhandledQty += r.qty;
+          unhandledSpeciesSet.add(normalizeSpeciesName(r.species));
+        }
+      });
+
+      document.getElementById('metric-unhandled-products').innerHTML = `${unhandledSpeciesSet.size}<span class="metric-unit">品</span>`;
+      document.getElementById('metric-unhandled-qty').innerHTML = `${unhandledQty}<span class="metric-unit">匹</span>`;
+      document.getElementById('metric-unhandled-stores').innerHTML = `${unhandledStoresSet.size}<span class="metric-unit">店</span>`;
+    }
+
+    // ==========================================
+    // 14. フィルターチップス描画
+    // ==========================================
+    function renderCategoryChips() {
+      const container = document.getElementById('category-chips-container');
+      const cats = new Set();
+      requestsData.forEach(r => {
+        if (r.category) cats.add(r.category);
+      });
+      const list = ['all', ...Array.from(cats)];
+
+      container.innerHTML = list.map(c => `
+        <button type="button" class="chip-btn ${selectedCategoryFilter === c ? 'active' : ''}" onclick="setCategoryFilter('${escapeJs(c)}')">
+          ${c === 'all' ? '全カテゴリ' : escapeHtml(c)}
+        </button>
+      `).join('');
+    }
+
+    function setCategoryFilter(c) {
+      selectedCategoryFilter = c;
+      renderCategoryChips();
+      renderAll();
+      if (navigator.vibrate) navigator.vibrate(10);
+    }
+
+    function toggleSortOrder() {
+      currentSortOrder = (currentSortOrder === 'count_desc') ? 'name_asc' : 'count_desc';
+      const label = document.getElementById('sort-label');
+      const icon = document.getElementById('sort-icon');
+      if (currentSortOrder === 'count_desc') {
+        label.innerText = '多い順';
+        icon.innerText = '⬇';
+      } else {
+        label.innerText = '名前順';
+        icon.innerText = '🔤';
+      }
+      renderProductView();
+      if (navigator.vibrate) navigator.vibrate(10);
+    }
+
+    function toggleCompletedFilter() {
+      showCompleted = !showCompleted;
+      localStorage.setItem(STORAGE_KEY_SHOW_COMPLETED, String(showCompleted));
+      updateCompletedFilterUI();
+      renderAll();
+      if (navigator.vibrate) navigator.vibrate(15);
+      showToast(showCompleted ? '👁️ 完了済みも含めて表示中' : '🙈 完了済みを非表示にしました');
+    }
+
+    function updateCompletedFilterUI() {
+      const btn = document.getElementById('completed-toggle-btn');
+      const label = document.getElementById('completed-filter-label');
+      if (showCompleted) {
+        btn.classList.add('active');
+        label.innerText = '完了も表示中';
+      } else {
+        btn.classList.remove('active');
+        label.innerText = '未完了のみ';
+      }
+    }
+
+    // ==========================================
+    // 15. 画面切り替え（商品別 ⇄ 店舗別）
     // ==========================================
     function switchView(viewName) {
       currentView = viewName;
@@ -1392,16 +2241,12 @@
       document.getElementById('view-product').style.display = (viewName === 'product') ? 'block' : 'none';
       document.getElementById('view-store').style.display = (viewName === 'store') ? 'block' : 'none';
 
-      // フィルタチップの更新
-      renderCategoryChips();
       renderAll();
-
-      // 触覚フィードバック（バイブレーション対応端末）
       if (navigator.vibrate) navigator.vibrate(15);
     }
 
     // ==========================================
-    // 屋外・直射日光モード切り替え
+    // 16. 屋外・直射日光モード切り替え
     // ==========================================
     function toggleSunlightMode() {
       isSunlightMode = !isSunlightMode;
@@ -1428,385 +2273,63 @@
     }
 
     // ==========================================
-    // 集計ロジック（商品別）
-    // ==========================================
-    function aggregateProducts() {
-      const map = {};
-
-      currentOrders.forEach(order => {
-        const isStoreCompleted = completedStoreSet.has(order.customerName);
-
-        order.items.forEach(item => {
-          const key = item.name;
-          if (!map[key]) {
-            map[key] = {
-              name: item.name,
-              category: item.category || 'その他',
-              unit: item.unit || '個',
-              totalQty: 0,
-              unhandledQty: 0,
-              breakdown: [] // { customerName, phone, qty, orderId, isCompleted }
-            };
-          }
-
-          map[key].totalQty += item.qty;
-          if (!isStoreCompleted) {
-            map[key].unhandledQty += item.qty;
-          }
-
-          map[key].breakdown.push({
-            customerName: order.customerName,
-            phone: order.phone,
-            qty: item.qty,
-            unit: item.unit || '個',
-            orderId: order.orderId,
-            isCompleted: isStoreCompleted
-          });
-        });
-      });
-
-      let list = Object.values(map);
-
-      // カテゴリ絞り込み
-      if (selectedCategoryFilter !== 'all') {
-        list = list.filter(p => p.category === selectedCategoryFilter);
-      }
-
-      // 検索ワード絞り込み
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        list = list.filter(p => {
-          return p.name.toLowerCase().includes(q) ||
-                 p.category.toLowerCase().includes(q) ||
-                 p.breakdown.some(b => b.customerName.toLowerCase().includes(q));
-        });
-      }
-
-      // ソート
-      if (currentSortOrder === 'count_desc') {
-        list.sort((a, b) => b.unhandledQty - a.unhandledQty || b.totalQty - a.totalQty);
-      } else {
-        list.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
-      }
-
-      return list;
-    }
-
-    // ==========================================
-    // 描画：商品別集計
-    // ==========================================
-    function renderProductView() {
-      const container = document.getElementById('product-list-container');
-      const products = aggregateProducts();
-
-      // バッジの更新
-      document.getElementById('badge-product-count').innerText = products.length;
-
-      if (products.length === 0) {
-        container.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-state-icon">🐟</div>
-            <div class="empty-state-title">該当する商品がありません</div>
-            <div style="font-size:0.85rem;">検索条件を変更するか、右上の更新を押してください。</div>
-          </div>
-        `;
-        return;
-      }
-
-      let html = '';
-      products.forEach(p => {
-        const isExpanded = expandedProductMap.has(p.name);
-        const unhandledStoreCount = p.breakdown.filter(b => !b.isCompleted).length;
-        const totalStoreCount = p.breakdown.length;
-
-        html += `
-          <div class="product-group-card ${isExpanded ? 'expanded' : ''}" id="prod-card-${encodeURIComponent(p.name)}">
-            <div class="product-card-header" onclick="toggleProductExpand('${escapeJs(p.name)}')">
-              <div class="prod-main-info">
-                <span class="prod-category-tag">${escapeHtml(p.category)}</span>
-                <div class="prod-name">${escapeHtml(p.name)}</div>
-                <div class="prod-sub-meta">
-                  <span>🏢 注文店舗: <strong>${totalStoreCount}店</strong></span>
-                  ${unhandledStoreCount > 0 
-                    ? `<span style="color:var(--accent);">⏳ 未対応: <strong>${unhandledStoreCount}店</strong></span>`
-                    : `<span style="color:var(--success);">✅ 全て完了</span>`
-                  }
-                </div>
-              </div>
-              <div class="prod-total-badge">
-                <div class="prod-total-count">
-                  ${p.unhandledQty}
-                  <span class="prod-total-unit">${escapeHtml(p.unit)}</span>
-                </div>
-                ${p.totalQty !== p.unhandledQty ? `<span style="font-size:0.72rem; color:var(--text-sub);">全計 ${p.totalQty}${escapeHtml(p.unit)}</span>` : ''}
-                <span class="expand-chevron">▼</span>
-              </div>
-            </div>
-
-            <!-- 店舗内訳アコーディオン -->
-            <div class="product-breakdown-drawer">
-              <div class="breakdown-header-title">📋 注文元店舗の内訳（タップで個別完了切替）:</div>
-              ${p.breakdown.map(b => `
-                <div class="breakdown-store-row ${b.isCompleted ? 'completed' : ''}">
-                  <div class="breakdown-store-name">
-                    <span>${b.isCompleted ? '✅' : '🏢'}</span>
-                    <span>${escapeHtml(b.customerName)}</span>
-                  </div>
-                  <div style="display:flex; align-items:center; gap:8px;">
-                    <span class="breakdown-store-qty">${b.qty} <small style="font-size:0.75rem;">${escapeHtml(b.unit)}</small></span>
-                    <button type="button" class="btn-quick-toggle ${b.isCompleted ? 'done' : ''}" onclick="toggleStoreComplete('${escapeJs(b.customerName)}')">
-                      ${b.isCompleted ? '対応済み' : '完了にする'}
-                    </button>
-                  </div>
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        `;
-      });
-
-      container.innerHTML = html;
-    }
-
-    function toggleProductExpand(productName) {
-      if (expandedProductMap.has(productName)) {
-        expandedProductMap.delete(productName);
-      } else {
-        expandedProductMap.add(productName);
-      }
-      renderProductView();
-      if (navigator.vibrate) navigator.vibrate(10);
-    }
-
-    // ==========================================
-    // 描画：店舗別集計
-    // ==========================================
-    function renderStoreView() {
-      const container = document.getElementById('store-list-container');
-      let stores = currentOrders.slice();
-
-      // 検索絞り込み
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        stores = stores.filter(s => {
-          return s.customerName.toLowerCase().includes(q) ||
-                 (s.phone && s.phone.includes(q)) ||
-                 s.items.some(item => item.name.toLowerCase().includes(q));
-        });
-      }
-
-      // 未対応／完了絞り込み
-      if (currentStoreFilter === 'uncompleted') {
-        stores = stores.filter(s => !completedStoreSet.has(s.customerName));
-      } else if (currentStoreFilter === 'completed') {
-        stores = stores.filter(s => completedStoreSet.has(s.customerName));
-      }
-
-      // バッジの更新
-      document.getElementById('badge-store-count').innerText = stores.length;
-
-      if (stores.length === 0) {
-        container.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-state-icon">🏢</div>
-            <div class="empty-state-title">該当する店舗がありません</div>
-            <div style="font-size:0.85rem;">検索条件やフィルタを変更してください。</div>
-          </div>
-        `;
-        return;
-      }
-
-      let html = '';
-      stores.forEach(s => {
-        const isDone = completedStoreSet.has(s.customerName);
-        const totalItemsCount = s.items.reduce((sum, i) => sum + i.qty, 0);
-
-        html += `
-          <div class="store-order-card ${isDone ? 'completed' : ''}" id="store-card-${encodeURIComponent(s.customerName)}">
-            <div class="store-card-top">
-              <div class="store-info-box">
-                <div class="store-name-title">
-                  <span>${isDone ? '✅' : '🏢'}</span>
-                  <span>${escapeHtml(s.customerName)}</span>
-                </div>
-                <div class="store-meta-line">
-                  ${s.phone ? `<a href="tel:${escapeHtml(s.phone)}" class="phone-link">📞 ${escapeHtml(s.phone)}</a>` : ''}
-                  <span>⏱ ${escapeHtml(s.orderDate || '本日')}</span>
-                  <span>計 <strong>${s.items.length}品 (${totalItemsCount}個)</strong></span>
-                </div>
-              </div>
-
-              <!-- 対応済みトグルボタン -->
-              <button type="button" class="store-complete-toggle-btn ${isDone ? 'done' : ''}" onclick="toggleStoreComplete('${escapeJs(s.customerName)}')">
-                <span>${isDone ? '✓ 対応済み' : '○ 完了にする'}</span>
-              </button>
-            </div>
-
-            <!-- 商品明細リスト -->
-            <div class="store-items-table">
-              ${s.items.map(item => `
-                <div class="store-item-row">
-                  <div class="store-item-name">
-                    <span style="font-size:0.75rem; color:var(--text-sub); margin-right:4px;">[${escapeHtml(item.category || '生体')}]</span>
-                    ${escapeHtml(item.name)}
-                  </div>
-                  <div class="store-item-qty">${item.qty} <small style="font-size:0.75rem;">${escapeHtml(item.unit || '個')}</small></div>
-                </div>
-              `).join('')}
-            </div>
-
-            <!-- 備考・受取不可日 -->
-            ${s.ngDates && s.ngDates !== 'なし' ? `<div class="store-note-badge">⚠️ 受取不可日: ${escapeHtml(s.ngDates)}</div>` : ''}
-            ${s.notes ? `<div class="store-note-badge" style="background:rgba(56,189,248,0.12); border-color:var(--primary); color:var(--primary);">💬 備考: ${escapeHtml(s.notes)}</div>` : ''}
-          </div>
-        `;
-      });
-
-      container.innerHTML = html;
-    }
-
-    // ==========================================
-    // 店舗の「対応済み」トグル処理
-    // ==========================================
-    function toggleStoreComplete(storeName) {
-      if (completedStoreSet.has(storeName)) {
-        completedStoreSet.delete(storeName);
-        showToast(`↩️ 「${storeName}」を未対応に戻しました`);
-      } else {
-        completedStoreSet.add(storeName);
-        showToast(`✅ 「${storeName}」を対応済みにしました`);
-      }
-      saveCompletedStores();
-      renderAll();
-      if (navigator.vibrate) navigator.vibrate(25);
-    }
-
-    // ==========================================
-    // サマリー数値の再計算
-    // ==========================================
-    function updateMetrics() {
-      let unhandledProductsCount = 0;
-      let unhandledQtyCount = 0;
-      const unhandledStoreSet = new Set();
-
-      currentOrders.forEach(o => {
-        const isDone = completedStoreSet.has(o.customerName);
-        if (!isDone) {
-          unhandledStoreSet.add(o.customerName);
-          o.items.forEach(i => {
-            unhandledQtyCount += i.qty;
-          });
-        }
-      });
-
-      // 未対応の商品種別数
-      const productMap = {};
-      currentOrders.forEach(o => {
-        if (!completedStoreSet.has(o.customerName)) {
-          o.items.forEach(i => {
-            productMap[i.name] = (productMap[i.name] || 0) + i.qty;
-          });
-        }
-      });
-      unhandledProductsCount = Object.keys(productMap).length;
-
-      document.getElementById('metric-unhandled-products').innerHTML = `${unhandledProductsCount}<span class="metric-unit">品</span>`;
-      document.getElementById('metric-unhandled-qty').innerHTML = `${unhandledQtyCount}<span class="metric-unit">個</span>`;
-      document.getElementById('metric-unhandled-stores').innerHTML = `${unhandledStoreSet.size}<span class="metric-unit">店</span>`;
-    }
-
-    // ==========================================
-    // フィルタチップのレンダリング
-    // ==========================================
-    function renderCategoryChips() {
-      const container = document.getElementById('filter-chips-container');
-      if (currentView === 'product') {
-        // 全カテゴリの抽出
-        const cats = new Set();
-        currentOrders.forEach(o => o.items.forEach(i => { if (i.category) cats.add(i.category); }));
-        const catList = ['all', ...Array.from(cats)];
-
-        container.innerHTML = `
-          ${catList.map(cat => `
-            <button type="button" class="chip-btn ${selectedCategoryFilter === cat ? 'active' : ''}" onclick="setCategoryFilter('${escapeJs(cat)}')">
-              ${cat === 'all' ? '全カテゴリ' : escapeHtml(cat)}
-            </button>
-          `).join('')}
-          <button type="button" class="chip-btn sort-toggle-btn" onclick="toggleSortOrder()">
-            ${currentSortOrder === 'count_desc' ? '⬇ 多い順' : '🔤 名前順'}
-          </button>
-        `;
-      } else {
-        // 店舗フィルタ
-        container.innerHTML = `
-          <button type="button" class="chip-btn ${currentStoreFilter === 'all' ? 'active' : ''}" onclick="setStoreFilter('all')">
-            すべて (${currentOrders.length})
-          </button>
-          <button type="button" class="chip-btn ${currentStoreFilter === 'uncompleted' ? 'active' : ''}" onclick="setStoreFilter('uncompleted')">
-            ⏳ 未対応のみ (${currentOrders.filter(o => !completedStoreSet.has(o.customerName)).length})
-          </button>
-          <button type="button" class="chip-btn ${currentStoreFilter === 'completed' ? 'active' : ''}" onclick="setStoreFilter('completed')">
-            ✅ 完了 (${currentOrders.filter(o => completedStoreSet.has(o.customerName)).length})
-          </button>
-          <button type="button" class="chip-btn sort-toggle-btn" onclick="resetAllCompleted()">
-            🔄 完了リセット
-          </button>
-        `;
-      }
-    }
-
-    function setCategoryFilter(cat) {
-      selectedCategoryFilter = cat;
-      renderCategoryChips();
-      renderProductView();
-      if (navigator.vibrate) navigator.vibrate(10);
-    }
-
-    function toggleSortOrder() {
-      currentSortOrder = (currentSortOrder === 'count_desc') ? 'name_asc' : 'count_desc';
-      renderCategoryChips();
-      renderProductView();
-      if (navigator.vibrate) navigator.vibrate(10);
-    }
-
-    function setStoreFilter(flt) {
-      currentStoreFilter = flt;
-      renderCategoryChips();
-      renderStoreView();
-      if (navigator.vibrate) navigator.vibrate(10);
-    }
-
-    function resetAllCompleted() {
-      if (confirm('すべての店舗の対応状況を「未対応」にリセットしますか？')) {
-        completedStoreSet.clear();
-        saveCompletedStores();
-        renderAll();
-        showToast('全ての完了チェックをリセットしました');
-      }
-    }
-
-    // ==========================================
-    // 検索入力制御
+    // 17. 検索入力ハンドラ
     // ==========================================
     function handleSearchInput() {
-      const box = document.getElementById('search-box');
+      const input = document.getElementById('search-input');
       const clearBtn = document.getElementById('search-clear-btn');
-      searchQuery = box.value.trim();
+      searchQuery = input.value.trim();
       clearBtn.classList.toggle('visible', searchQuery.length > 0);
       renderAll();
     }
 
     function clearSearch() {
-      const box = document.getElementById('search-box');
-      box.value = '';
+      const input = document.getElementById('search-input');
+      input.value = '';
       searchQuery = '';
       document.getElementById('search-clear-btn').classList.remove('visible');
       renderAll();
-      box.focus();
+      input.focus();
     }
 
     // ==========================================
-    // 全体再描画
+    // 18. データソース切り替え（モック ⇄ 本番GAS）
+    // ==========================================
+    function toggleDataSourceModal() {
+      if (dataSource === 'mock') {
+        if (confirm('【データソースの切り替え】\n現在「動作確認用モックデータ」を表示しています。\n本番のGoogleスプレッドシート（採集リクエストシート）と接続しますか？')) {
+          dataSource = 'live';
+          localStorage.setItem(STORAGE_KEY_DATASOURCE, 'live');
+          updateDataSourceUI();
+          fetchRequests(false);
+        }
+      } else {
+        if (confirm('【データソースの切り替え】\n本番接続から「動作確認用モックデータ」に戻しますか？')) {
+          dataSource = 'mock';
+          localStorage.setItem(STORAGE_KEY_DATASOURCE, 'mock');
+          requestsData = JSON.parse(JSON.stringify(DEFAULT_MOCK_REQUESTS));
+          saveRequestsToCache();
+          updateDataSourceUI();
+          renderCategoryChips();
+          renderAll();
+          showToast('モックデータモードに切り替えました');
+        }
+      }
+    }
+
+    function updateDataSourceUI() {
+      const pill = document.getElementById('data-source-pill');
+      if (dataSource === 'live') {
+        pill.innerText = '🌐 本番シート連動中';
+        pill.style.color = 'var(--success)';
+      } else {
+        pill.innerText = '🧪 モックデータ中';
+        pill.style.color = 'var(--accent)';
+      }
+    }
+
+    // ==========================================
+    // 19. 全件再描画
     // ==========================================
     function renderAll() {
       updateMetrics();
@@ -1817,111 +2340,20 @@
       }
     }
 
-    // ==========================================
-    // データ更新・通信処理
-    // ==========================================
-    async function refreshData() {
-      const refreshIcon = document.getElementById('refresh-icon');
-      refreshIcon.classList.add('spin');
-
-      if (!navigator.onLine) {
-        setTimeout(() => {
-          refreshIcon.classList.remove('spin');
-          showToast('📡 オフラインです。保存済みキャッシュを表示中');
-        }, 500);
-        return;
-      }
-
-      if (dataMode === 'mock') {
-        // モックモードのシミュレーション更新
-        setTimeout(() => {
-          refreshIcon.classList.remove('spin');
-          updateLastSyncTime();
-          renderAll();
-          showToast('🔄 最新データを同期しました（モック）');
-        }, 600);
-        return;
-      }
-
-      // 本番GAS APIからの取得
-      try {
-        const res = await fetch(`${LIVE_GAS_API_URL}?action=getPickingList&showAll=0`, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data = await res.json();
-
-        if (data && data.orders && data.orders.length > 0) {
-          // GASのピッキング注文データをアプリ形式に変換
-          const converted = data.orders.map(o => ({
-            orderId: o.orderId,
-            customerName: o.customerName || '名称未設定店',
-            phone: o.phone || '',
-            orderDate: o.orderDate || '',
-            ngDates: o.ngDates || 'なし',
-            notes: o.notes || '',
-            items: (o.items || []).map(i => ({
-              name: i.name,
-              category: i.category || '生体',
-              qty: Number(i.qty) || 1,
-              unit: '匹'
-            }))
-          }));
-
-          currentOrders = converted;
-          saveOrdersToCache();
-          updateLastSyncTime();
-          renderAll();
-          showToast(`✅ 本番スプレッドシートから${converted.length}件の注文を受信しました`);
-        } else {
-          showToast('本番未発送注文は現在0件です');
-        }
-      } catch (err) {
-        console.warn('Live fetch error:', err);
-        showToast('⚠️ 本番同期に失敗。キャッシュデータを維持します');
-      } finally {
-        refreshIcon.classList.remove('spin');
-      }
-    }
-
-    // データソース切り替え（モック ⇄ 本番GAS）
-    function toggleDataSourceModal() {
-      if (dataMode === 'mock') {
-        if (confirm('【データソースの切り替え】\n現在「動作確認用モックデータ」を表示しています。\n本番のGoogleスプレッドシート（未発送注文）と接続しますか？')) {
-          dataMode = 'live';
-          localStorage.setItem(STORAGE_KEY_DATA_MODE, 'live');
-          updateDataSourcePill();
-          refreshData();
-        }
-      } else {
-        if (confirm('【データソースの切り替え】\n本番接続から「動作確認用モックデータ」に戻しますか？')) {
-          dataMode = 'mock';
-          localStorage.setItem(STORAGE_KEY_DATA_MODE, 'mock');
-          currentOrders = JSON.parse(JSON.stringify(DEFAULT_MOCK_ORDERS));
-          saveOrdersToCache();
-          updateDataSourcePill();
-          renderAll();
-          showToast('モックデータモードに切り替えました');
-        }
-      }
-    }
-
-    function updateDataSourcePill() {
-      const pill = document.getElementById('data-source-pill');
-      if (dataMode === 'live') {
-        pill.innerText = '🌐 本番GAS連動中';
-        pill.style.color = 'var(--success)';
-      } else {
-        pill.innerText = '🧪 モックデータ中';
-        pill.style.color = 'var(--accent)';
+    function resetAllStatusForTest() {
+      if (confirm('すべてのリクエストのステータスを「新規受付（未完了）」にリセットしますか？')) {
+        requestsData.forEach(r => {
+          r.status = '新規受付';
+        });
+        saveRequestsToCache();
+        renderAll();
+        showToast('全てのステータスを未対応にリセットしました');
       }
     }
 
     // ==========================================
-    // ユーティリティ
+    // 20. ユーティリティ
     // ==========================================
-    function scrollToTop() {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
     let toastTimer = null;
     function showToast(msg) {
       const el = document.getElementById('toast-msg');
@@ -1930,7 +2362,7 @@
       if (toastTimer) clearTimeout(toastTimer);
       toastTimer = setTimeout(() => {
         el.classList.remove('show');
-      }, 2600);
+      }, 2500);
     }
 
     function escapeHtml(str) {
