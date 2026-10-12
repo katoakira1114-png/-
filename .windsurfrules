@@ -1,0 +1,5 @@
+# Windsurf AI Rules
+# Mirrors .cursorrules and AI_COLLABORATION_GUIDELINES.md
+# Follow additive development (never delete or rollback unfamiliar functions).
+# Update @lastModified, @modifiedBy, @note in file headers and SYSTEM_META in 無題.js.
+# Protect appsscript.json scopes and spreadsheet column index mappings.

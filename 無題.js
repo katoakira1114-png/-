@@ -1,3 +1,26 @@
+/**
+ * @fileoverview 川畑水産 Web受注・出荷・採集・在庫管理システム GASバックエンド
+ * @version 2.4.0
+ * @lastModified 2026-10-12 20:15:00 JST
+ * @modifiedBy Antigravity AI (Pair Programming)
+ * @note 共同開発規範準拠・SYSTEM_META定数導入・採集リクエストAPI連携
+ */
+
+// =============================================================================
+// 【システムメタデータ・共同開発変更追跡定数】
+// ※AIおよび開発者がコードを修正した際は、必ず以下のLAST_UPDATED、LAST_MODIFIED_BY、
+//   CHANGE_SUMMARYを最新情報に更新してください。
+// =============================================================================
+var SYSTEM_META = {
+  PROJECT_NAME: "川畑水産 Web受注・出荷・採集管理システム",
+  VERSION: "2.4.0",
+  LAST_UPDATED: "2026-10-12 20:15:00 JST",
+  LAST_MODIFIED_BY: "Antigravity AI (katoakira1114 / kawabatasuisanyaeyama)",
+  CHANGE_SUMMARY: "共同開発規範の導入（追記型開発・SYSTEM_METAメタデータ追跡システムの標準化）",
+  ENVIRONMENT: "production",
+  SPREADSHEET_ID: "1ZiNel8TGJ-e7JMolkRagVOSnr1UczvQzpTa-F-s4p3o"
+};
+
 var SPREADSHEET_ID = "1ZiNel8TGJ-e7JMolkRagVOSnr1UczvQzpTa-F-s4p3o";
 var PDF_FOLDER_NAME = "川畑水産_納品書PDF";
 var EDIT_FOLDER_NAME = "川畑水産_納品書(編集用)";
@@ -364,6 +387,14 @@ function doGet(e) {
       } catch (syncErr) {
         console.warn("Schema maintenance warning: " + syncErr);
       }
+    }
+
+    // 【システムメタデータ・稼働情報取得API】バージョン・変更履歴・開発者確認用
+    if (action === "getSystemMeta" || action === "meta" || action === "health") {
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        meta: SYSTEM_META
+      })).setMimeType(ContentService.MimeType.JSON);
     }
 
     // 【診断API】顧客マスタと申請シートの登録状況確認用
