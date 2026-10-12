@@ -1,0 +1,1952 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>船上・洋上注文集計ボード - 川畑水産</title>
+  <meta name="description" content="船上・屋外の直射日光下でも素早く注文・リクエスト状況を把握できる片手操作対応Webアプリ">
+  <style>
+    /* ========================================================
+       カラーパレット・テーマ変数
+       ※標準モードと直射日光・屋外ハイコントラストモードの2系統
+       ======================================================== */
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-card: #243247;
+      --border: #334155;
+      --text-main: #f8fafc;
+      --text-sub: #94a3b8;
+      --primary: #38bdf8;
+      --primary-bg: #0369a1;
+      --accent: #f59e0b;
+      --accent-bg: rgba(245, 158, 11, 0.15);
+      --success: #10b981;
+      --success-bg: rgba(16, 185, 129, 0.18);
+      --danger: #ef4444;
+      --highlight: #38bdf8;
+      --font-scale: 1;
+      --card-radius: 12px;
+      --shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    /* ☀️ 屋外・直射日光モード（超高コントラスト・白背景・太字） */
+    body.sunlight-mode {
+      --bg: #ffffff;
+      --surface: #f1f5f9;
+      --surface-card: #ffffff;
+      --border: #000000;
+      --text-main: #000000;
+      --text-sub: #1e293b;
+      --primary: #0044cc;
+      --primary-bg: #0033aa;
+      --accent: #b45309;
+      --accent-bg: #fef3c7;
+      --success: #047857;
+      --success-bg: #d1fae5;
+      --danger: #b91c1c;
+      --highlight: #000000;
+      --shadow: 0 2px 0 #000000;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    input, textarea, select {
+      user-select: auto;
+      -webkit-user-select: auto;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+      padding-bottom: 95px;
+      line-height: 1.4;
+      min-height: 100vh;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    /* ========================================================
+       固定ヘッダーエリア
+       ======================================================== */
+    .sticky-top-bar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--surface);
+      border-bottom: 2px solid var(--border);
+      box-shadow: var(--shadow);
+    }
+
+    .header-main {
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .brand-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-icon {
+      font-size: 1.4rem;
+      line-height: 1;
+    }
+
+    .brand-title {
+      font-size: 1.15rem;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tag-outdoor {
+      font-size: 0.7rem;
+      font-weight: 800;
+      background: var(--accent);
+      color: #000;
+      padding: 2px 6px;
+      border-radius: 4px;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-header-action {
+      background: var(--surface-card);
+      border: 1.5px solid var(--border);
+      color: var(--text-main);
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.15s ease;
+      touch-action: manipulation;
+    }
+
+    .btn-header-action:active {
+      transform: scale(0.95);
+      background: var(--primary-bg);
+      color: #fff;
+    }
+
+    .btn-sunlight.active {
+      background: #fbbf24;
+      color: #000;
+      border-color: #000;
+      font-weight: 900;
+    }
+
+    /* ネットワーク＆データモードバナー */
+    .status-sub-bar {
+      background: rgba(0, 0, 0, 0.25);
+      padding: 4px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: var(--text-sub);
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    body.sunlight-mode .status-sub-bar {
+      background: #e2e8f0;
+      color: #0f172a;
+      border-top: 1px solid #000;
+      font-weight: 700;
+    }
+
+    .net-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 700;
+    }
+
+    .net-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+    }
+
+    .net-dot.offline {
+      background: var(--accent);
+    }
+
+    /* ========================================================
+       クイックサマリーカード（合計集計）
+       ======================================================== */
+    .summary-metrics-bar {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      padding: 10px 12px;
+      background: var(--bg);
+    }
+
+    .metric-card {
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: var(--card-radius);
+      padding: 8px 10px;
+      text-align: center;
+      box-shadow: var(--shadow);
+    }
+
+    .metric-card.accent {
+      border-color: var(--primary);
+    }
+
+    .metric-label {
+      font-size: 0.72rem;
+      font-weight: 800;
+      color: var(--text-sub);
+      margin-bottom: 2px;
+    }
+
+    body.sunlight-mode .metric-label {
+      color: #000;
+    }
+
+    .metric-value {
+      font-size: 1.5rem;
+      font-weight: 900;
+      color: var(--text-main);
+      line-height: 1.1;
+    }
+
+    .metric-value.accent {
+      color: var(--primary);
+    }
+
+    body.sunlight-mode .metric-value.accent {
+      color: var(--primary);
+    }
+
+    .metric-unit {
+      font-size: 0.75rem;
+      font-weight: 700;
+      margin-left: 2px;
+      color: var(--text-sub);
+    }
+
+    body.sunlight-mode .metric-unit {
+      color: #000;
+    }
+
+    /* ========================================================
+       タブナビゲーション（2画面切り替え）
+       ======================================================== */
+    .view-switch-tabs {
+      display: flex;
+      gap: 8px;
+      padding: 0 12px 10px 12px;
+      background: var(--bg);
+    }
+
+    .view-tab-btn {
+      flex: 1;
+      padding: 12px 8px;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      color: var(--text-sub);
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 900;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+      touch-action: manipulation;
+    }
+
+    .view-tab-btn.active {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+      box-shadow: 0 4px 10px rgba(56, 189, 248, 0.35);
+    }
+
+    body.sunlight-mode .view-tab-btn {
+      border-width: 2px;
+      border-color: #000;
+      color: #000;
+    }
+
+    body.sunlight-mode .view-tab-btn.active {
+      background: #000000;
+      color: #ffffff;
+      border-color: #000000;
+    }
+
+    .tab-badge {
+      background: rgba(0, 0, 0, 0.35);
+      color: #fff;
+      font-size: 0.8rem;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 12px;
+    }
+
+    body.sunlight-mode .view-tab-btn.active .tab-badge {
+      background: #ffffff;
+      color: #000000;
+    }
+
+    /* ========================================================
+       検索＆フィルタリングバー
+       ======================================================== */
+    .filter-bar {
+      padding: 0 12px 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .search-input-wrapper {
+      position: relative;
+      width: 100%;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 1.1rem;
+      pointer-events: none;
+      color: var(--text-sub);
+    }
+
+    .search-input {
+      width: 100%;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      color: var(--text-main);
+      padding: 12px 40px 12px 38px;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 700;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+
+    body.sunlight-mode .search-input {
+      border-color: #000;
+      color: #000;
+      background: #fff;
+    }
+
+    .search-input:focus {
+      border-color: var(--primary);
+    }
+
+    .search-clear-btn {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      color: var(--text-sub);
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-weight: 900;
+      font-size: 0.85rem;
+      display: none;
+    }
+
+    .search-clear-btn.visible {
+      display: flex;
+    }
+
+    /* クイックフィルタチップス */
+    .filter-chips-row {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .filter-chips-row::-webkit-scrollbar {
+      display: none;
+    }
+
+    .chip-btn {
+      padding: 6px 12px;
+      background: var(--surface);
+      border: 1.5px solid var(--border);
+      color: var(--text-sub);
+      border-radius: 20px;
+      font-size: 0.82rem;
+      font-weight: 800;
+      cursor: pointer;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      touch-action: manipulation;
+    }
+
+    .chip-btn.active {
+      background: var(--surface-card);
+      color: var(--text-main);
+      border-color: var(--primary);
+      box-shadow: 0 0 0 1px var(--primary);
+    }
+
+    body.sunlight-mode .chip-btn {
+      border-color: #000;
+      color: #000;
+    }
+
+    body.sunlight-mode .chip-btn.active {
+      background: #000;
+      color: #fff;
+    }
+
+    .sort-toggle-btn {
+      margin-left: auto;
+      background: var(--surface-card);
+      color: var(--text-main);
+      border-color: var(--border);
+    }
+
+    /* ========================================================
+       メインコンテンツ・カードリスト
+       ======================================================== */
+    .main-container {
+      padding: 0 12px;
+    }
+
+    /* 空状態メッセージ */
+    .empty-state {
+      background: var(--surface);
+      border: 2px dashed var(--border);
+      border-radius: var(--card-radius);
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--text-sub);
+      margin-top: 10px;
+    }
+
+    .empty-state-icon {
+      font-size: 2.5rem;
+      margin-bottom: 8px;
+    }
+
+    .empty-state-title {
+      font-size: 1.1rem;
+      font-weight: 900;
+      color: var(--text-main);
+      margin-bottom: 4px;
+    }
+
+    /* --------------------------------------------------------
+       1. 【商品別集計画面】カード
+       -------------------------------------------------------- */
+    .product-group-card {
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: var(--card-radius);
+      margin-bottom: 10px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      transition: transform 0.1s ease, border-color 0.15s ease;
+    }
+
+    .product-group-card:active {
+      transform: scale(0.99);
+    }
+
+    body.sunlight-mode .product-group-card {
+      border: 2.5px solid #000000;
+      background: #ffffff;
+    }
+
+    .product-card-header {
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .prod-main-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .prod-category-tag {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 800;
+      color: var(--primary);
+      background: rgba(56, 189, 248, 0.15);
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 4px;
+    }
+
+    body.sunlight-mode .prod-category-tag {
+      background: #e2e8f0;
+      color: #000;
+      border: 1px solid #000;
+    }
+
+    .prod-name {
+      font-size: 1.18rem;
+      font-weight: 900;
+      color: var(--text-main);
+      word-break: break-word;
+      line-height: 1.25;
+    }
+
+    .prod-sub-meta {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-sub);
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    body.sunlight-mode .prod-sub-meta {
+      color: #334155;
+    }
+
+    /* 合計数量の特大バッジ */
+    .prod-total-badge {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      justify-content: center;
+      text-align: right;
+      padding-left: 8px;
+    }
+
+    .prod-total-count {
+      font-size: 1.85rem;
+      font-weight: 900;
+      color: var(--primary);
+      line-height: 1;
+      display: flex;
+      align-items: baseline;
+      gap: 2px;
+    }
+
+    body.sunlight-mode .prod-total-count {
+      color: #000;
+    }
+
+    .prod-total-unit {
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: var(--text-sub);
+    }
+
+    body.sunlight-mode .prod-total-unit {
+      color: #000;
+    }
+
+    .expand-chevron {
+      font-size: 0.85rem;
+      color: var(--text-sub);
+      margin-top: 4px;
+      transition: transform 0.2s ease;
+    }
+
+    .product-group-card.expanded .expand-chevron {
+      transform: rotate(180deg);
+      color: var(--primary);
+    }
+
+    /* アコーディオン展開：店舗内訳詳細リスト */
+    .product-breakdown-drawer {
+      display: none;
+      background: rgba(0, 0, 0, 0.25);
+      border-top: 1.5px dashed var(--border);
+      padding: 10px 14px;
+    }
+
+    body.sunlight-mode .product-breakdown-drawer {
+      background: #f8fafc;
+      border-top: 2px dashed #000;
+    }
+
+    .product-group-card.expanded .product-breakdown-drawer {
+      display: block;
+    }
+
+    .breakdown-header-title {
+      font-size: 0.78rem;
+      font-weight: 800;
+      color: var(--text-sub);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    body.sunlight-mode .breakdown-header-title {
+      color: #000;
+    }
+
+    .breakdown-store-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      background: var(--surface-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 6px;
+      gap: 8px;
+    }
+
+    body.sunlight-mode .breakdown-store-row {
+      background: #ffffff;
+      border: 1.5px solid #000;
+    }
+
+    .breakdown-store-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .breakdown-store-row.completed {
+      opacity: 0.6;
+      background: rgba(16, 185, 129, 0.08);
+      border-color: var(--success);
+    }
+
+    .breakdown-store-name {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .breakdown-store-row.completed .breakdown-store-name {
+      text-decoration: line-through;
+    }
+
+    .breakdown-store-qty {
+      font-size: 1.15rem;
+      font-weight: 900;
+      color: var(--primary);
+    }
+
+    body.sunlight-mode .breakdown-store-qty {
+      color: #000;
+    }
+
+    .btn-quick-toggle {
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 800;
+      border: 1.5px solid var(--border);
+      background: var(--surface);
+      color: var(--text-main);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      touch-action: manipulation;
+    }
+
+    .btn-quick-toggle.done {
+      background: var(--success);
+      color: #fff;
+      border-color: var(--success);
+    }
+
+    body.sunlight-mode .btn-quick-toggle {
+      border-color: #000;
+    }
+
+    body.sunlight-mode .btn-quick-toggle.done {
+      background: #000;
+      color: #fff;
+    }
+
+    /* --------------------------------------------------------
+       2. 【店舗別集計画面】カード
+       -------------------------------------------------------- */
+    .store-order-card {
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: var(--card-radius);
+      margin-bottom: 12px;
+      box-shadow: var(--shadow);
+      padding: 14px;
+      position: relative;
+      transition: all 0.15s ease;
+    }
+
+    body.sunlight-mode .store-order-card {
+      border: 2.5px solid #000000;
+      background: #ffffff;
+    }
+
+    .store-order-card.completed {
+      border-color: var(--success);
+      background: rgba(16, 185, 129, 0.05);
+    }
+
+    body.sunlight-mode .store-order-card.completed {
+      background: #f0fdf4;
+      border-color: #047857;
+    }
+
+    .store-card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1.5px solid var(--border);
+    }
+
+    body.sunlight-mode .store-card-top {
+      border-bottom-color: #000;
+    }
+
+    .store-info-box {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .store-name-title {
+      font-size: 1.25rem;
+      font-weight: 900;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      line-height: 1.25;
+      margin-bottom: 4px;
+    }
+
+    .store-order-card.completed .store-name-title {
+      text-decoration: line-through;
+      color: var(--text-sub);
+    }
+
+    .store-meta-line {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--text-sub);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    body.sunlight-mode .store-meta-line {
+      color: #1e293b;
+    }
+
+    .phone-link {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    body.sunlight-mode .phone-link {
+      color: #0044cc;
+      text-decoration: underline;
+    }
+
+    /* 店舗の「対応済み」トグルボタン（巨大で押しやすい） */
+    .store-complete-toggle-btn {
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 900;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border: 2px solid var(--border);
+      background: var(--surface-card);
+      color: var(--text-main);
+      transition: all 0.15s ease;
+      touch-action: manipulation;
+      white-space: nowrap;
+    }
+
+    body.sunlight-mode .store-complete-toggle-btn {
+      border: 2px solid #000;
+      background: #f1f5f9;
+      color: #000;
+    }
+
+    .store-complete-toggle-btn:active {
+      transform: scale(0.96);
+    }
+
+    .store-complete-toggle-btn.done {
+      background: var(--success);
+      color: #ffffff;
+      border-color: var(--success);
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4);
+    }
+
+    body.sunlight-mode .store-complete-toggle-btn.done {
+      background: #047857;
+      color: #ffffff;
+      border-color: #000000;
+    }
+
+    /* 注文明細リスト */
+    .store-items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 8px;
+    }
+
+    .store-item-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 0;
+      border-bottom: 1px dashed var(--border);
+      font-size: 0.95rem;
+    }
+
+    body.sunlight-mode .store-item-row {
+      border-bottom-color: #cbd5e1;
+    }
+
+    .store-item-row:last-child {
+      border-bottom: none;
+    }
+
+    .store-item-name {
+      font-weight: 800;
+      color: var(--text-main);
+      flex: 1;
+      padding-right: 8px;
+    }
+
+    .store-order-card.completed .store-item-name {
+      color: var(--text-sub);
+    }
+
+    .store-item-qty {
+      font-size: 1.15rem;
+      font-weight: 900;
+      color: var(--primary);
+      white-space: nowrap;
+    }
+
+    body.sunlight-mode .store-item-qty {
+      color: #000;
+    }
+
+    /* 備考・受取不可日バナー */
+    .store-note-badge {
+      background: var(--accent-bg);
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.78rem;
+      font-weight: 800;
+      color: var(--accent);
+      margin-top: 6px;
+      line-height: 1.35;
+    }
+
+    body.sunlight-mode .store-note-badge {
+      background: #fef3c7;
+      border: 1.5px solid #b45309;
+      color: #78350f;
+    }
+
+    /* ========================================================
+       固定ボトムバー（片手操作用クイックバー）
+       ======================================================== */
+    .fixed-bottom-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 90;
+      background: var(--surface);
+      border-top: 2px solid var(--border);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.4);
+    }
+
+    body.sunlight-mode .fixed-bottom-bar {
+      background: #ffffff;
+      border-top: 2.5px solid #000000;
+      box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .bottom-tab-switch {
+      display: flex;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .bottom-tab-btn {
+      flex: 1;
+      padding: 12px 6px;
+      background: var(--surface-card);
+      border: 1.5px solid var(--border);
+      color: var(--text-main);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 900;
+      cursor: pointer;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      touch-action: manipulation;
+    }
+
+    .bottom-tab-btn.active {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+    }
+
+    body.sunlight-mode .bottom-tab-btn {
+      border: 2px solid #000;
+      color: #000;
+      background: #f8fafc;
+    }
+
+    body.sunlight-mode .bottom-tab-btn.active {
+      background: #000000;
+      color: #ffffff;
+      border-color: #000000;
+    }
+
+    .bottom-action-btn {
+      padding: 12px 14px;
+      background: var(--surface-card);
+      border: 1.5px solid var(--border);
+      color: var(--text-main);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 900;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      touch-action: manipulation;
+    }
+
+    body.sunlight-mode .bottom-action-btn {
+      border: 2px solid #000;
+      color: #000;
+      background: #fff;
+    }
+
+    .bottom-action-btn:active {
+      transform: scale(0.95);
+    }
+
+    /* トースト通知 */
+    .toast-msg {
+      position: fixed;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: #0f172a;
+      color: #f8fafc;
+      border: 2px solid var(--primary);
+      padding: 10px 18px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 800;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.25s ease;
+      white-space: nowrap;
+      max-width: 90vw;
+      text-align: center;
+    }
+
+    .toast-msg.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    body.sunlight-mode .toast-msg {
+      background: #000;
+      color: #fff;
+      border-color: #000;
+    }
+
+    /* 回転アニメーション */
+    .spin {
+      animation: spin-anim 0.8s linear infinite;
+    }
+
+    @keyframes spin-anim {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ========================================================
+       固定ヘッダーエリア
+       ======================================================== -->
+  <div class="sticky-top-bar">
+    <div class="header-main">
+      <div class="brand-box">
+        <span class="brand-icon">⚓</span>
+        <div>
+          <div class="brand-title">
+            船上注文集計
+            <span class="tag-outdoor">洋上・屋外仕様</span>
+          </div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <!-- ☀️ 直射日光・高コントラスト切替ボタン -->
+        <button type="button" class="btn-header-action btn-sunlight" id="sunlight-btn" onclick="toggleSunlightMode()">
+          <span id="sunlight-icon">☀️</span>
+          <span id="sunlight-label">屋外モード</span>
+        </button>
+        <!-- 🔄 更新ボタン -->
+        <button type="button" class="btn-header-action" id="refresh-btn" onclick="refreshData()">
+          <span id="refresh-icon">🔄</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ネットワーク状態＆最終更新時刻サブバー -->
+    <div class="status-sub-bar">
+      <div class="net-pill">
+        <span class="net-dot" id="net-dot"></span>
+        <span id="net-text">オンライン</span>
+        <span style="opacity:0.6; margin:0 4px;">|</span>
+        <span id="data-source-pill" style="cursor:pointer;" onclick="toggleDataSourceModal()">🧪 モックデータ中</span>
+      </div>
+      <div id="last-updated-text">最終更新: 取得中...</div>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       クイックサマリーカード
+       ======================================================== -->
+  <div class="summary-metrics-bar">
+    <div class="metric-card accent">
+      <div class="metric-label">未対応 品目</div>
+      <div class="metric-value accent" id="metric-unhandled-products">0<span class="metric-unit">品</span></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">未対応 合計匹数</div>
+      <div class="metric-value" id="metric-unhandled-qty">0<span class="metric-unit">個</span></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">未完了 店舗</div>
+      <div class="metric-value" id="metric-unhandled-stores">0<span class="metric-unit">店</span></div>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       タブ切り替え（商品別 ⇄ 店舗別）
+       ======================================================== -->
+  <div class="view-switch-tabs">
+    <button type="button" class="view-tab-btn active" id="tab-btn-product" onclick="switchView('product')">
+      <span>🐟 商品別集計</span>
+      <span class="tab-badge" id="badge-product-count">0</span>
+    </button>
+    <button type="button" class="view-tab-btn" id="tab-btn-store" onclick="switchView('store')">
+      <span>🏢 店舗別集計</span>
+      <span class="tab-badge" id="badge-store-count">0</span>
+    </button>
+  </div>
+
+  <!-- ========================================================
+       検索＆フィルタリングバー
+       ======================================================== -->
+  <div class="filter-bar">
+    <div class="search-input-wrapper">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search-box" class="search-input" placeholder="商品名・店舗名・魚種で検索..." oninput="handleSearchInput()">
+      <button type="button" class="search-clear-btn" id="search-clear-btn" onclick="clearSearch()">✕</button>
+    </div>
+
+    <!-- クイックフィルタチップス -->
+    <div class="filter-chips-row" id="filter-chips-container">
+      <!-- JSで動的生成 -->
+    </div>
+  </div>
+
+  <!-- ========================================================
+       メインリスト表示領域
+       ======================================================== -->
+  <div class="main-container">
+    <!-- 1. 商品別集計リスト -->
+    <div id="view-product" style="display: block;">
+      <div id="product-list-container"></div>
+    </div>
+
+    <!-- 2. 店舗別集計リスト -->
+    <div id="view-store" style="display: none;">
+      <div id="store-list-container"></div>
+    </div>
+  </div>
+
+  <!-- ========================================================
+       片手操作用固定ボトムバー
+       ======================================================== -->
+  <div class="fixed-bottom-bar">
+    <div class="bottom-tab-switch">
+      <button type="button" class="bottom-tab-btn active" id="bottom-tab-prod" onclick="switchView('product')">
+        🐟 商品別
+      </button>
+      <button type="button" class="bottom-tab-btn" id="bottom-tab-store" onclick="switchView('store')">
+        🏢 店舗別
+      </button>
+    </div>
+    <button type="button" class="bottom-action-btn" onclick="scrollToTop()">
+      ⬆ 上部へ
+    </button>
+  </div>
+
+  <!-- トースト通知 -->
+  <div class="toast-msg" id="toast-msg"></div>
+
+  <!-- ========================================================
+       JavaScript ロジック
+       ======================================================== -->
+  <script>
+    // ==========================================
+    // 定数・ストレージキー・API設定
+    // ==========================================
+    const STORAGE_KEY_ORDERS = 'kawabata_boat_orders_v1';
+    const STORAGE_KEY_COMPLETED = 'kawabata_boat_completed_stores_v1';
+    const STORAGE_KEY_SUNLIGHT = 'kawabata_boat_sunlight_mode';
+    const STORAGE_KEY_LAST_SYNC = 'kawabata_boat_last_sync_time';
+    const STORAGE_KEY_DATA_MODE = 'kawabata_boat_data_mode'; // 'mock' or 'live'
+
+    const LIVE_GAS_API_URL = "https://script.google.com/macros/s/AKfycbxIYsPdreUjaOFutfshhQIwOLb_Ke1JprcDZj_LAT9oZnc-l-3jZLsPAsFd_QdQJAQ4eA/exec";
+
+    // 動作確認用初期モックデータ（鮮魚・観賞魚生体・資材・リクエスト品）
+    const DEFAULT_MOCK_ORDERS = [
+      {
+        orderId: "ORD-20261012-01",
+        customerName: "八重山アクアリウム",
+        phone: "090-1234-5678",
+        orderDate: "10/12 06:30",
+        ngDates: "10/14(水)不可",
+        notes: "午前中便希望。状態の良いペア優先でお願いします。",
+        items: [
+          { name: "カクレクマノミ (ペア)", category: "魚", qty: 4, unit: "匹" },
+          { name: "ハタゴイソギンチャク (M)", category: "イソギンチャク", qty: 2, unit: "個" },
+          { name: "ヒレナガハギ (S)", category: "魚", qty: 3, unit: "匹" },
+          { name: "シャコガイ (ブルー特美)", category: "シャコガイ", qty: 1, unit: "個" }
+        ]
+      },
+      {
+        orderId: "ORD-20261012-02",
+        customerName: "美ら海マリンショップ",
+        phone: "0980-82-9999",
+        orderDate: "10/12 07:15",
+        ngDates: "なし",
+        notes: "採集でき次第即連絡ください。",
+        items: [
+          { name: "カクレクマノミ (ペア)", category: "魚", qty: 6, unit: "匹" },
+          { name: "アカモンガラ (成魚)", category: "魚", qty: 2, unit: "匹" },
+          { name: "マガキガイ (掃除用)", category: "貝", qty: 20, unit: "個" },
+          { name: "ライブロック (擬岩/特選)", category: "擬岩", qty: 5, unit: "kg" }
+        ]
+      },
+      {
+        orderId: "ORD-20261012-03",
+        customerName: "東京アクアワールド 築地店",
+        phone: "03-3541-0000",
+        orderDate: "10/12 08:00",
+        ngDates: "10/15(木)午後不可",
+        notes: "航空便パッキング。酸素多めで手配願います。",
+        items: [
+          { name: "スミレナガハナダイ (オス)", category: "魚", qty: 5, unit: "匹" },
+          { name: "スミレナガハナダイ (メス)", category: "魚", qty: 8, unit: "匹" },
+          { name: "カクレクマノミ (ペア)", category: "魚", qty: 3, unit: "匹" },
+          { name: "ハタゴイソギンチャク (M)", category: "イソギンチャク", qty: 1, unit: "個" }
+        ]
+      },
+      {
+        orderId: "ORD-20261012-04",
+        customerName: "オーシャンブルー南風",
+        phone: "090-8888-2222",
+        orderDate: "10/12 08:45",
+        ngDates: "なし",
+        notes: "船着き場直接引き取り希望（16時頃）。",
+        items: [
+          { name: "マガキガイ (掃除用)", category: "貝", qty: 30, unit: "個" },
+          { name: "ヒレナガハギ (S)", category: "魚", qty: 2, unit: "匹" },
+          { name: "ハマサンゴ (グリーン)", category: "サンゴ", qty: 3, unit: "個" }
+        ]
+      },
+      {
+        orderId: "ORD-20261012-05",
+        customerName: "アクアプロRYUKYU",
+        phone: "090-7777-3333",
+        orderDate: "10/12 09:20",
+        ngDates: "10/16(金)不可",
+        notes: "【採集リクエスト】ニシキヤッコ幼魚見つけたら必ず確保してください！",
+        items: [
+          { name: "ニシキヤッコ (幼魚リクエスト)", category: "生体リクエスト", qty: 2, unit: "匹" },
+          { name: "スミレナガハナダイ (オス)", category: "魚", qty: 3, unit: "匹" },
+          { name: "シャコガイ (ブルー特美)", category: "シャコガイ", qty: 2, unit: "個" }
+        ]
+      }
+    ];
+
+    // ==========================================
+    // アプリケーション状態
+    // ==========================================
+    let currentView = 'product'; // 'product' or 'store'
+    let currentOrders = [];
+    let completedStoreSet = new Set(); // 完了済み店舗のIDまたは店舗名
+    let expandedProductMap = new Set(); // 展開中の商品名
+    let searchQuery = '';
+    let selectedCategoryFilter = 'all'; // 'all', '魚', 'サンゴ', etc.
+    let currentSortOrder = 'count_desc'; // 'count_desc', 'name_asc'
+    let currentStoreFilter = 'all'; // 'all', 'uncompleted', 'completed'
+    let isSunlightMode = false;
+    let dataMode = 'mock'; // 'mock' or 'live'
+
+    // ==========================================
+    // 起動・初期化処理
+    // ==========================================
+    window.addEventListener('DOMContentLoaded', () => {
+      // 1. 直射日光モードの復元
+      try {
+        isSunlightMode = localStorage.getItem(STORAGE_KEY_SUNLIGHT) === 'true';
+        if (isSunlightMode) {
+          document.body.classList.add('sunlight-mode');
+          updateSunlightButtonUI(true);
+        }
+      } catch(e) {}
+
+      // 2. データモードの復元
+      try {
+        dataMode = localStorage.getItem(STORAGE_KEY_DATA_MODE) || 'mock';
+      } catch(e) {}
+      updateDataSourcePill();
+
+      // 3. 対応済み店舗セットの復元
+      try {
+        const rawCompleted = localStorage.getItem(STORAGE_KEY_COMPLETED);
+        if (rawCompleted) {
+          completedStoreSet = new Set(JSON.parse(rawCompleted));
+        }
+      } catch(e) {}
+
+      // 4. キャッシュされた注文データの読み込み
+      loadOrdersFromCache();
+
+      // 5. ネットワーク監視
+      setupNetworkWatcher();
+
+      // 6. UIの初期描画
+      renderCategoryChips();
+      renderAll();
+
+      // 最終更新表示
+      const lastSync = localStorage.getItem(STORAGE_KEY_LAST_SYNC);
+      if (lastSync) {
+        document.getElementById('last-updated-text').innerText = `最終更新: ${lastSync}`;
+      } else {
+        updateLastSyncTime();
+      }
+    });
+
+    // ネットワーク監視（オンライン・オフライン自動検知）
+    function setupNetworkWatcher() {
+      const netDot = document.getElementById('net-dot');
+      const netText = document.getElementById('net-text');
+
+      function updateStatus() {
+        if (navigator.onLine) {
+          netDot.className = 'net-dot';
+          netText.innerText = 'オンライン';
+        } else {
+          netDot.className = 'net-dot offline';
+          netText.innerText = 'オフライン(キャッシュ)';
+          showToast('📡 電波圏外：保存済みデータを維持しています');
+        }
+      }
+
+      window.addEventListener('online', updateStatus);
+      window.addEventListener('offline', updateStatus);
+      updateStatus();
+    }
+
+    // ==========================================
+    // データ管理・ローカルストレージ
+    // ==========================================
+    function loadOrdersFromCache() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY_ORDERS);
+        if (raw) {
+          currentOrders = JSON.parse(raw);
+        } else {
+          // 初回はモックデータで初期化
+          currentOrders = JSON.parse(JSON.stringify(DEFAULT_MOCK_ORDERS));
+          saveOrdersToCache();
+        }
+      } catch(e) {
+        currentOrders = JSON.parse(JSON.stringify(DEFAULT_MOCK_ORDERS));
+      }
+    }
+
+    function saveOrdersToCache() {
+      try {
+        localStorage.setItem(STORAGE_KEY_ORDERS, JSON.stringify(currentOrders));
+      } catch(e) {
+        console.warn('Failed to save orders to localStorage:', e);
+      }
+    }
+
+    function saveCompletedStores() {
+      try {
+        localStorage.setItem(STORAGE_KEY_COMPLETED, JSON.stringify(Array.from(completedStoreSet)));
+      } catch(e) {}
+    }
+
+    function updateLastSyncTime() {
+      const now = new Date();
+      const timeStr = `${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      localStorage.setItem(STORAGE_KEY_LAST_SYNC, timeStr);
+      document.getElementById('last-updated-text').innerText = `最終更新: ${timeStr}`;
+    }
+
+    // ==========================================
+    // 画面切り替え（商品別 ⇄ 店舗別）
+    // ==========================================
+    function switchView(viewName) {
+      currentView = viewName;
+
+      // ヘッダータブ
+      document.getElementById('tab-btn-product').classList.toggle('active', viewName === 'product');
+      document.getElementById('tab-btn-store').classList.toggle('active', viewName === 'store');
+
+      // ボトムタブ
+      document.getElementById('bottom-tab-prod').classList.toggle('active', viewName === 'product');
+      document.getElementById('bottom-tab-store').classList.toggle('active', viewName === 'store');
+
+      // コンテナ表示切り替え
+      document.getElementById('view-product').style.display = (viewName === 'product') ? 'block' : 'none';
+      document.getElementById('view-store').style.display = (viewName === 'store') ? 'block' : 'none';
+
+      // フィルタチップの更新
+      renderCategoryChips();
+      renderAll();
+
+      // 触覚フィードバック（バイブレーション対応端末）
+      if (navigator.vibrate) navigator.vibrate(15);
+    }
+
+    // ==========================================
+    // 屋外・直射日光モード切り替え
+    // ==========================================
+    function toggleSunlightMode() {
+      isSunlightMode = !isSunlightMode;
+      document.body.classList.toggle('sunlight-mode', isSunlightMode);
+      localStorage.setItem(STORAGE_KEY_SUNLIGHT, String(isSunlightMode));
+      updateSunlightButtonUI(isSunlightMode);
+      showToast(isSunlightMode ? '☀️ 屋外・直射日光モードをONにしました' : '🌙 標準モードに戻しました');
+      if (navigator.vibrate) navigator.vibrate(20);
+    }
+
+    function updateSunlightButtonUI(isSun) {
+      const btn = document.getElementById('sunlight-btn');
+      const icon = document.getElementById('sunlight-icon');
+      const label = document.getElementById('sunlight-label');
+      if (isSun) {
+        btn.classList.add('active');
+        icon.innerText = '🌙';
+        label.innerText = '標準モード';
+      } else {
+        btn.classList.remove('active');
+        icon.innerText = '☀️';
+        label.innerText = '屋外モード';
+      }
+    }
+
+    // ==========================================
+    // 集計ロジック（商品別）
+    // ==========================================
+    function aggregateProducts() {
+      const map = {};
+
+      currentOrders.forEach(order => {
+        const isStoreCompleted = completedStoreSet.has(order.customerName);
+
+        order.items.forEach(item => {
+          const key = item.name;
+          if (!map[key]) {
+            map[key] = {
+              name: item.name,
+              category: item.category || 'その他',
+              unit: item.unit || '個',
+              totalQty: 0,
+              unhandledQty: 0,
+              breakdown: [] // { customerName, phone, qty, orderId, isCompleted }
+            };
+          }
+
+          map[key].totalQty += item.qty;
+          if (!isStoreCompleted) {
+            map[key].unhandledQty += item.qty;
+          }
+
+          map[key].breakdown.push({
+            customerName: order.customerName,
+            phone: order.phone,
+            qty: item.qty,
+            unit: item.unit || '個',
+            orderId: order.orderId,
+            isCompleted: isStoreCompleted
+          });
+        });
+      });
+
+      let list = Object.values(map);
+
+      // カテゴリ絞り込み
+      if (selectedCategoryFilter !== 'all') {
+        list = list.filter(p => p.category === selectedCategoryFilter);
+      }
+
+      // 検索ワード絞り込み
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        list = list.filter(p => {
+          return p.name.toLowerCase().includes(q) ||
+                 p.category.toLowerCase().includes(q) ||
+                 p.breakdown.some(b => b.customerName.toLowerCase().includes(q));
+        });
+      }
+
+      // ソート
+      if (currentSortOrder === 'count_desc') {
+        list.sort((a, b) => b.unhandledQty - a.unhandledQty || b.totalQty - a.totalQty);
+      } else {
+        list.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+      }
+
+      return list;
+    }
+
+    // ==========================================
+    // 描画：商品別集計
+    // ==========================================
+    function renderProductView() {
+      const container = document.getElementById('product-list-container');
+      const products = aggregateProducts();
+
+      // バッジの更新
+      document.getElementById('badge-product-count').innerText = products.length;
+
+      if (products.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">🐟</div>
+            <div class="empty-state-title">該当する商品がありません</div>
+            <div style="font-size:0.85rem;">検索条件を変更するか、右上の更新を押してください。</div>
+          </div>
+        `;
+        return;
+      }
+
+      let html = '';
+      products.forEach(p => {
+        const isExpanded = expandedProductMap.has(p.name);
+        const unhandledStoreCount = p.breakdown.filter(b => !b.isCompleted).length;
+        const totalStoreCount = p.breakdown.length;
+
+        html += `
+          <div class="product-group-card ${isExpanded ? 'expanded' : ''}" id="prod-card-${encodeURIComponent(p.name)}">
+            <div class="product-card-header" onclick="toggleProductExpand('${escapeJs(p.name)}')">
+              <div class="prod-main-info">
+                <span class="prod-category-tag">${escapeHtml(p.category)}</span>
+                <div class="prod-name">${escapeHtml(p.name)}</div>
+                <div class="prod-sub-meta">
+                  <span>🏢 注文店舗: <strong>${totalStoreCount}店</strong></span>
+                  ${unhandledStoreCount > 0 
+                    ? `<span style="color:var(--accent);">⏳ 未対応: <strong>${unhandledStoreCount}店</strong></span>`
+                    : `<span style="color:var(--success);">✅ 全て完了</span>`
+                  }
+                </div>
+              </div>
+              <div class="prod-total-badge">
+                <div class="prod-total-count">
+                  ${p.unhandledQty}
+                  <span class="prod-total-unit">${escapeHtml(p.unit)}</span>
+                </div>
+                ${p.totalQty !== p.unhandledQty ? `<span style="font-size:0.72rem; color:var(--text-sub);">全計 ${p.totalQty}${escapeHtml(p.unit)}</span>` : ''}
+                <span class="expand-chevron">▼</span>
+              </div>
+            </div>
+
+            <!-- 店舗内訳アコーディオン -->
+            <div class="product-breakdown-drawer">
+              <div class="breakdown-header-title">📋 注文元店舗の内訳（タップで個別完了切替）:</div>
+              ${p.breakdown.map(b => `
+                <div class="breakdown-store-row ${b.isCompleted ? 'completed' : ''}">
+                  <div class="breakdown-store-name">
+                    <span>${b.isCompleted ? '✅' : '🏢'}</span>
+                    <span>${escapeHtml(b.customerName)}</span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="breakdown-store-qty">${b.qty} <small style="font-size:0.75rem;">${escapeHtml(b.unit)}</small></span>
+                    <button type="button" class="btn-quick-toggle ${b.isCompleted ? 'done' : ''}" onclick="toggleStoreComplete('${escapeJs(b.customerName)}')">
+                      ${b.isCompleted ? '対応済み' : '完了にする'}
+                    </button>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function toggleProductExpand(productName) {
+      if (expandedProductMap.has(productName)) {
+        expandedProductMap.delete(productName);
+      } else {
+        expandedProductMap.add(productName);
+      }
+      renderProductView();
+      if (navigator.vibrate) navigator.vibrate(10);
+    }
+
+    // ==========================================
+    // 描画：店舗別集計
+    // ==========================================
+    function renderStoreView() {
+      const container = document.getElementById('store-list-container');
+      let stores = currentOrders.slice();
+
+      // 検索絞り込み
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        stores = stores.filter(s => {
+          return s.customerName.toLowerCase().includes(q) ||
+                 (s.phone && s.phone.includes(q)) ||
+                 s.items.some(item => item.name.toLowerCase().includes(q));
+        });
+      }
+
+      // 未対応／完了絞り込み
+      if (currentStoreFilter === 'uncompleted') {
+        stores = stores.filter(s => !completedStoreSet.has(s.customerName));
+      } else if (currentStoreFilter === 'completed') {
+        stores = stores.filter(s => completedStoreSet.has(s.customerName));
+      }
+
+      // バッジの更新
+      document.getElementById('badge-store-count').innerText = stores.length;
+
+      if (stores.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">🏢</div>
+            <div class="empty-state-title">該当する店舗がありません</div>
+            <div style="font-size:0.85rem;">検索条件やフィルタを変更してください。</div>
+          </div>
+        `;
+        return;
+      }
+
+      let html = '';
+      stores.forEach(s => {
+        const isDone = completedStoreSet.has(s.customerName);
+        const totalItemsCount = s.items.reduce((sum, i) => sum + i.qty, 0);
+
+        html += `
+          <div class="store-order-card ${isDone ? 'completed' : ''}" id="store-card-${encodeURIComponent(s.customerName)}">
+            <div class="store-card-top">
+              <div class="store-info-box">
+                <div class="store-name-title">
+                  <span>${isDone ? '✅' : '🏢'}</span>
+                  <span>${escapeHtml(s.customerName)}</span>
+                </div>
+                <div class="store-meta-line">
+                  ${s.phone ? `<a href="tel:${escapeHtml(s.phone)}" class="phone-link">📞 ${escapeHtml(s.phone)}</a>` : ''}
+                  <span>⏱ ${escapeHtml(s.orderDate || '本日')}</span>
+                  <span>計 <strong>${s.items.length}品 (${totalItemsCount}個)</strong></span>
+                </div>
+              </div>
+
+              <!-- 対応済みトグルボタン -->
+              <button type="button" class="store-complete-toggle-btn ${isDone ? 'done' : ''}" onclick="toggleStoreComplete('${escapeJs(s.customerName)}')">
+                <span>${isDone ? '✓ 対応済み' : '○ 完了にする'}</span>
+              </button>
+            </div>
+
+            <!-- 商品明細リスト -->
+            <div class="store-items-table">
+              ${s.items.map(item => `
+                <div class="store-item-row">
+                  <div class="store-item-name">
+                    <span style="font-size:0.75rem; color:var(--text-sub); margin-right:4px;">[${escapeHtml(item.category || '生体')}]</span>
+                    ${escapeHtml(item.name)}
+                  </div>
+                  <div class="store-item-qty">${item.qty} <small style="font-size:0.75rem;">${escapeHtml(item.unit || '個')}</small></div>
+                </div>
+              `).join('')}
+            </div>
+
+            <!-- 備考・受取不可日 -->
+            ${s.ngDates && s.ngDates !== 'なし' ? `<div class="store-note-badge">⚠️ 受取不可日: ${escapeHtml(s.ngDates)}</div>` : ''}
+            ${s.notes ? `<div class="store-note-badge" style="background:rgba(56,189,248,0.12); border-color:var(--primary); color:var(--primary);">💬 備考: ${escapeHtml(s.notes)}</div>` : ''}
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    // ==========================================
+    // 店舗の「対応済み」トグル処理
+    // ==========================================
+    function toggleStoreComplete(storeName) {
+      if (completedStoreSet.has(storeName)) {
+        completedStoreSet.delete(storeName);
+        showToast(`↩️ 「${storeName}」を未対応に戻しました`);
+      } else {
+        completedStoreSet.add(storeName);
+        showToast(`✅ 「${storeName}」を対応済みにしました`);
+      }
+      saveCompletedStores();
+      renderAll();
+      if (navigator.vibrate) navigator.vibrate(25);
+    }
+
+    // ==========================================
+    // サマリー数値の再計算
+    // ==========================================
+    function updateMetrics() {
+      let unhandledProductsCount = 0;
+      let unhandledQtyCount = 0;
+      const unhandledStoreSet = new Set();
+
+      currentOrders.forEach(o => {
+        const isDone = completedStoreSet.has(o.customerName);
+        if (!isDone) {
+          unhandledStoreSet.add(o.customerName);
+          o.items.forEach(i => {
+            unhandledQtyCount += i.qty;
+          });
+        }
+      });
+
+      // 未対応の商品種別数
+      const productMap = {};
+      currentOrders.forEach(o => {
+        if (!completedStoreSet.has(o.customerName)) {
+          o.items.forEach(i => {
+            productMap[i.name] = (productMap[i.name] || 0) + i.qty;
+          });
+        }
+      });
+      unhandledProductsCount = Object.keys(productMap).length;
+
+      document.getElementById('metric-unhandled-products').innerHTML = `${unhandledProductsCount}<span class="metric-unit">品</span>`;
+      document.getElementById('metric-unhandled-qty').innerHTML = `${unhandledQtyCount}<span class="metric-unit">個</span>`;
+      document.getElementById('metric-unhandled-stores').innerHTML = `${unhandledStoreSet.size}<span class="metric-unit">店</span>`;
+    }
+
+    // ==========================================
+    // フィルタチップのレンダリング
+    // ==========================================
+    function renderCategoryChips() {
+      const container = document.getElementById('filter-chips-container');
+      if (currentView === 'product') {
+        // 全カテゴリの抽出
+        const cats = new Set();
+        currentOrders.forEach(o => o.items.forEach(i => { if (i.category) cats.add(i.category); }));
+        const catList = ['all', ...Array.from(cats)];
+
+        container.innerHTML = `
+          ${catList.map(cat => `
+            <button type="button" class="chip-btn ${selectedCategoryFilter === cat ? 'active' : ''}" onclick="setCategoryFilter('${escapeJs(cat)}')">
+              ${cat === 'all' ? '全カテゴリ' : escapeHtml(cat)}
+            </button>
+          `).join('')}
+          <button type="button" class="chip-btn sort-toggle-btn" onclick="toggleSortOrder()">
+            ${currentSortOrder === 'count_desc' ? '⬇ 多い順' : '🔤 名前順'}
+          </button>
+        `;
+      } else {
+        // 店舗フィルタ
+        container.innerHTML = `
+          <button type="button" class="chip-btn ${currentStoreFilter === 'all' ? 'active' : ''}" onclick="setStoreFilter('all')">
+            すべて (${currentOrders.length})
+          </button>
+          <button type="button" class="chip-btn ${currentStoreFilter === 'uncompleted' ? 'active' : ''}" onclick="setStoreFilter('uncompleted')">
+            ⏳ 未対応のみ (${currentOrders.filter(o => !completedStoreSet.has(o.customerName)).length})
+          </button>
+          <button type="button" class="chip-btn ${currentStoreFilter === 'completed' ? 'active' : ''}" onclick="setStoreFilter('completed')">
+            ✅ 完了 (${currentOrders.filter(o => completedStoreSet.has(o.customerName)).length})
+          </button>
+          <button type="button" class="chip-btn sort-toggle-btn" onclick="resetAllCompleted()">
+            🔄 完了リセット
+          </button>
+        `;
+      }
+    }
+
+    function setCategoryFilter(cat) {
+      selectedCategoryFilter = cat;
+      renderCategoryChips();
+      renderProductView();
+      if (navigator.vibrate) navigator.vibrate(10);
+    }
+
+    function toggleSortOrder() {
+      currentSortOrder = (currentSortOrder === 'count_desc') ? 'name_asc' : 'count_desc';
+      renderCategoryChips();
+      renderProductView();
+      if (navigator.vibrate) navigator.vibrate(10);
+    }
+
+    function setStoreFilter(flt) {
+      currentStoreFilter = flt;
+      renderCategoryChips();
+      renderStoreView();
+      if (navigator.vibrate) navigator.vibrate(10);
+    }
+
+    function resetAllCompleted() {
+      if (confirm('すべての店舗の対応状況を「未対応」にリセットしますか？')) {
+        completedStoreSet.clear();
+        saveCompletedStores();
+        renderAll();
+        showToast('全ての完了チェックをリセットしました');
+      }
+    }
+
+    // ==========================================
+    // 検索入力制御
+    // ==========================================
+    function handleSearchInput() {
+      const box = document.getElementById('search-box');
+      const clearBtn = document.getElementById('search-clear-btn');
+      searchQuery = box.value.trim();
+      clearBtn.classList.toggle('visible', searchQuery.length > 0);
+      renderAll();
+    }
+
+    function clearSearch() {
+      const box = document.getElementById('search-box');
+      box.value = '';
+      searchQuery = '';
+      document.getElementById('search-clear-btn').classList.remove('visible');
+      renderAll();
+      box.focus();
+    }
+
+    // ==========================================
+    // 全体再描画
+    // ==========================================
+    function renderAll() {
+      updateMetrics();
+      if (currentView === 'product') {
+        renderProductView();
+      } else {
+        renderStoreView();
+      }
+    }
+
+    // ==========================================
+    // データ更新・通信処理
+    // ==========================================
+    async function refreshData() {
+      const refreshIcon = document.getElementById('refresh-icon');
+      refreshIcon.classList.add('spin');
+
+      if (!navigator.onLine) {
+        setTimeout(() => {
+          refreshIcon.classList.remove('spin');
+          showToast('📡 オフラインです。保存済みキャッシュを表示中');
+        }, 500);
+        return;
+      }
+
+      if (dataMode === 'mock') {
+        // モックモードのシミュレーション更新
+        setTimeout(() => {
+          refreshIcon.classList.remove('spin');
+          updateLastSyncTime();
+          renderAll();
+          showToast('🔄 最新データを同期しました（モック）');
+        }, 600);
+        return;
+      }
+
+      // 本番GAS APIからの取得
+      try {
+        const res = await fetch(`${LIVE_GAS_API_URL}?action=getPickingList&showAll=0`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        if (data && data.orders && data.orders.length > 0) {
+          // GASのピッキング注文データをアプリ形式に変換
+          const converted = data.orders.map(o => ({
+            orderId: o.orderId,
+            customerName: o.customerName || '名称未設定店',
+            phone: o.phone || '',
+            orderDate: o.orderDate || '',
+            ngDates: o.ngDates || 'なし',
+            notes: o.notes || '',
+            items: (o.items || []).map(i => ({
+              name: i.name,
+              category: i.category || '生体',
+              qty: Number(i.qty) || 1,
+              unit: '匹'
+            }))
+          }));
+
+          currentOrders = converted;
+          saveOrdersToCache();
+          updateLastSyncTime();
+          renderAll();
+          showToast(`✅ 本番スプレッドシートから${converted.length}件の注文を受信しました`);
+        } else {
+          showToast('本番未発送注文は現在0件です');
+        }
+      } catch (err) {
+        console.warn('Live fetch error:', err);
+        showToast('⚠️ 本番同期に失敗。キャッシュデータを維持します');
+      } finally {
+        refreshIcon.classList.remove('spin');
+      }
+    }
+
+    // データソース切り替え（モック ⇄ 本番GAS）
+    function toggleDataSourceModal() {
+      if (dataMode === 'mock') {
+        if (confirm('【データソースの切り替え】\n現在「動作確認用モックデータ」を表示しています。\n本番のGoogleスプレッドシート（未発送注文）と接続しますか？')) {
+          dataMode = 'live';
+          localStorage.setItem(STORAGE_KEY_DATA_MODE, 'live');
+          updateDataSourcePill();
+          refreshData();
+        }
+      } else {
+        if (confirm('【データソースの切り替え】\n本番接続から「動作確認用モックデータ」に戻しますか？')) {
+          dataMode = 'mock';
+          localStorage.setItem(STORAGE_KEY_DATA_MODE, 'mock');
+          currentOrders = JSON.parse(JSON.stringify(DEFAULT_MOCK_ORDERS));
+          saveOrdersToCache();
+          updateDataSourcePill();
+          renderAll();
+          showToast('モックデータモードに切り替えました');
+        }
+      }
+    }
+
+    function updateDataSourcePill() {
+      const pill = document.getElementById('data-source-pill');
+      if (dataMode === 'live') {
+        pill.innerText = '🌐 本番GAS連動中';
+        pill.style.color = 'var(--success)';
+      } else {
+        pill.innerText = '🧪 モックデータ中';
+        pill.style.color = 'var(--accent)';
+      }
+    }
+
+    // ==========================================
+    // ユーティリティ
+    // ==========================================
+    function scrollToTop() {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    let toastTimer = null;
+    function showToast(msg) {
+      const el = document.getElementById('toast-msg');
+      el.innerText = msg;
+      el.classList.add('show');
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        el.classList.remove('show');
+      }, 2600);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function escapeJs(str) {
+      if (!str) return '';
+      return String(str).replace(/'/g, "\\'").replace(/"/g, '\\"');
+    }
+  </script>
+</body>
+</html>
