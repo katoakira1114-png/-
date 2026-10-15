@@ -3,10 +3,10 @@
   川畑水産 システムファイル
   @file index.html
   @title 商品注文フォーム（顧客向け公式LINE連携）
-  @version 2.4.0
-  @lastModified 2026-10-12 20:15:00 JST
+  @version 2.5.0
+  @lastModified 2026-10-15 19:10:00 JST
   @modifiedBy Antigravity AI
-  @note 共同開発規範準拠・LIFF認証＆SWR爆速起動＆カート保持
+  @note LINEログイン先行ゲート（認証→マスタ照会通過）＆売り切れ商品非表示化・共同開発規範準拠
   =============================================================================
 -->
 <!DOCTYPE html>
@@ -27,6 +27,90 @@
     header { background-color: var(--card-bg); text-align: center; padding: 10px 15px; font-size: 1.05rem; font-weight: bold; border-bottom: 1px solid var(--border-color); }
     .user-badge { font-size: 0.8rem; color: #008000; margin-top: 3px; font-weight: bold; background: #eef9ee; padding: 2px 8px; border-radius: 10px; display: inline-block; }
     
+    /* LINEログインゲート画面 */
+    .login-gate-box {
+      max-width: 480px;
+      margin: 20px auto 40px auto;
+      padding: 0 16px;
+      text-align: center;
+    }
+    .login-gate-icon { font-size: 3.2rem; margin-bottom: 6px; }
+    .login-gate-title { font-size: 1.3rem; font-weight: bold; color: var(--primary-color); margin-bottom: 4px; }
+    .login-gate-subtitle { font-size: 0.85rem; color: #555; margin-bottom: 18px; }
+    .login-gate-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 22px 18px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      border: 1px solid #ddecfa;
+      text-align: left;
+    }
+    .login-gate-notice {
+      background: #f0f7ff;
+      border: 1px solid #c8e1ff;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.84rem;
+      color: #004488;
+      line-height: 1.55;
+      margin-bottom: 18px;
+    }
+    .line-login-button {
+      width: 100%;
+      background: #06c755;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      padding: 15px 16px;
+      font-size: 1.05rem;
+      font-weight: bold;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 4px 12px rgba(6, 199, 85, 0.35);
+      transition: background 0.15s, transform 0.1s;
+    }
+    .line-login-button:active {
+      transform: scale(0.98);
+      background: #05b04c;
+    }
+    .line-login-button svg { flex-shrink: 0; }
+    .login-gate-steps {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px dashed #e1e8ed;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .step-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 0.8rem;
+      color: #555;
+      line-height: 1.4;
+    }
+    .step-badge {
+      display: inline-block;
+      width: fit-content;
+      font-size: 0.72rem;
+      font-weight: bold;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    .step-badge.green { background: #e8f8ef; color: #06c755; border: 1px solid #b6ebc9; }
+    .step-badge.blue { background: #eef6ff; color: #005bac; border: 1px solid #c8e1ff; }
+    .login-gate-help {
+      margin-top: 18px;
+      font-size: 0.75rem;
+      color: #888;
+      line-height: 1.5;
+      text-align: center;
+    }
+
     .register-box { background: #fff; margin: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); overflow: hidden; }
     .register-header { background: var(--primary-color); color: #fff; text-align: center; padding: 12px; font-weight: bold; font-size: 1rem; }
     .register-body { padding: 15px; }
@@ -137,6 +221,45 @@
         <span id="sync-indicator" style="display:none; font-size: 0.72rem; color: #005bac; font-weight: bold; background: #eef5fc; padding: 2px 8px; border-radius: 10px; border: 1px solid #bce1ff;">🔄 最新同期中...</span>
       </div>
     </header>
+
+    <!-- 0. LINE未認証・キャッシュ切れ時のログイン案内画面（ログイン先行ゲート） -->
+    <div id="login-gate-screen" style="display: none;">
+      <div class="login-gate-box">
+        <div class="login-gate-icon">🐠</div>
+        <h2 class="login-gate-title">川畑水産 会員専用サイト</h2>
+        <div class="login-gate-subtitle">八重山・石垣島 観賞魚・生体 卸売受注システム</div>
+        
+        <div class="login-gate-card">
+          <div class="login-gate-notice">
+            <strong>【会員制・承認制のご案内】</strong><br>
+            当サイトは観賞魚取扱店様・業者様専用の卸売・注文サイトです。<br>
+            商品の閲覧およびご注文には、<strong>公式LINEアカウントでの認証</strong>が必要です。
+          </div>
+          
+          <button type="button" class="line-login-button" onclick="execLiffLogin()">
+            <svg viewBox="0 0 24 24" width="22" height="22">
+              <path fill="#ffffff" d="M12 2C6.48 2 2 5.92 2 10.76c0 3.1 1.83 5.83 4.67 7.27-.2.74-.75 2.68-.86 3.09-.13.51.19.5.39.37.16-.1 2.22-1.52 3.12-2.14.88.13 1.77.2 2.68.2 5.52 0 10-3.92 10-8.76S17.52 2 12 2z"/>
+            </svg>
+            LINEでログインする
+          </button>
+          
+          <div class="login-gate-steps">
+            <div class="step-item">
+              <span class="step-badge green">登録済みのお客様</span>
+              <span>ボタンを押してLINE認証すると、そのまま商品注文画面へ進みます。</span>
+            </div>
+            <div class="step-item">
+              <span class="step-badge blue">初めてのお客様</span>
+              <span>LINE認証後、会員登録・取引申請画面へ進みます。</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="login-gate-help">
+          ※SafariやChromeで開いた場合や、キャッシュが消去された場合は、上記ボタンからLINEログインを行ってください。
+        </div>
+      </div>
+    </div>
 
     <!-- 未登録ユーザー向けの会員登録・利用申請画面 -->
     <div id="unregistered-alert" style="display: none;">
@@ -407,6 +530,34 @@
       return (val && !val.includes("待機") && !val.includes("ログイン")) ? val : "";
     }
 
+    // ==========================================
+    // 画面状態の一元管理（ステートマシン）
+    // state: 'loading' | 'login_gate' | 'unregistered' | 'main'
+    // ==========================================
+    function setAppState(state) {
+      const loginGate = document.getElementById('login-gate-screen');
+      const alertBox = document.getElementById('unregistered-alert');
+      const mainUI = document.getElementById('main-ui');
+      const footerBar = document.getElementById('footer-bar');
+      const container = document.getElementById('product-container');
+      const badge = document.getElementById('user-badge');
+
+      if (loginGate) loginGate.style.display = (state === 'login_gate') ? 'block' : 'none';
+      if (alertBox) alertBox.style.display = (state === 'unregistered') ? 'block' : 'none';
+      if (mainUI) mainUI.style.display = (state === 'main') ? 'block' : 'none';
+      if (footerBar) footerBar.style.display = (state === 'main') ? 'block' : 'none';
+      if (container) container.style.display = (state === 'main') ? 'grid' : 'none';
+
+      if (state === 'login_gate') {
+        if (badge) {
+          badge.innerText = '🔒 LINE未認証';
+          badge.style.display = 'inline-block';
+          badge.style.color = '#888';
+          badge.style.background = '#f0f0f0';
+        }
+      }
+    }
+
     window.addEventListener('DOMContentLoaded', async () => {
       const container = document.getElementById('product-container');
       const syncIndicator = document.getElementById('sync-indicator');
@@ -414,8 +565,28 @@
       // 1. 保存されたカートおよび受取不可日の即時復元（画面間移動時のカート保持）
       restoreCartFromStorage();
 
-      // 2. キャッシュされたカタログ・顧客情報が存在すれば即時描画（0.01秒で表示）
-      const cachedData = loadCatalogCache();
+      // 2. LIFF認証の初期化
+      let loggedIn = false;
+      let uid = "";
+      try {
+        await initLiff();
+        loggedIn = (typeof liff !== 'undefined' && liff.isLoggedIn && liff.isLoggedIn());
+        uid = extractUserId();
+      } catch (liffInitErr) {
+        console.warn("[LIFF Init Catch]", liffInitErr);
+      }
+
+      // 3. 【LINE未ログイン・キャッシュ消去時の先行ゲート判定】
+      // 未ログインかつUIDが取得できない場合、顧客申請画面ではなく「LINEでログイン」ボタン画面を表示！
+      if (!loggedIn && !uid) {
+        console.log("[Auth Flow] LINE未ログインを検出 -> LINEログイン案内画面を表示します");
+        setAppState('login_gate');
+        return; // ここで終了（UIDなしでGAS照会を行わないため、誤って未登録画面に飛ぶのを防止）
+      }
+
+      // 4. LINEログイン済み（UID取得済み）の場合:
+      // キャッシュが存在すれば即時展開（高速SWR）
+      const cachedData = loadCatalogCache(uid);
       let hasRenderedFromCache = false;
       if (cachedData && cachedData.products && cachedData.products.length > 0) {
         applyCatalogData(cachedData, true);
@@ -424,16 +595,15 @@
         if (syncIndicator) syncIndicator.style.display = 'inline-block';
       }
 
-      // 3. バックグラウンドでLIFF認証および最新商品データ照会（SWR）
+      // 5. 最新データ照会（GASへUIDを送信して顧客マスタ＆商品を取得）
       try {
-        await initLiff();
-        const uid = extractUserId();
         await fetchProducts(uid, hasRenderedFromCache);
       } catch (mainErr) {
         console.warn("[Sync Error]", mainErr);
         if (!hasRenderedFromCache) {
+          setAppState('main');
           container.style.display = 'block';
-          container.innerHTML = `<div class="loading-text" style="color:red; font-weight:bold;">通信エラーが発生しました。<br>${mainErr.message}</div>`;
+          container.innerHTML = `<div class="loading-text" style="color:red; font-weight:bold;">通信エラーが発生しました。<br>${escapeHtml(mainErr.message)}</div>`;
         }
       } finally {
         if (syncIndicator) syncIndicator.style.display = 'none';
@@ -567,35 +737,30 @@
       isRegistered = !!data.isRegistered;
       customerMaster = data.customer;
       userHistory = data.userHistory || { purchaseCounts: {}, lastOrderItems: [] };
-
-      const alertBox = document.getElementById('unregistered-alert');
-      const mainUI = document.getElementById('main-ui');
-      const footerBar = document.getElementById('footer-bar');
       const badge = document.getElementById('user-badge');
-      const container = document.getElementById('product-container');
 
       if (!isRegistered) {
-        console.warn("[GAS API] 未登録判定の理由: 送信されたUIDが顧客マスタに未登録または承認待ちのため");
-        alertBox.style.display = 'block';
-        mainUI.style.display = 'none';
-        footerBar.style.display = 'none';
-        container.style.display = 'none';
+        // UID取得済みだが顧客マスタに未登録・承認待ちの場合 -> 初めて顧客申請画面を表示！
+        console.warn("[GAS API] 未登録判定: 顧客マスタに未登録または承認待ちのため申請画面を表示");
+        setAppState('unregistered');
         applyProfileToUI();
-        if (!extractUserId()) {
-          badge.innerText = `👤 未登録`;
+        if (badge) {
+          badge.innerText = `👤 未登録（申請受付中）`;
           badge.style.display = 'inline-block';
+          badge.style.color = '#e67e22';
+          badge.style.background = '#fff8e1';
         }
         return true;
       }
 
-      alertBox.style.display = 'none';
-      mainUI.style.display = 'block';
-      footerBar.style.display = 'block';
-      container.style.display = 'grid';
+      // 顧客マスタに登録済みの場合 -> そのまま通過して商品注文画面を表示！
+      setAppState('main');
 
       if (customerMaster && customerMaster.name) {
         badge.innerText = `🏢 ${customerMaster.name} 様`;
         badge.style.display = 'inline-block';
+        badge.style.color = '#008000';
+        badge.style.background = '#eef9ee';
         const nameEl = document.getElementById('cust-name');
         const phoneEl = document.getElementById('cust-phone');
         if (nameEl) nameEl.value = customerMaster.name || '';
@@ -606,10 +771,13 @@
       }
 
       const discountRate = (isRegistered && customerMaster && customerMaster.discountRate) ? customerMaster.discountRate : 1.0;
-      allProducts = (data.products || []).map(p => {
-        const appliedPrice = p.isAsk ? 0 : Math.floor(p.price * discountRate);
-        return { ...p, price: appliedPrice, vol: Number(p.vol) || 0, stock: Number(p.stock) || 0 };
-      });
+      // 【売り切れ商品非表示】在庫が0以下の商品は顧客側画面から完全に除外
+      allProducts = (data.products || [])
+        .filter(p => Number(p.stock) > 0)
+        .map(p => {
+          const appliedPrice = p.isAsk ? 0 : Math.floor(p.price * discountRate);
+          return { ...p, price: appliedPrice, vol: Number(p.vol) || 0, stock: Number(p.stock) || 0 };
+        });
 
       // カートの在庫超過チェック（在庫が減っていた場合はクランプ）
       let cartChanged = false;
@@ -816,7 +984,8 @@
       const container = document.getElementById('product-container');
       container.innerHTML = '';
       
-      let filtered = allProducts.filter(p => p.category === currentCategory);
+      // 在庫あり（stock > 0）の商品のみ抽出（売り切れ商品は顧客側完全非表示）
+      let filtered = allProducts.filter(p => p.category === currentCategory && p.stock > 0);
       if (filtered.length === 0) return container.innerHTML = '<div class="loading-text">該当する商品は現在ありません。</div>';
 
       // ソート: 1.在庫あり優先 2.過去の購入回数/数量が多い順 3.通常順

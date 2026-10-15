@@ -1,9 +1,9 @@
 /**
  * @fileoverview 川畑水産 Web受注・出荷・採集・在庫管理システム GASバックエンド
- * @version 2.4.0
- * @lastModified 2026-10-12 20:15:00 JST
+ * @version 2.5.0
+ * @lastModified 2026-10-15 19:10:00 JST
  * @modifiedBy Antigravity AI (Pair Programming)
- * @note 共同開発規範準拠・SYSTEM_META定数導入・採集リクエストAPI連携
+ * @note 共同開発規範準拠・顧客向け商品一覧から売り切れ商品(stock<=0)を完全非表示化
  */
 
 // =============================================================================
@@ -13,10 +13,10 @@
 // =============================================================================
 var SYSTEM_META = {
   PROJECT_NAME: "川畑水産 Web受注・出荷・採集管理システム",
-  VERSION: "2.4.0",
-  LAST_UPDATED: "2026-10-12 20:15:00 JST",
+  VERSION: "2.5.0",
+  LAST_UPDATED: "2026-10-15 19:10:00 JST",
   LAST_MODIFIED_BY: "Antigravity AI (katoakira1114 / kawabatasuisanyaeyama)",
-  CHANGE_SUMMARY: "共同開発規範の導入（追記型開発・SYSTEM_METAメタデータ追跡システムの標準化）",
+  CHANGE_SUMMARY: "顧客向け商品取得時に在庫0以下の売り切れ商品を除外する安全フィルターを適用",
   ENVIRONMENT: "production",
   SPREADSHEET_ID: "1ZiNel8TGJ-e7JMolkRagVOSnr1UczvQzpTa-F-s4p3o"
 };
@@ -917,9 +917,9 @@ function doGet(e) {
         // 頭にアルファベット(A, B, C)が付いていない商品は全顧客に表示OK
 
         var numStock = Number(row[colStock]) || 0;
-        if (numStock <= 0 && colSoldOut !== -1 && row[colSoldOut]) {
-          var soldOutTime = new Date(row[colSoldOut]).getTime();
-          if (nowTime - soldOutTime > 2 * 60 * 60 * 1000) continue;
+        // 【顧客向け表示制御】売り切れた商品（在庫0以下）は顧客側画面に一切表示しない
+        if (numStock <= 0) {
+          continue;
         }
 
         var priceVal = row[colPrice];

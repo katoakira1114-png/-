@@ -30,7 +30,13 @@ This document is specifically formatted and structured for **LLM-based AI Coding
 - **Frontend**: Vanilla HTML5, CSS3, modern ES6+ JavaScript. No build step (Babel/Webpack not needed). Single-page standalone files hosted on GitHub Pages.
 - **Backend**: Google Apps Script (GAS) running on V8 runtime. Exposed via Google Apps Script Web App Deployment.
 - **Authentication & Authorization**:
-  - Storefront: LINE Front-end Framework (LIFF SDK v2) automatically extracts LINE User ID (`sub` / `userId`) and queries the customer master.
+  - Storefront (`index.html`):
+    - LINE Front-end Framework (LIFF SDK v2) authentication.
+    - **Login Gate Screen**: If unauthenticated or browser cache is cleared, displays the "LINEでログイン" gate screen before any application form is shown.
+    - **Customer Master Resolution**: After authentication, queries GAS with `userId`.
+      - If registered in customer master (`isRegistered: true`): Passes directly to catalog order UI (`setAppState('main')`).
+      - If not registered (`isRegistered: false`): Advances to the registration application form (`setAppState('unregistered')`).
+    - **Sold-out Item Visibility**: Inactive / sold-out items (`stock <= 0`) are completely filtered out both in GAS backend and frontend catalog display.
   - Internal Consoles (`picking.html`, `stock.html`): Completely severed from public storefront navigation (hidden URLs, direct access for staff on-site). Mutual navigation links between picking and stock consoles.
 
 ---
