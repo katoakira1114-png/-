@@ -401,6 +401,11 @@ Zero-indexed column mapping in GAS:
   - Storefront (`index.html`) and Staff console (`stock.html`) parse with `split(/[,\n]/).map(s=>s.trim()).filter(Boolean)`.
   - When `length > 1`, UI displays badge `📷 N枚` and enables multi-photo gallery navigation (arrows, thumbnails, swipe gestures).
 - **Column F (`在庫`)**: Updated via `updateStock`. Direct numeric typing (e.g. `550`) and delta steppers (`±1`, `±5`) both target this column. Clearing or 0 sets Column H (`売り切れ日時`). Restocking clears Column H.
+- **Staff Console (`stock.html`) Sorting & Operational UX**:
+  - Automatically sorts in-stock items (`stock > 0`) to the top by default (`stock_first`) while preserving original sheet registration order within each group.
+  - Supports dynamic sort modes via UI selector: `並び: 在庫あり優先 🟢` (default), `並び: 在庫数多い順 🔢`, and `並び: シート登録順 📋`.
+  - Renders a prominent visual section divider (`⚠️ ここから下は現在売り切れ（在庫 0）の商品です`) between in-stock and depleted items.
+  - Interactive handlers (`saveDirectStock`, `changeStock`, `openEditModal`, `openPhotoQuickModal`) bind strictly to `_rawIndex` on `rawStockItems`, ensuring that operations remain 100% accurate regardless of filtering, searching, or sorting.
 
 ---
 

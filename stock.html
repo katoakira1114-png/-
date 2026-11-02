@@ -3,10 +3,10 @@
   川畑水産 システムファイル
   @file stock.html
   @title 在庫・生体管理コンソール（社内専用）
-  @version 2.4.0
-  @lastModified 2026-10-12 20:15:00 JST
+  @version 2.5.0
+  @lastModified 2026-11-02 14:50:00 JST
   @modifiedBy Antigravity AI
-  @note 共同開発規範準拠・在庫直接手入力＆カメラ複数写真Drive自動保存
+  @note 在庫あり優先ソート（stock>0を最上位配置）・並び替え切り替え・フィルタ時インデックス不整合修正
   =============================================================================
 -->
 <!DOCTYPE html>
@@ -85,9 +85,22 @@
       border-radius: 8px; outline: none; background: #f8fafc;
     }
     .search-input:focus { border-color: var(--primary); background: #fff; }
+    .search-controls-row {
+      display: flex; gap: 8px; align-items: center;
+    }
     .status-select {
-      padding: 9px 10px; font-size: 0.82rem; border: 1px solid var(--border);
+      flex: 1; padding: 9px 10px; font-size: 0.82rem; border: 1px solid var(--border);
       border-radius: 8px; outline: none; background: #fff; font-weight: bold; color: #475569;
+    }
+
+    /* 在庫あり／売り切れセクション仕切り */
+    .stock-section-divider {
+      background: #f1f5f9; border: 1px dashed #cbd5e1; border-radius: 8px;
+      padding: 9px 12px; margin: 16px 0 10px 0; font-size: 0.8rem; font-weight: bold;
+      color: #64748b; display: flex; align-items: center; justify-content: space-between;
+    }
+    .stock-section-divider.soldout {
+      background: #fef2f2; border-color: #fecaca; color: #dc2626;
     }
 
     /* カテゴリチップ */
@@ -335,11 +348,18 @@
   <div id="view-list">
     <div class="filter-panel">
       <div class="search-row">
-        <input type="text" class="search-input" id="search-input" placeholder="🔍 商品名・規格で検索..." oninput="renderStockList()">
+        <input type="text" class="search-input" id="search-input" placeholder="🔍 商品名・規格・IDで検索..." oninput="renderStockList()">
+      </div>
+      <div class="search-controls-row">
+        <select class="status-select" id="stock-sort-select" onchange="renderStockList()">
+          <option value="stock_first">並び: 在庫あり優先 🟢</option>
+          <option value="qty_desc">並び: 在庫数多い順 🔢</option>
+          <option value="sheet_order">並び: シート登録順 📋</option>
+        </select>
         <select class="status-select" id="stock-status-filter" onchange="renderStockList()">
-          <option value="all">すべて表示</option>
-          <option value="in_stock">在庫ありのみ</option>
-          <option value="out_of_stock">在庫切れのみ</option>
+          <option value="all">表示: すべて</option>
+          <option value="in_stock">表示: 在庫ありのみ</option>
+          <option value="out_of_stock">表示: 在庫切れのみ</option>
         </select>
       </div>
 
@@ -612,6 +632,7 @@
         const data = await res.json();
         if (data.status === 'success') {
           rawStockItems = data.items || [];
+          rawStockItems.forEach((it, i) => { it._rawIndex = i; });
           renderCategoryChips(data.categories || []);
           renderStockList();
 
@@ -661,9 +682,14 @@
     function renderStockList() {
       const container = document.getElementById('product-list-container');
       const query = (document.getElementById('search-input').value || '').trim().toLowerCase();
-      const statusFilter = document.getElementById('stock-status-filter').value;
+      const statusFilter = document.getElementById('stock-status-filter') ? document.getElementById('stock-status-filter').value : 'all';
 
-      let filtered = rawStockItems;
+      // 原本配列の元インデックス(_rawIndex)を保証
+      rawStockItems.forEach((it, i) => {
+        if (it._rawIndex === undefined) it._rawIndex = i;
+      });
+
+      let filtered = rawStockItems.slice();
 
       // カテゴリ絞り込み
       if (selectedCategory !== 'ALL') {
@@ -672,9 +698,9 @@
 
       // ステータス絞り込み
       if (statusFilter === 'in_stock') {
-        filtered = filtered.filter(it => it.stock > 0);
+        filtered = filtered.filter(it => (Number(it.stock) || 0) > 0);
       } else if (statusFilter === 'out_of_stock') {
-        filtered = filtered.filter(it => it.stock <= 0);
+        filtered = filtered.filter(it => (Number(it.stock) || 0) <= 0);
       }
 
       // テキスト検索
@@ -690,8 +716,9 @@
       let totalStock = 0;
       let outOfStockCount = 0;
       rawStockItems.forEach(it => {
-        totalStock += it.stock;
-        if (it.stock <= 0) outOfStockCount++;
+        const s = Number(it.stock) || 0;
+        totalStock += s;
+        if (s <= 0) outOfStockCount++;
       });
       document.getElementById('sum-total-species').innerText = rawStockItems.length;
       document.getElementById('sum-total-stock').innerText = totalStock.toLocaleString();
@@ -708,9 +735,48 @@
         return;
       }
 
+      // 並び替え（ソート処理）
+      // デフォルト: 在庫あり(stock > 0)を最優先で上部に表示、在庫なし(stock <= 0)を下部に表示
+      const sortSelect = document.getElementById('stock-sort-select');
+      const sortMode = sortSelect ? sortSelect.value : 'stock_first';
+
+      if (sortMode === 'stock_first') {
+        filtered.sort((a, b) => {
+          const aIn = (Number(a.stock) || 0) > 0 ? 1 : 0;
+          const bIn = (Number(b.stock) || 0) > 0 ? 1 : 0;
+          if (aIn !== bIn) return bIn - aIn; // 在庫ありが上(1)、在庫切れが下(0)
+          return (a._rawIndex || 0) - (b._rawIndex || 0);  // 同グループ内は元の登録順を維持
+        });
+      } else if (sortMode === 'qty_desc') {
+        filtered.sort((a, b) => {
+          const diff = (Number(b.stock) || 0) - (Number(a.stock) || 0);
+          if (diff !== 0) return diff;
+          return (a._rawIndex || 0) - (b._rawIndex || 0);
+        });
+      } else if (sortMode === 'sheet_order') {
+        filtered.sort((a, b) => (a._rawIndex || 0) - (b._rawIndex || 0));
+      }
+
       let html = '';
-      filtered.forEach((it, idx) => {
-        const isOut = it.stock <= 0;
+      let hasShownDivider = false;
+      const hasInStock = filtered.some(it => (Number(it.stock) || 0) > 0);
+
+      filtered.forEach((it) => {
+        const rawIdx = (it._rawIndex !== undefined) ? it._rawIndex : rawStockItems.indexOf(it);
+        const isOut = (Number(it.stock) || 0) <= 0;
+
+        // 在庫あり優先ソート時、在庫あり商品が存在し、かつ最初の売り切れ商品が出現した場所に仕切りを表示
+        if (sortMode === 'stock_first' && isOut && !hasShownDivider && hasInStock) {
+          hasShownDivider = true;
+          const outCount = filtered.filter(x => (Number(x.stock) || 0) <= 0).length;
+          html += `
+            <div class="stock-section-divider soldout">
+              <span>⚠️ ここから下は現在売り切れ（在庫 0）の商品です</span>
+              <span>${outCount}品目</span>
+            </div>
+          `;
+        }
+
         const priceStr = it.isAsk ? 'ASK' : `¥${(it.price || 0).toLocaleString()}`;
         const firstChar = (it.id || '').charAt(0).toUpperCase();
         let tierBadgeHtml = '';
@@ -723,9 +789,9 @@
         const imgCountBadge = imgList.length > 1 ? `<span class="img-count-badge">📷 ${imgList.length}</span>` : '';
 
         html += `
-          <div class="product-card ${isOut ? 'out-of-stock' : ''}" id="p-card-${idx}">
+          <div class="product-card ${isOut ? 'out-of-stock' : ''}" id="p-card-${rawIdx}">
             <div class="card-top">
-              <div class="img-box" onclick="openPhotoQuickModal(${idx})" title="写真を確認 / 追加">
+              <div class="img-box" onclick="openPhotoQuickModal(${rawIdx})" title="写真を確認 / 追加">
                 ${primaryImg ? `<img src="${escapeHtml(primaryImg)}" loading="lazy" alt="${escapeHtml(it.name)}">${imgCountBadge}` : `<div class="img-placeholder">🐟</div><span class="img-add-badge">＋写真</span>`}
               </div>
               <div class="info-box">
@@ -746,19 +812,19 @@
               <div class="stock-display-wrap">
                 <span class="stock-label">現在庫:</span>
                 <div class="stock-direct-box">
-                  <input type="number" class="stock-input-direct ${isOut ? 'zero' : ''}" id="stock-input-${idx}" value="${it.stock}" min="0" onkeydown="if(event.key==='Enter') saveDirectStock(${idx})">
+                  <input type="number" class="stock-input-direct ${isOut ? 'zero' : ''}" id="stock-input-${rawIdx}" value="${it.stock}" min="0" onkeydown="if(event.key==='Enter') saveDirectStock(${rawIdx})">
                   <span class="stock-unit">個</span>
-                  <button type="button" class="btn-stock-save" id="btn-save-stock-${idx}" onclick="saveDirectStock(${idx})">確定</button>
+                  <button type="button" class="btn-stock-save" id="btn-save-stock-${rawIdx}" onclick="saveDirectStock(${rawIdx})">確定</button>
                 </div>
               </div>
 
               <div class="stepper-actions">
-                <button type="button" class="btn-step" onclick="changeStock(${idx}, -5)">−5</button>
-                <button type="button" class="btn-step" onclick="changeStock(${idx}, -1)">−1</button>
-                <button type="button" class="btn-step" onclick="changeStock(${idx}, 1)">＋1</button>
-                <button type="button" class="btn-step" onclick="changeStock(${idx}, 5)">＋5</button>
-                ${isOut ? `<button type="button" class="btn-step quick-add" onclick="setExactStock(${idx}, 10)">補充+10</button>` : `<button type="button" class="btn-step quick-zero" onclick="setExactStock(${idx}, 0)">売切</button>`}
-                <button type="button" class="btn-edit-item" onclick="openEditModal(${idx})">✏️ 編集</button>
+                <button type="button" class="btn-step" onclick="changeStock(${rawIdx}, -5)">−5</button>
+                <button type="button" class="btn-step" onclick="changeStock(${rawIdx}, -1)">−1</button>
+                <button type="button" class="btn-step" onclick="changeStock(${rawIdx}, 1)">＋1</button>
+                <button type="button" class="btn-step" onclick="changeStock(${rawIdx}, 5)">＋5</button>
+                ${isOut ? `<button type="button" class="btn-step quick-add" onclick="setExactStock(${rawIdx}, 10)">補充+10</button>` : `<button type="button" class="btn-step quick-zero" onclick="setExactStock(${rawIdx}, 0)">売切</button>`}
+                <button type="button" class="btn-edit-item" onclick="openEditModal(${rawIdx})">✏️ 編集</button>
               </div>
             </div>
           </div>
